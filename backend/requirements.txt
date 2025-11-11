@@ -1,0 +1,14 @@
+# Core API dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+pydantic==2.9.2
+
+# Optional: WhisperX for real transcription
+# Note: WhisperX installation can be complex on Windows. 
+# The app will work with mock data if WhisperX is not installed.
+# To install WhisperX, run: pip install git+https://github.com/m-bain/whisperx.git
+# Requirements for WhisperX:
+# torch>=2.2.0
+# torchaudio>=2.2.0
+

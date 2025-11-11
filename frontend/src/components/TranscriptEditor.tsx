@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Edit2, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -84,43 +84,34 @@ export function TranscriptEditor({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleRunAnalysis = () => {
+  const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     
-    // Simulate AI analysis
-    setTimeout(() => {
-      const mockAnalysis: AnalysisData = {
-        bestFitRole: 'Senior Full-Stack Developer',
-        communicationScore: 87,
-        technicalDebtRisk: 'Low',
-        softSkillSummary: {
-          leadership: 85,
-          collaboration: 90,
-          problemSolving: 82,
-          adaptability: 88,
-        },
-        fullAnalysis: {
-          strengths: [
-            'Strong technical background in React and Node.js with 5 years of experience',
-            'Proven leadership skills managing a team of 4 developers',
-            'Proactive approach to addressing technical debt',
-            'Excellent communication skills and documentation practices',
-            'Demonstrates continuous learning mindset',
-          ],
-          weaknesses: [
-            'Limited production experience with AI/ML integration',
-            'May need mentorship in scaling applications beyond current team size',
-          ],
-          recommendations: [
-            'Strong candidate for senior individual contributor or tech lead role',
-            'Provide opportunities for AI/ML learning and application',
-            'Excellent cultural fit based on communication and collaboration indicators',
-          ],
-        },
-      };
-      
-      onAnalysisComplete(mockAnalysis);
-    }, 2000);
+    try {
+      // Collect the combined transcript text from all blocks
+      const fullTranscriptText = transcriptBlocks.map(block => block.text).join(' ');
+
+      const formData = new FormData();
+      formData.append("transcript_text", fullTranscriptText);
+
+      const response = await fetch('http://127.0.0.1:8000/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data: AnalysisData = await response.json();
+        onAnalysisComplete(data);
+      } else {
+        console.error('Analysis failed:', response.statusText);
+        alert('Analysis failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error during analysis:', error);
+      alert('An error occurred during analysis. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle, Award, Brain, AlertTriangle, TrendingUp, Home } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -54,8 +54,7 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
             </div>
             <Button
               onClick={onBackToUpload}
-              variant="outline"
-              className="border-zinc-700 hover:bg-zinc-800 text-zinc-300"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
             >
               <Home className="w-4 h-4 mr-2" />
               New Analysis

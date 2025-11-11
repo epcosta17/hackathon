@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Upload, FileAudio } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
@@ -41,70 +41,34 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
     }
   };
 
-  const startTranscription = () => {
+  const startTranscription = async () => {
     if (!file) return;
 
     setIsTranscribing(true);
     setProgress(0);
 
-    // Simulate transcription progress
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            // Mock transcript data
-            const mockTranscript: TranscriptBlock[] = [
-              {
-                id: '1',
-                timestamp: 0,
-                duration: 12,
-                text: "Hello, thank you for the opportunity to interview today. I'm really excited about this position."
-              },
-              {
-                id: '2',
-                timestamp: 12,
-                duration: 15,
-                text: "I've been working in software development for the past five years, primarily focusing on React and Node.js applications."
-              },
-              {
-                id: '3',
-                timestamp: 27,
-                duration: 18,
-                text: "In my current role, I lead a team of four developers. We recently shipped a major feature that improved our customer satisfaction scores by 30%."
-              },
-              {
-                id: '4',
-                timestamp: 45,
-                duration: 14,
-                text: "One of the biggest challenges we faced was technical debt from legacy code. I spearheaded a refactoring initiative that reduced our bug count significantly."
-              },
-              {
-                id: '5',
-                timestamp: 59,
-                duration: 16,
-                text: "I'm particularly interested in this role because of your company's focus on AI integration. I've been learning about machine learning models in my spare time."
-              },
-              {
-                id: '6',
-                timestamp: 75,
-                duration: 13,
-                text: "Communication is something I value highly. I run weekly sync meetings and maintain detailed documentation for all our projects."
-              },
-              {
-                id: '7',
-                timestamp: 88,
-                duration: 11,
-                text: "I believe in continuous learning and I'm always looking for ways to improve both my technical and soft skills."
-              }
-            ];
-            onTranscriptionComplete(mockTranscript);
-          }, 500);
-          return 100;
-        }
-        return prev + 2;
+    try {
+      const formData = new FormData();
+      formData.append("audio_file", file);
+
+      const response = await fetch('http://127.0.0.1:8000/api/transcribe', {
+        method: 'POST',
+        body: formData,
       });
-    }, 50);
+
+      if (response.ok) {
+        const blocks: TranscriptBlock[] = await response.json();
+        onTranscriptionComplete(blocks);
+      } else {
+        console.error('Transcription failed:', response.statusText);
+        alert('Transcription failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error during transcription:', error);
+      alert('An error occurred during transcription. Please try again.');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   return (
