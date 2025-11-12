@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
-import { AnalysisData, TranscriptBlock } from '../App';
+import { AnalysisData } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql, 
@@ -13,42 +13,11 @@ import {
 
 interface AnalysisDashboardProps {
   analysisData: AnalysisData;
-  transcriptBlocks: TranscriptBlock[];
+  transcriptBlocks: any[];  // Not used anymore
   onBackToUpload: () => void;
 }
 
-interface ParsedAnalysis {
-  generalComments: {
-    howInterview: string;
-    attitude: string;
-    structure: string;
-    platform: string;
-  };
-  keyPoints: Array<{ title: string; content: string }>;
-  codingChallenge: {
-    coreExercise: string;
-    followUp: string;
-    knowledge: string;
-  };
-  technologies: Array<{ name: string; timestamps?: string }>;
-  qaTopics: Array<{ title: string; content: string }>;
-  statistics: {
-    duration: string;
-    technicalTime: string;
-    qaTime: string;
-    technicalQuestions: number;
-    followUpQuestions: number;
-    technologiesCount: number;
-    complexity: string;
-    pace: string;
-    engagement: number;
-    communicationScore: number;
-    technicalDepthScore: number;
-    engagementScore: number;
-  };
-}
-
-export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUpload }: AnalysisDashboardProps) {
+export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     keyPoints: true,
@@ -60,16 +29,6 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // Strip markdown formatting from text
-  const stripMarkdown = (text: string): string => {
-    return text
-      .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove bold **text**
-      .replace(/\*(.+?)\*/g, '$1')      // Remove italic *text*
-      .replace(/`(.+?)`/g, '$1')        // Remove code `text`
-      .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Remove links [text](url)
-      .trim();
   };
 
   // Get technology icon based on name
@@ -110,170 +69,14 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
     return <Code {...iconProps} />;
   };
 
-  // Parse markdown report into structured data
-  const parsedData = useMemo((): ParsedAnalysis => {
-    const lines = analysisData.markdown_report.split('\n');
-    const data: ParsedAnalysis = {
-      generalComments: { howInterview: '', attitude: '', structure: '', platform: '' },
-      keyPoints: [],
-      codingChallenge: { coreExercise: '', followUp: '', knowledge: '' },
-      technologies: [],
-      qaTopics: [],
-      statistics: {
-        duration: '55:00',
-        technicalTime: '35:00 (64%)',
-        qaTime: '15:00 (27%)',
-        technicalQuestions: 3,
-        followUpQuestions: 8,
-        technologiesCount: 10,
-        complexity: 'Intermediate to Advanced',
-        pace: 'Moderate',
-        engagement: 8,
-        communicationScore: 85,
-        technicalDepthScore: 78,
-        engagementScore: 80,
-      },
-    };
-
-    let currentSection = '';
-    let currentSubItem = '';
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.includes('## General Comments')) currentSection = 'general';
-      else if (line.includes('## Key Technical Emphasis Points')) currentSection = 'keyPoints';
-      else if (line.includes('## Live Coding Challenge')) currentSection = 'coding';
-      else if (line.includes('## Technologies and Tools')) currentSection = 'technologies';
-      else if (line.includes('## Non-Technical & Situational Q&A')) currentSection = 'qa';
-      else if (line.includes('## Expert Statistics')) currentSection = 'statistics';
-
-      if (currentSection === 'general') {
-        if (line.includes('**A general explanation')) {
-          const content = stripMarkdown(line.split(':').slice(1).join(':').trim());
-          data.generalComments.howInterview = content;
-        } else if (line.includes('**What\'s the interviewer\'s attitude?**')) {
-          const content = stripMarkdown(line.split('?**').slice(1).join('').trim());
-          data.generalComments.attitude = content;
-        } else if (line.includes('**Structure of the interview')) {
-          data.generalComments.structure = stripMarkdown(line.split(':').slice(1).join(':').trim());
-          // Collect sub-bullets
-          let j = i + 1;
-          while (j < lines.length && lines[j].trim().startsWith('*')) {
-            data.generalComments.structure += ' ' + stripMarkdown(lines[j].trim());
-            j++;
-          }
-        } else if (line.includes('**Is it done on')) {
-          const content = stripMarkdown(line.split('?**').slice(1).join('').trim());
-          data.generalComments.platform = content;
-        }
-      } else if (currentSection === 'keyPoints' && line.startsWith('* **')) {
-        const match = line.match(/\* \*\*(.+?):\*\* (.+)/);
-        if (match) {
-          data.keyPoints.push({ title: stripMarkdown(match[1]), content: stripMarkdown(match[2]) });
-        }
-      } else if (currentSection === 'coding') {
-        if (line.includes('**The Core Exercise:**')) {
-          data.codingChallenge.coreExercise = stripMarkdown(line.split(':**').slice(1).join('').trim());
-        } else if (line.includes('**Critical Technical Follow-up:**')) {
-          data.codingChallenge.followUp = stripMarkdown(line.split(':**').slice(1).join('').trim());
-        } else if (line.includes('**Required Technical Knowledge:**')) {
-          let j = i + 1;
-          const knowledgeItems: string[] = [];
-          const knowledgeText = line.split(':**').slice(1).join('').trim();
-          
-          // If knowledge is on the same line
-          if (knowledgeText) {
-            knowledgeItems.push(stripMarkdown(knowledgeText));
-          }
-          
-          // Collect sub-bullets
-          while (j < lines.length && lines[j].trim().startsWith('*') && !lines[j].includes('##')) {
-            const item = stripMarkdown(lines[j].trim().replace(/^\*+\s*/, ''));
-            knowledgeItems.push(item);
-            
-            // Extract technologies from the knowledge text
-            const techMatch = item.match(/(TypeScript|JavaScript|React|Vue|Angular|Python|Java|Go|Rust|Node\.js|Django|Flask|FastAPI|Express|JSX|SQL|NoSQL|PostgreSQL|MongoDB|Redis|MySQL|GraphQL|Docker|Kubernetes|AWS|GCP|Azure|Git|CI\/CD|Jest|Pytest)/gi);
-            if (techMatch) {
-              techMatch.forEach(tech => {
-                if (!data.technologies.some(t => t.name.toLowerCase() === tech.toLowerCase())) {
-                  data.technologies.push({ name: tech, timestamps: undefined });
-                }
-              });
-            }
-            j++;
-          }
-          data.codingChallenge.knowledge = knowledgeItems.join(', ');
-        }
-      } else if (currentSection === 'technologies') {
-        // Handle both "* tech" and "    * tech" (indented sub-bullets)
-        // Format: "* TechnologyName (MM:SS-MM:SS)" or just "* TechnologyName"
-        if (line.trim().startsWith('*') && !line.includes('**') && !line.includes('List of Technologies')) {
-          const techLine = stripMarkdown(line.replace(/^\s*\*\s*/, '').trim());
-          if (techLine && !techLine.toLowerCase().includes('list of technologies')) {
-            // Try to extract technology name and timestamps
-            const match = techLine.match(/^(.+?)\s*\(([^)]+)\)$/);
-            if (match) {
-              data.technologies.push({ name: match[1].trim(), timestamps: match[2].trim() });
-            } else {
-              data.technologies.push({ name: techLine, timestamps: undefined });
-            }
-          }
-        }
-      } else if (currentSection === 'qa' && line.startsWith('* **')) {
-        const match = line.match(/\* \*\*(.+?):\*\* (.+)/);
-        if (match) {
-          data.qaTopics.push({ title: stripMarkdown(match[1]), content: stripMarkdown(match[2]) });
-        }
-      } else if (currentSection === 'statistics') {
-        if (line.includes('**Total Interview Duration:**')) {
-          data.statistics.duration = line.split(':**').pop()?.trim() || data.statistics.duration;
-        } else if (line.includes('**Technical Discussion Time:**')) {
-          data.statistics.technicalTime = line.split(':**').pop()?.trim() || data.statistics.technicalTime;
-        } else if (line.includes('**Q&A Discussion Time:**')) {
-          data.statistics.qaTime = line.split(':**').pop()?.trim() || data.statistics.qaTime;
-        } else if (line.includes('**Number of Technical Questions:**')) {
-          data.statistics.technicalQuestions = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.technicalQuestions;
-        } else if (line.includes('**Number of Follow-up Questions:**')) {
-          data.statistics.followUpQuestions = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.followUpQuestions;
-        } else if (line.includes('**Technologies Mentioned:**')) {
-          data.statistics.technologiesCount = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.technologiesCount;
-        } else if (line.includes('**Complexity Level:**')) {
-          data.statistics.complexity = line.split(':**').pop()?.trim() || data.statistics.complexity;
-        } else if (line.includes('**Interview Pace:**')) {
-          data.statistics.pace = line.split(':**').pop()?.trim() || data.statistics.pace;
-        } else if (line.includes('**Candidate Engagement Opportunities:**')) {
-          data.statistics.engagement = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.engagement;
-        } else if (line.includes('**Communication Score:**')) {
-          data.statistics.communicationScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.communicationScore;
-        } else if (line.includes('**Technical Depth Score:**')) {
-          data.statistics.technicalDepthScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.technicalDepthScore;
-        } else if (line.includes('**Engagement Score:**')) {
-          data.statistics.engagementScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.engagementScore;
-        }
-      }
-    }
-
-    // Deduplicate technologies (case-insensitive)
-    const uniqueTechs = new Map<string, { name: string; timestamps?: string }>();
-    data.technologies.forEach(tech => {
-      const lowerTech = tech.name.toLowerCase();
-      if (!uniqueTechs.has(lowerTech)) {
-        uniqueTechs.set(lowerTech, tech);
-      } else {
-        // If we already have this tech but new one has timestamps, update it
-        const existing = uniqueTechs.get(lowerTech)!;
-        if (!existing.timestamps && tech.timestamps) {
-          uniqueTechs.set(lowerTech, tech);
-        }
-      }
-    });
-    data.technologies = Array.from(uniqueTechs.values());
-
-    return data;
-  }, [analysisData.markdown_report]);
+  // No parsing needed - we get JSON directly from the API!
 
   const handleDownloadReport = async () => {
+    if (!analysisData.docx_path) {
+      alert('DOCX file not ready yet. Please wait a moment and try again.');
+      return;
+    }
+
     setIsDownloading(true);
     try {
       const response = await fetch('http://127.0.0.1:8000/api/download-report', {
@@ -282,7 +85,7 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          transcript_blocks: transcriptBlocks
+          docx_path: analysisData.docx_path
         }),
       });
 
@@ -298,7 +101,7 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
         document.body.removeChild(a);
       } else {
         console.error('Download failed:', response.statusText);
-        alert('Failed to download report. Please try again.');
+        alert('DOCX file not ready yet. Please wait a moment and try again.');
       }
     } catch (error) {
       console.error('Error downloading report:', error);
@@ -401,11 +204,11 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                       )}
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{parsedData.statistics.communicationScore}</p>
+                  <p className="text-3xl font-bold text-white">{analysisData.statistics.communicationScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${parsedData.statistics.communicationScore}%` }}
+                      animate={{ width: `${analysisData.statistics.communicationScore}%` }}
                       transition={{ duration: 1, delay: 0.3 }}
                       className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
                     />
@@ -436,11 +239,11 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                       )}
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{parsedData.statistics.technicalDepthScore}</p>
+                  <p className="text-3xl font-bold text-white">{analysisData.statistics.technicalDepthScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${parsedData.statistics.technicalDepthScore}%` }}
+                      animate={{ width: `${analysisData.statistics.technicalDepthScore}%` }}
                       transition={{ duration: 1, delay: 0.4 }}
                       className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
                     />
@@ -471,11 +274,11 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                       )}
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{parsedData.statistics.engagementScore}</p>
+                  <p className="text-3xl font-bold text-white">{analysisData.statistics.engagementScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${parsedData.statistics.engagementScore}%` }}
+                      animate={{ width: `${analysisData.statistics.engagementScore}%` }}
                       transition={{ duration: 1, delay: 0.5 }}
                       className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
                     />
@@ -490,36 +293,36 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <Clock className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Duration</p>
               </div>
-              <p className="text-xl font-bold text-white">{parsedData.statistics.duration}</p>
+              <p className="text-xl font-bold text-white">{analysisData.statistics.duration}</p>
             </div>
             <div className="flex flex-col items-center min-w-[100px]">
               <div className="flex items-center gap-1 mb-1">
                 <Code className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Technical</p>
               </div>
-              <p className="text-lg font-bold text-blue-400">{parsedData.statistics.technicalTime}</p>
+              <p className="text-lg font-bold text-blue-400">{analysisData.statistics.technicalTime}</p>
             </div>
             <div className="flex flex-col items-center min-w-[90px]">
               <div className="flex items-center gap-1 mb-1">
                 <MessageSquare className="w-4 h-4 text-purple-300" />
                 <p className="text-zinc-300 text-xs">Q&A Time</p>
               </div>
-              <p className="text-lg font-bold text-purple-300">{parsedData.statistics.qaTime}</p>
+              <p className="text-lg font-bold text-purple-300">{analysisData.statistics.qaTime}</p>
             </div>
             <div className="flex flex-col items-center min-w-[80px]">
               <div className="flex items-center gap-1 mb-1">
                 <Users className="w-4 h-4 text-green-400" />
                 <p className="text-zinc-300 text-xs">Engagement</p>
               </div>
-              <p className="text-xl font-bold text-green-400">{parsedData.statistics.engagement}</p>
+              <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
             </div>
             <div className="flex flex-col items-center min-w-[140px]">
               <div className="flex items-center gap-1 mb-1">
                 <Zap className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Complexity</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getComplexityColor(parsedData.statistics.complexity)}`}>
-                {parsedData.statistics.complexity}
+              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getComplexityColor(analysisData.statistics.complexity)}`}>
+                {analysisData.statistics.complexity}
               </span>
             </div>
             <div className="flex flex-col items-center min-w-[80px]">
@@ -527,8 +330,8 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <TrendingUp className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Pace</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getPaceColor(parsedData.statistics.pace)}`}>
-                {parsedData.statistics.pace}
+              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getPaceColor(analysisData.statistics.pace)}`}>
+                {analysisData.statistics.pace}
               </span>
             </div>
             <div className="flex flex-col items-center min-w-[70px]">
@@ -536,14 +339,14 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <Award className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Questions</p>
               </div>
-              <p className="text-xl font-bold text-cyan-400">{parsedData.statistics.technicalQuestions}</p>
+              <p className="text-xl font-bold text-cyan-400">{analysisData.statistics.technicalQuestions}</p>
             </div>
             <div className="flex flex-col items-center min-w-[70px]">
               <div className="flex items-center gap-1 mb-1">
                 <Brain className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Follow-ups</p>
               </div>
-              <p className="text-xl font-bold text-yellow-400">{parsedData.statistics.followUpQuestions}</p>
+              <p className="text-xl font-bold text-yellow-400">{analysisData.statistics.followUpQuestions}</p>
             </div>
           </div>
         </motion.div>
@@ -573,15 +376,15 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <div className="px-6 pb-6 space-y-6 text-zinc-300">
                   <div>
                     <p className="text-cyan-400 font-medium mb-3">Interview Overview</p>
-                    <p className="leading-loose">{parsedData.generalComments.howInterview}</p>
+                    <p className="leading-loose">{analysisData.generalComments.howInterview}</p>
                   </div>
                   <div>
                     <p className="text-cyan-400 font-medium mb-3">Interviewer's Attitude</p>
-                    <p className="leading-loose">{parsedData.generalComments.attitude}</p>
+                    <p className="leading-loose">{analysisData.generalComments.attitude}</p>
                   </div>
                   <div>
                     <p className="text-cyan-400 font-medium mb-3">Platform Used</p>
-                    <p className="leading-loose">{parsedData.generalComments.platform}</p>
+                    <p className="leading-loose">{analysisData.generalComments.platform}</p>
                   </div>
                 </div>
               </motion.div>
@@ -612,7 +415,7 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 className="overflow-hidden"
               >
                 <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  {parsedData.keyPoints.map((point, idx) => (
+                  {analysisData.keyPoints.map((point, idx) => (
                     <div key={idx}>
                       <p className="text-yellow-400 font-semibold mb-3">{point.title}</p>
                       <p className="leading-loose">{point.content}</p>
@@ -649,15 +452,15 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <div className="px-6 pb-6 space-y-6 text-zinc-300">
                   <div>
                     <p className="font-semibold mb-3" style={{ color: '#60a5fa' }}>Core Exercise</p>
-                    <p className="leading-loose">{parsedData.codingChallenge.coreExercise}</p>
+                    <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
                   </div>
                   <div>
                     <p className="font-semibold mb-3" style={{ color: '#fb923c' }}>Critical Follow-up</p>
-                    <p className="leading-loose">{parsedData.codingChallenge.followUp}</p>
+                    <p className="leading-loose">{analysisData.codingChallenge.followUp}</p>
                   </div>
                   <div>
                     <p className="font-semibold mb-3" style={{ color: '#c084fc' }}>Required Knowledge</p>
-                    <p className="leading-loose">{parsedData.codingChallenge.knowledge}</p>
+                    <p className="leading-loose">{analysisData.codingChallenge.knowledge}</p>
                   </div>
                 </div>
               </motion.div>
@@ -689,7 +492,7 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
               >
                 <div className="px-6 pb-6">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {parsedData.technologies.map((tech, idx) => (
+                    {analysisData.technologies.map((tech, idx) => (
                       <div
                         key={idx}
                         className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors"
@@ -735,7 +538,7 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 className="overflow-hidden"
               >
                 <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  {parsedData.qaTopics.map((topic, idx) => (
+                  {analysisData.qaTopics.map((topic, idx) => (
                     <div key={idx}>
                       <p className="text-green-400 font-semibold mb-3">{topic.title}</p>
                       <p className="leading-loose">{topic.content}</p>

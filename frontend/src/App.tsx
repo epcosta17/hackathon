@@ -18,8 +18,57 @@ export interface TranscriptBlock {
   words?: Word[];
 }
 
+export interface Technology {
+  name: string;
+  timestamps?: string;
+}
+
+export interface KeyPoint {
+  title: string;
+  content: string;
+}
+
+export interface QATopic {
+  title: string;
+  content: string;
+}
+
+export interface GeneralComments {
+  howInterview: string;
+  attitude: string;
+  structure: string;
+  platform: string;
+}
+
+export interface CodingChallenge {
+  coreExercise: string;
+  followUp: string;
+  knowledge: string;
+}
+
+export interface Statistics {
+  duration: string;
+  technicalTime: string;
+  qaTime: string;
+  technicalQuestions: number;
+  followUpQuestions: number;
+  technologiesCount: number;
+  complexity: string;
+  pace: string;
+  engagement: number;
+  communicationScore: number;
+  technicalDepthScore: number;
+  engagementScore: number;
+}
+
 export interface AnalysisData {
-  markdown_report: string;
+  generalComments: GeneralComments;
+  keyPoints: KeyPoint[];
+  codingChallenge: CodingChallenge;
+  technologies: Technology[];
+  qaTopics: QATopic[];
+  statistics: Statistics;
+  docx_path?: string;
 }
 
 export default function App() {
