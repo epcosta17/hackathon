@@ -24,11 +24,9 @@ export function TranscriptEditor({
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const [scrollBehavior, setScrollBehavior] = useState<'center' | 'start'>('center');
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
-  const userClickedSegment = useRef(false);
 
   // Create audio URL from file
   useEffect(() => {
@@ -60,29 +58,42 @@ export function TranscriptEditor({
   }, [audioUrl]);
 
   const getCurrentBlock = () => {
-    return transcriptBlocks.find(
+    // First try exact match
+    let block = transcriptBlocks.find(
       (block) => currentTime >= block.timestamp && currentTime < block.timestamp + block.duration
     );
+    
+    // If no exact match, find the closest block (last one before or at current time)
+    if (!block && transcriptBlocks.length > 0) {
+      block = transcriptBlocks
+        .filter(b => b.timestamp <= currentTime)
+        .sort((a, b) => b.timestamp - a.timestamp)[0];
+      
+      // If still nothing, just use the first block
+      if (!block) {
+        block = transcriptBlocks[0];
+      }
+    }
+    
+    return block;
   };
 
   const currentBlock = getCurrentBlock();
 
-  // Auto-scroll to active block (only during natural playback or scrubbing)
+  // Auto-scroll to active block during playback
   useEffect(() => {
-    if (activeBlockRef.current && shouldAutoScroll && !userClickedSegment.current) {
-      activeBlockRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: scrollBehavior,
+    if (autoScrollEnabled && currentBlock?.id) {
+      // Use requestAnimationFrame to ensure ref is attached after React updates DOM
+      requestAnimationFrame(() => {
+        if (activeBlockRef.current) {
+          activeBlockRef.current.scrollIntoView({
+            behavior: 'auto', // Instant jump, no animation
+            block: 'start',
+          });
+        }
       });
     }
-    // Reset the flag after a brief delay
-    if (userClickedSegment.current) {
-      const timer = setTimeout(() => {
-        userClickedSegment.current = false;
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [currentBlock?.id, shouldAutoScroll, scrollBehavior]);
+  }, [currentBlock?.id, autoScrollEnabled]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -92,9 +103,8 @@ export function TranscriptEditor({
       audio.pause();
     } else {
       audio.play();
-      // Re-enable auto-scroll when playing normally, center the active segment
-      setShouldAutoScroll(true);
-      setScrollBehavior('center'); // Center during normal playback
+      // Re-enable auto-scroll when playing
+      setAutoScrollEnabled(true);
     }
     setIsPlaying(!isPlaying);
   };
@@ -105,19 +115,38 @@ export function TranscriptEditor({
       audioRef.current.currentTime = newTime;
     }
     setCurrentTime(newTime);
-    // Enable auto-scroll when scrubbing the player, scroll to top
-    setShouldAutoScroll(true);
-    setScrollBehavior('start'); // Scroll selected segment to the top
     
-    // Force immediate scroll after a brief delay to ensure ref is set
-    setTimeout(() => {
-      if (activeBlockRef.current) {
-        activeBlockRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
+    // Disable auto-scroll when scrubbing - it will be re-enabled when play is pressed
+    setAutoScrollEnabled(false);
+    
+    // Find the block for this time IMMEDIATELY (don't wait for state update)
+    let targetBlock = transcriptBlocks.find(
+      (block) => newTime >= block.timestamp && newTime < block.timestamp + block.duration
+    );
+    
+    if (!targetBlock && transcriptBlocks.length > 0) {
+      targetBlock = transcriptBlocks
+        .filter(b => b.timestamp <= newTime)
+        .sort((a, b) => b.timestamp - a.timestamp)[0];
+      
+      if (!targetBlock) {
+        targetBlock = transcriptBlocks[0];
       }
-    }, 50);
+    }
+    
+    // Scroll to the target block by finding it in the DOM
+    if (targetBlock) {
+      setTimeout(() => {
+        // Find the element with this block's key
+        const element = document.querySelector(`[data-block-id="${targetBlock.id}"]`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'auto', // Instant jump, no animation
+            block: 'start',
+          });
+        }
+      }, 50);
+    }
   };
 
   const jumpToTimestamp = (timestamp: number) => {
@@ -128,8 +157,7 @@ export function TranscriptEditor({
     setCurrentTime(timestamp);
     setIsPlaying(true);
     // Disable auto-scroll when clicking a segment
-    userClickedSegment.current = true;
-    setShouldAutoScroll(false);
+    setAutoScrollEnabled(false);
   };
 
   const handleBlockEdit = (id: string, newText: string) => {
@@ -254,7 +282,7 @@ export function TranscriptEditor({
                   Scroll to view all segments
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto px-8 pb-8 scroll-smooth" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+              <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" style={{ maxHeight: 'calc(100vh - 350px)' }}>
                 <div className="max-w-3xl space-y-4">
                 {transcriptBlocks.map((block) => {
                   const isActive = currentBlock?.id === block.id;
@@ -263,6 +291,7 @@ export function TranscriptEditor({
                   return (
                     <motion.div
                       key={block.id}
+                      data-block-id={block.id}
                       ref={isActive ? activeBlockRef : null}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
