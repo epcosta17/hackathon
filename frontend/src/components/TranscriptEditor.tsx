@@ -25,8 +25,11 @@ export function TranscriptEditor({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
+  const seekBarRef = useRef<HTMLDivElement | null>(null);
 
   // Create audio URL from file
   useEffect(() => {
@@ -149,6 +152,23 @@ export function TranscriptEditor({
     }
   };
 
+  const handleSeekBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!seekBarRef.current || !duration) return;
+    
+    const rect = seekBarRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = x / rect.width;
+    const time = percentage * duration;
+    
+    setHoverTime(Math.max(0, Math.min(time, duration)));
+    setHoverPosition(x);
+  };
+
+  const handleSeekBarLeave = () => {
+    setHoverTime(null);
+    setHoverPosition(null);
+  };
+
   const jumpToTimestamp = (timestamp: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = timestamp;
@@ -259,15 +279,30 @@ export function TranscriptEditor({
               <span className="text-zinc-400 text-sm min-w-[3rem]">
                 {formatTime(currentTime)}
               </span>
-              <input
-                type="range"
-                min="0"
-                max={duration}
-                step="0.1"
-                value={currentTime}
-                onChange={handleScrub}
-                className="flex-1 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:cursor-pointer"
-              />
+              <div 
+                ref={seekBarRef}
+                className="flex-1 relative"
+                onMouseMove={handleSeekBarHover}
+                onMouseLeave={handleSeekBarLeave}
+              >
+                <input
+                  type="range"
+                  min="0"
+                  max={duration}
+                  step="0.1"
+                  value={currentTime}
+                  onChange={handleScrub}
+                  className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:cursor-pointer"
+                />
+                {hoverTime !== null && hoverPosition !== null && (
+                  <div
+                    className="absolute -top-10 transform -translate-x-1/2 bg-zinc-800 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap border border-zinc-700"
+                    style={{ left: `${hoverPosition}px` }}
+                  >
+                    {formatTime(hoverTime)}
+                  </div>
+                )}
+              </div>
               <span className="text-zinc-400 text-sm min-w-[3rem]">
                 {formatTime(duration)}
               </span>
