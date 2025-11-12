@@ -34,11 +34,27 @@ You MUST structure your response EXACTLY as outlined below, including all headin
 ---
 * **The Core Exercise:** [Briefly describe the main coding task and its stated objectives (e.g., Tic-Tac-Toe, binary search tree)]
 * **Critical Technical Follow-up:** [Identify the most challenging extension or abstraction question posed by the interviewer (e.g., generalize N x N board, performance optimization)]
-* **Required Technical Knowledge:** [List the programming language, framework/library, and core concepts needed (e.g., React, TypeScript, Array Manipulation)]
+* **Required Technical Knowledge:** [List as plain text without formatting: Programming Language (e.g., TypeScript), Framework/Library (e.g., React, JSX), and Core Concepts (e.g., state management, event handling, array manipulation). **INFER** technologies based on coding challenge context even if not explicitly mentioned.]
 
 ## Technologies and Tools Used 🛠️
 ---
-* **List of Technologies Mentioned:** [List all programming languages, frameworks, libraries, and design/testing tools explicitly named by the interviewer as being used by the team (e.g., Python, Figma, Postman, CI/CD)]
+List ALL technologies as individual bullet points (one per line) with timestamp ranges where they were mentioned:
+* [Technology 1] (MM:SS-MM:SS)
+* [Technology 2] (MM:SS-MM:SS)
+* [Technology 3] (MM:SS-MM:SS)
+* ...
+
+Include all categories:
+- Programming languages (e.g., Python, JavaScript, TypeScript, Java)
+- Frameworks & Libraries (e.g., React, Vue, Django, Flask, Node.js, Express, JSX)
+- Databases (e.g., PostgreSQL, MongoDB, Redis, MySQL)
+- Development Tools (e.g., Git, Docker, Kubernetes, VS Code)
+- Testing Tools (e.g., Jest, Pytest, Selenium)
+- Design Tools (e.g., Figma, Sketch)
+- Cloud & DevOps (e.g., AWS, GCP, Azure, CI/CD, Jenkins)
+- Other relevant technologies mentioned in ANY context during the interview
+
+Use the transcript timestamps to identify when each technology was discussed.
 
 ## Non-Technical & Situational Q&A Topics 🗣️
 ---
@@ -59,3 +75,6 @@ Analyze the interview and provide quantitative metrics:
 * **Complexity Level:** [Rate as: Beginner / Intermediate / Advanced / Expert]
 * **Interview Pace:** [Rate as: Relaxed / Moderate / Fast-paced / Intensive]
 * **Candidate Engagement Opportunities:** [Count times candidate asked questions or initiated discussion]
+* **Communication Score:** [Rate 0-100 based on clarity of explanations, question responses, and dialogue flow]
+* **Technical Depth Score:** [Rate 0-100 based on complexity of challenges, depth of technical discussion, and advanced concepts covered]
+* **Engagement Score:** [Rate 0-100 derived from Candidate Engagement Opportunities: calculate as (Candidate Engagement Opportunities × 10), capped at 100. For example: 6 opportunities = 60 score, 8 opportunities = 80 score, 10+ opportunities = 100 score]

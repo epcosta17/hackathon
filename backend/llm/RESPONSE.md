@@ -18,13 +18,15 @@
 ---
 * **The Core Exercise:** [Description of the task]
 * **Critical Technical Follow-up:** [Description of the most challenging extension or abstraction]
-* **Required Technical Knowledge:** [List of programming language, framework/library, and core concepts]
+* **Required Technical Knowledge:** Programming Language: TypeScript, Framework/Library: React, JSX, Core Concepts: state management, event handling, array manipulation
 
 ## Technologies and Tools Used 🛠️
 ---
-* **List of Technologies Mentioned:** * [Technology 1]
-    * [Technology 2]
-    * [Technology 3]
+* TypeScript (17:33-68:33)
+* React (09:32-68:36)
+* JSX (09:32-20:35)
+* Node.js (05:20-08:45)
+* Git (02:15-03:30)
 
 ## Non-Technical & Situational Q&A Topics 🗣️
 ---
@@ -42,4 +44,7 @@
 * **Technologies Mentioned:** X
 * **Complexity Level:** [Beginner / Intermediate / Advanced / Expert]
 * **Interview Pace:** [Relaxed / Moderate / Fast-paced / Intensive]
-* **Candidate Engagement Opportunities:** X
+* **Candidate Engagement Opportunities:** 8
+* **Communication Score:** 85
+* **Technical Depth Score:** 78
+* **Engagement Score:** 80

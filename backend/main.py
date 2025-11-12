@@ -12,7 +12,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 import json
 import asyncio
-# OpenAI Whisper API (optional)
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+# Load environment variables from multiple possible locations
+load_dotenv()  # Load from current directory
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))  # Load from backend/.env
+load_dotenv(os.path.join(os.path.dirname(__file__), 'llm', '.env'))  # Load from backend/llm/.env
+
+# LLM APIs (optional)
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -392,7 +400,7 @@ def generate_mock_transcript() -> List[TranscriptBlock]:
     return [TranscriptBlock(**block, words=create_words(block['text'])) for block in data]
 
 def generate_analysis_report(transcript_text: str) -> str:
-    """Generate comprehensive interview analysis report in markdown format."""
+    """Generate comprehensive interview analysis report using Google Gemini API."""
     
     # Load the prompt template
     prompt_path = os.path.join(os.path.dirname(__file__), "llm", "PROMPT.md")
@@ -400,11 +408,56 @@ def generate_analysis_report(transcript_text: str) -> str:
         with open(prompt_path, 'r') as f:
             prompt_template = f.read()
     except:
-        prompt_template = "Analyze the interview transcript"
+        prompt_template = "Analyze the interview transcript and provide structured insights."
     
-    # For now, generate a mock structured report
-    # TODO: Replace with actual LLM call (OpenAI, Anthropic, etc.)
+    # Try to use Google Gemini API for actual analysis
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
     
+    if gemini_api_key:
+        try:
+            print("🤖 Using Google Gemini API for analysis...")
+            
+            # Configure Gemini API
+            genai.configure(api_key=gemini_api_key)
+            
+            # Create the model
+            model = genai.GenerativeModel(
+                model_name='gemini-2.0-flash-exp',
+                generation_config={
+                    'temperature': 0.3,
+                    'top_p': 0.95,
+                    'top_k': 40,
+                    'max_output_tokens': 8192,
+                }
+            )
+            
+            # Prepare the full prompt
+            full_prompt = f"""{prompt_template}
+
+**Interview Transcript:**
+{transcript_text}
+
+Please analyze this interview transcript and provide a comprehensive report following the exact structure outlined above."""
+            
+            # Generate content
+            response = model.generate_content(full_prompt)
+            
+            if response and response.text:
+                report = response.text
+                print("✅ Gemini analysis complete!")
+                return report
+            else:
+                print(f"⚠️ Empty response from Gemini API")
+                print("📋 Falling back to mock data...")
+            
+        except Exception as e:
+            print(f"⚠️ Gemini API error: {str(e)}")
+            print("📋 Falling back to mock data...")
+    else:
+        print("⚠️ GEMINI_API_KEY not found in environment variables")
+        print("📋 Using mock analysis data...")
+    
+    # Fallback to mock data if API is not available
     report = """# Interview Analysis Report
 
 ## General Comments 💬

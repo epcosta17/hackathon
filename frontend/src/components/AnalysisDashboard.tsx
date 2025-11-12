@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap } from 'lucide-react';
+import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { AnalysisData, TranscriptBlock } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,7 +30,7 @@ interface ParsedAnalysis {
     followUp: string;
     knowledge: string;
   };
-  technologies: string[];
+  technologies: Array<{ name: string; timestamps?: string }>;
   qaTopics: Array<{ title: string; content: string }>;
   statistics: {
     duration: string;
@@ -42,6 +42,9 @@ interface ParsedAnalysis {
     complexity: string;
     pace: string;
     engagement: number;
+    communicationScore: number;
+    technicalDepthScore: number;
+    engagementScore: number;
   };
 }
 
@@ -57,6 +60,16 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Strip markdown formatting from text
+  const stripMarkdown = (text: string): string => {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove bold **text**
+      .replace(/\*(.+?)\*/g, '$1')      // Remove italic *text*
+      .replace(/`(.+?)`/g, '$1')        // Remove code `text`
+      .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Remove links [text](url)
+      .trim();
   };
 
   // Get technology icon based on name
@@ -115,7 +128,10 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
         technologiesCount: 10,
         complexity: 'Intermediate to Advanced',
         pace: 'Moderate',
-        engagement: 12,
+        engagement: 8,
+        communicationScore: 85,
+        technicalDepthScore: 78,
+        engagementScore: 80,
       },
     };
 
@@ -134,54 +150,80 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
 
       if (currentSection === 'general') {
         if (line.includes('**A general explanation')) {
-          const content = line.split(':').slice(1).join(':').trim();
+          const content = stripMarkdown(line.split(':').slice(1).join(':').trim());
           data.generalComments.howInterview = content;
         } else if (line.includes('**What\'s the interviewer\'s attitude?**')) {
-          const content = line.split('?**').slice(1).join('').trim();
+          const content = stripMarkdown(line.split('?**').slice(1).join('').trim());
           data.generalComments.attitude = content;
         } else if (line.includes('**Structure of the interview')) {
-          data.generalComments.structure = line.split(':').slice(1).join(':').trim();
+          data.generalComments.structure = stripMarkdown(line.split(':').slice(1).join(':').trim());
           // Collect sub-bullets
           let j = i + 1;
           while (j < lines.length && lines[j].trim().startsWith('*')) {
-            data.generalComments.structure += ' ' + lines[j].trim();
+            data.generalComments.structure += ' ' + stripMarkdown(lines[j].trim());
             j++;
           }
         } else if (line.includes('**Is it done on')) {
-          const content = line.split('?**').slice(1).join('').trim();
+          const content = stripMarkdown(line.split('?**').slice(1).join('').trim());
           data.generalComments.platform = content;
         }
       } else if (currentSection === 'keyPoints' && line.startsWith('* **')) {
         const match = line.match(/\* \*\*(.+?):\*\* (.+)/);
         if (match) {
-          data.keyPoints.push({ title: match[1], content: match[2] });
+          data.keyPoints.push({ title: stripMarkdown(match[1]), content: stripMarkdown(match[2]) });
         }
       } else if (currentSection === 'coding') {
         if (line.includes('**The Core Exercise:**')) {
-          data.codingChallenge.coreExercise = line.split(':**').slice(1).join('').trim();
+          data.codingChallenge.coreExercise = stripMarkdown(line.split(':**').slice(1).join('').trim());
         } else if (line.includes('**Critical Technical Follow-up:**')) {
-          data.codingChallenge.followUp = line.split(':**').slice(1).join('').trim();
+          data.codingChallenge.followUp = stripMarkdown(line.split(':**').slice(1).join('').trim());
         } else if (line.includes('**Required Technical Knowledge:**')) {
           let j = i + 1;
           const knowledgeItems: string[] = [];
-          while (j < lines.length && lines[j].trim().startsWith('*')) {
-            knowledgeItems.push(lines[j].trim().replace('* ', ''));
+          const knowledgeText = line.split(':**').slice(1).join('').trim();
+          
+          // If knowledge is on the same line
+          if (knowledgeText) {
+            knowledgeItems.push(stripMarkdown(knowledgeText));
+          }
+          
+          // Collect sub-bullets
+          while (j < lines.length && lines[j].trim().startsWith('*') && !lines[j].includes('##')) {
+            const item = stripMarkdown(lines[j].trim().replace(/^\*+\s*/, ''));
+            knowledgeItems.push(item);
+            
+            // Extract technologies from the knowledge text
+            const techMatch = item.match(/(TypeScript|JavaScript|React|Vue|Angular|Python|Java|Go|Rust|Node\.js|Django|Flask|FastAPI|Express|JSX|SQL|NoSQL|PostgreSQL|MongoDB|Redis|MySQL|GraphQL|Docker|Kubernetes|AWS|GCP|Azure|Git|CI\/CD|Jest|Pytest)/gi);
+            if (techMatch) {
+              techMatch.forEach(tech => {
+                if (!data.technologies.some(t => t.name.toLowerCase() === tech.toLowerCase())) {
+                  data.technologies.push({ name: tech, timestamps: undefined });
+                }
+              });
+            }
             j++;
           }
           data.codingChallenge.knowledge = knowledgeItems.join(', ');
         }
       } else if (currentSection === 'technologies') {
         // Handle both "* tech" and "    * tech" (indented sub-bullets)
-        if (line.trim().startsWith('*') && !line.includes('**')) {
-          const tech = line.replace(/^\s*\*\s*/, '').trim();
-          if (tech && !tech.toLowerCase().includes('list of technologies')) {
-            data.technologies.push(tech);
+        // Format: "* TechnologyName (MM:SS-MM:SS)" or just "* TechnologyName"
+        if (line.trim().startsWith('*') && !line.includes('**') && !line.includes('List of Technologies')) {
+          const techLine = stripMarkdown(line.replace(/^\s*\*\s*/, '').trim());
+          if (techLine && !techLine.toLowerCase().includes('list of technologies')) {
+            // Try to extract technology name and timestamps
+            const match = techLine.match(/^(.+?)\s*\(([^)]+)\)$/);
+            if (match) {
+              data.technologies.push({ name: match[1].trim(), timestamps: match[2].trim() });
+            } else {
+              data.technologies.push({ name: techLine, timestamps: undefined });
+            }
           }
         }
       } else if (currentSection === 'qa' && line.startsWith('* **')) {
         const match = line.match(/\* \*\*(.+?):\*\* (.+)/);
         if (match) {
-          data.qaTopics.push({ title: match[1], content: match[2] });
+          data.qaTopics.push({ title: stripMarkdown(match[1]), content: stripMarkdown(match[2]) });
         }
       } else if (currentSection === 'statistics') {
         if (line.includes('**Total Interview Duration:**')) {
@@ -202,9 +244,31 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
           data.statistics.pace = line.split(':**').pop()?.trim() || data.statistics.pace;
         } else if (line.includes('**Candidate Engagement Opportunities:**')) {
           data.statistics.engagement = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.engagement;
+        } else if (line.includes('**Communication Score:**')) {
+          data.statistics.communicationScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.communicationScore;
+        } else if (line.includes('**Technical Depth Score:**')) {
+          data.statistics.technicalDepthScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.technicalDepthScore;
+        } else if (line.includes('**Engagement Score:**')) {
+          data.statistics.engagementScore = parseInt(line.split(':**').pop()?.trim() || '0') || data.statistics.engagementScore;
         }
       }
     }
+
+    // Deduplicate technologies (case-insensitive)
+    const uniqueTechs = new Map<string, { name: string; timestamps?: string }>();
+    data.technologies.forEach(tech => {
+      const lowerTech = tech.name.toLowerCase();
+      if (!uniqueTechs.has(lowerTech)) {
+        uniqueTechs.set(lowerTech, tech);
+      } else {
+        // If we already have this tech but new one has timestamps, update it
+        const existing = uniqueTechs.get(lowerTech)!;
+        if (!existing.timestamps && tech.timestamps) {
+          uniqueTechs.set(lowerTech, tech);
+        }
+      }
+    });
+    data.technologies = Array.from(uniqueTechs.values());
 
     return data;
   }, [analysisData.markdown_report]);
@@ -258,10 +322,14 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
     return 'text-green-400 bg-green-500/10 border-green-500/20';
   };
 
-  // Calculate scores based on statistics
-  const communicationScore = Math.min(85 + parsedData.statistics.engagement * 2, 100);
-  const technicalScore = parsedData.statistics.technicalQuestions * 20;
-  const engagementScore = Math.min(parsedData.statistics.engagement * 8, 100);
+  // Score tooltips
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
+
+  const scoreExplanations = {
+    communication: "Measures clarity of explanations, response quality, and overall dialogue flow throughout the interview.",
+    technical: "Evaluates the complexity of challenges, depth of technical discussion, and coverage of advanced concepts.",
+    engagement: "Assesses the candidate's active participation, quality of questions asked, and overall interaction level."
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -312,18 +380,32 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
           {/* Score Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Communication Score */}
-            <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6">
+            <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-green-500/10 rounded-lg">
                   <TrendingUp className="w-8 h-8 text-green-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-zinc-400 text-sm mb-1">Communication Score</p>
-                  <p className="text-3xl font-bold text-white">{communicationScore}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-zinc-400 text-sm">Communication Score</p>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredTooltip('communication')}
+                      onMouseLeave={() => setHoveredTooltip(null)}
+                    >
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
+                      {hoveredTooltip === 'communication' && (
+                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                          {scoreExplanations.communication}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{parsedData.statistics.communicationScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${communicationScore}%` }}
+                      animate={{ width: `${parsedData.statistics.communicationScore}%` }}
                       transition={{ duration: 1, delay: 0.3 }}
                       className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
                     />
@@ -333,18 +415,32 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
             </div>
 
             {/* Technical Depth */}
-            <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6">
+            <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-500/10 rounded-lg">
                   <Code className="w-8 h-8 text-blue-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-zinc-400 text-sm mb-1">Technical Depth</p>
-                  <p className="text-3xl font-bold text-white">{technicalScore}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-zinc-400 text-sm">Technical Depth</p>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredTooltip('technical')}
+                      onMouseLeave={() => setHoveredTooltip(null)}
+                    >
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
+                      {hoveredTooltip === 'technical' && (
+                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                          {scoreExplanations.technical}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{parsedData.statistics.technicalDepthScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${technicalScore}%` }}
+                      animate={{ width: `${parsedData.statistics.technicalDepthScore}%` }}
                       transition={{ duration: 1, delay: 0.4 }}
                       className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
                     />
@@ -354,18 +450,32 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
             </div>
 
             {/* Engagement Score */}
-            <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-800/30 rounded-lg p-6">
+            <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-800/30 rounded-lg p-6 relative">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-purple-500/10 rounded-lg">
                   <MessageSquare className="w-8 h-8 text-purple-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-zinc-400 text-sm mb-1">Engagement Score</p>
-                  <p className="text-3xl font-bold text-white">{engagementScore}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-zinc-400 text-sm">Engagement Score</p>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setHoveredTooltip('engagement')}
+                      onMouseLeave={() => setHoveredTooltip(null)}
+                    >
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
+                      {hoveredTooltip === 'engagement' && (
+                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                          {scoreExplanations.engagement}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{parsedData.statistics.engagementScore}</p>
                   <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${engagementScore}%` }}
+                      animate={{ width: `${parsedData.statistics.engagementScore}%` }}
                       transition={{ duration: 1, delay: 0.5 }}
                       className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
                     />
@@ -391,15 +501,15 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
             </div>
             <div className="flex flex-col items-center min-w-[90px]">
               <div className="flex items-center gap-1 mb-1">
-                <MessageSquare className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Q&A Time</p>
+                <MessageSquare className="w-4 h-4 text-purple-300" />
+                <p className="text-zinc-300 text-xs">Q&A Time</p>
               </div>
-              <p className="text-lg font-bold text-purple-400">{parsedData.statistics.qaTime}</p>
+              <p className="text-lg font-bold text-purple-300">{parsedData.statistics.qaTime}</p>
             </div>
             <div className="flex flex-col items-center min-w-[80px]">
               <div className="flex items-center gap-1 mb-1">
-                <Users className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Engagement</p>
+                <Users className="w-4 h-4 text-green-400" />
+                <p className="text-zinc-300 text-xs">Engagement</p>
               </div>
               <p className="text-xl font-bold text-green-400">{parsedData.statistics.engagement}</p>
             </div>
@@ -580,14 +690,20 @@ export function AnalysisDashboard({ analysisData, transcriptBlocks, onBackToUplo
                 <div className="px-6 pb-6">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {parsedData.technologies.map((tech, idx) => (
-                      <span
+                      <div
                         key={idx}
-                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-full text-sm font-semibold flex items-center gap-3 hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors whitespace-nowrap overflow-hidden"
-                        style={{ color: '#06b6d4' }}
+                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors"
                       >
-                        {getTechIcon(tech)}
-                        <span className="truncate">{tech}</span>
-                      </span>
+                        <div className="flex items-center gap-3 mb-1">
+                          {getTechIcon(tech.name)}
+                          <span className="text-sm font-semibold truncate" style={{ color: '#06b6d4' }}>{tech.name}</span>
+                        </div>
+                        {tech.timestamps && (
+                          <div className="text-xs text-zinc-500 ml-9">
+                            {tech.timestamps}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
