@@ -88,7 +88,6 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
             
             if (data.progress !== undefined) {
               setProgress(data.progress);
-              console.log(`Progress: ${data.progress}% - ${data.message}`);
             }
             
             if (data.transcript) {
