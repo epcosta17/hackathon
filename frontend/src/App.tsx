@@ -19,20 +19,7 @@ export interface TranscriptBlock {
 }
 
 export interface AnalysisData {
-  bestFitRole: string;
-  communicationScore: number;
-  technicalDebtRisk: string;
-  softSkillSummary: {
-    leadership: number;
-    collaboration: number;
-    problemSolving: number;
-    adaptability: number;
-  };
-  fullAnalysis: {
-    strengths: string[];
-    weaknesses: string[];
-    recommendations: string[];
-  };
+  markdown_report: string;
 }
 
 export default function App() {
@@ -75,6 +62,7 @@ export default function App() {
       {currentScreen === 'analysis' && analysisData && (
         <AnalysisDashboard
           analysisData={analysisData}
+          transcriptBlocks={transcriptBlocks}
           onBackToUpload={handleBackToUpload}
         />
       )}

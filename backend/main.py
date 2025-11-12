@@ -36,14 +36,8 @@ class TranscriptBlock(BaseModel):
     words: List[Word] = Field(default_factory=list, description="Words with confidence scores")
 
 class AnalysisData(BaseModel):
-    """Data model for the structured AI analysis output."""
-    model_config = ConfigDict(populate_by_name=True)
-    
-    best_fit_role: str = Field(..., serialization_alias="bestFitRole", description="The AI's suggested best-fit role.")
-    communication_score: int = Field(..., serialization_alias="communicationScore", ge=0, le=100, description="Overall communication score.")
-    technical_debt_risk: str = Field(..., serialization_alias="technicalDebtRisk", description="Risk assessment (Low, Medium, High).")
-    soft_skill_summary: Dict[str, int] = Field(..., serialization_alias="softSkillSummary", description="Breakdown of soft skill scores.")
-    full_analysis: Dict[str, List[str]] = Field(..., serialization_alias="fullAnalysis", description="Detailed strengths, weaknesses, and recommendations.")
+    """Data model for the AI analysis output."""
+    markdown_report: str = Field(..., description="Complete analysis report in markdown format")
 
 # --- 2. FastAPI Setup ---
 
@@ -397,34 +391,99 @@ def generate_mock_transcript() -> List[TranscriptBlock]:
     
     return [TranscriptBlock(**block, words=create_words(block['text'])) for block in data]
 
+def generate_analysis_report(transcript_text: str) -> str:
+    """Generate comprehensive interview analysis report in markdown format."""
+    
+    # Load the prompt template
+    prompt_path = os.path.join(os.path.dirname(__file__), "llm", "PROMPT.md")
+    try:
+        with open(prompt_path, 'r') as f:
+            prompt_template = f.read()
+    except:
+        prompt_template = "Analyze the interview transcript"
+    
+    # For now, generate a mock structured report
+    # TODO: Replace with actual LLM call (OpenAI, Anthropic, etc.)
+    
+    report = """# Interview Analysis Report
+
+## General Comments 💬
+---
+* **A general explanation of how the interview is:** This was a structured technical interview with a balanced mix of coding challenges and Q&A discussion. The interviewer maintained a professional yet conversational tone throughout.
+
+* **What's the interviewer's attitude?** The interviewer was collaborative and encouraging, providing helpful hints when the candidate encountered challenges. They demonstrated patience and actively engaged with the candidate's questions.
+
+* **Structure of the interview and sections that compose it with the approximate time spent:**
+    * Introduction and Role Overview (~5:00)
+    * Live Coding Challenge (~25:00)
+    * Technical Discussion (~10:00)
+    * Candidate Q&A (~10:00)
+    * Closing Remarks (~5:00)
+
+* **Is it done on the candidate's machine sharing his/her screen or on an online platform? Which one?** The interview was conducted using VS Code Live Share on the candidate's machine, with Zoom for video communication.
+
+## Key Technical Emphasis Points 💡
+---
+* **Clean Code and Maintainability:** The interviewer strongly emphasized writing readable, well-structured code with meaningful variable names and proper separation of concerns.
+
+* **Problem-Solving Approach:** Focus on understanding the problem thoroughly before jumping into implementation, including edge cases and constraints.
+
+* **Testing Mindset:** Emphasis on thinking through test cases and potential failure scenarios while writing code.
+
+* **Communication Skills:** The interviewer valued clear articulation of thought processes and the ability to explain technical decisions.
+
+## Live Coding Challenge Details 💻
+---
+* **The Core Exercise:** Implement a function to find the longest substring without repeating characters, with follow-up optimizations.
+
+* **Critical Technical Follow-up:** Optimize the solution from O(n²) to O(n) time complexity using a sliding window approach with hash map.
+
+* **Required Technical Knowledge:** 
+    * Language: JavaScript/TypeScript
+    * Core Concepts: Hash Maps, Sliding Window Algorithm, String Manipulation, Time/Space Complexity Analysis
+    * Problem-Solving: Dynamic approach refinement based on feedback
+
+## Technologies and Tools Used 🛠️
+---
+* **List of Technologies Mentioned:**
+    * React & Next.js (Primary Frontend Framework)
+    * TypeScript (Type Safety)
+    * Node.js & Express (Backend)
+    * PostgreSQL (Database)
+    * Jest & React Testing Library (Testing)
+    * Docker & Kubernetes (Deployment)
+    * GitHub Actions (CI/CD)
+    * Figma (Design Collaboration)
+
+## Non-Technical & Situational Q&A Topics 🗣️
+---
+* **Team Structure and Growth Plans:** The team currently consists of 8 engineers and is planning to expand to 12 by Q3. There's a focus on building specialized sub-teams for different product areas.
+
+* **Work-Life Balance and Flexibility:** The company offers hybrid work with 2 days in office requirement. They emphasize sustainable pace and discourage regular overtime.
+
+* **Learning and Development Opportunities:** Annual learning budget of $2000 per engineer, weekly tech talks, and quarterly hackathons. Mentorship program available for growth.
+
+* **Product Roadmap and Technical Challenges:** Upcoming migration to microservices architecture, implementing real-time features, and improving system scalability for 10x user growth.
+
+## Expert Statistics 📊
+---
+* **Total Interview Duration:** 55:00
+* **Technical Discussion Time:** 35:00 (64%)
+* **Q&A Discussion Time:** 15:00 (27%)
+* **Number of Technical Questions:** 3
+* **Number of Follow-up Questions:** 8
+* **Technologies Mentioned:** 10
+* **Complexity Level:** Intermediate to Advanced
+* **Interview Pace:** Moderate
+* **Candidate Engagement Opportunities:** 12
+"""
+    
+    return report
+
 def run_mock_ai_analysis(transcript_text: str) -> AnalysisData:
-    """Simulates AI analysis and structured output generation."""
-    return AnalysisData(
-        best_fit_role='Senior Full-Stack Developer',
-        communication_score=87,
-        technical_debt_risk='Low',
-        soft_skill_summary={
-            'leadership': 85,
-            'collaboration': 90,
-            'problemSolving': 82,
-            'adaptability': 88
-        },
-        full_analysis={
-            'strengths': [
-                'Strong technical background in React and Node.js.',
-                'Proven leadership skills managing a team of developers.',
-                'Proactive approach to addressing technical debt.'
-            ],
-            'weaknesses': [
-                'Limited production experience with AI/ML integration.',
-                'May need mentorship in scaling applications.'
-            ],
-            'recommendations': [
-                'Strong candidate for senior individual contributor or tech lead role.',
-                'Provide opportunities for AI/ML learning and application.'
-            ],
-        },
-    )
+    """Generate AI analysis report."""
+    markdown_report = generate_analysis_report(transcript_text)
+    return AnalysisData(markdown_report=markdown_report)
 
 # --- 5. FastAPI Endpoints ---
 
@@ -532,6 +591,99 @@ async def analyze_endpoint(request: AnalyzeRequest):
     analysis_data = run_mock_ai_analysis(full_transcript)
     
     return analysis_data
+
+@app.post("/api/download-report")
+async def download_report_endpoint(request: AnalyzeRequest):
+    """
+    Generate and download interview analysis report as DOCX file.
+    """
+    if not request.transcript_blocks:
+        raise HTTPException(status_code=400, detail="Transcript blocks are required.")
+    
+    # Convert blocks to formatted text with timestamps
+    formatted_transcript = []
+    for block in request.transcript_blocks:
+        timestamp = f"{int(block.timestamp // 60)}:{int(block.timestamp % 60):02d}"
+        formatted_transcript.append(f"[{timestamp}] {block.text}")
+    
+    full_transcript = "\n".join(formatted_transcript)
+    
+    # Generate analysis report
+    markdown_report = generate_analysis_report(full_transcript)
+    
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Inches
+        from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+        import io
+        
+        # Create DOCX document
+        doc = Document()
+        
+        # Add title
+        title = doc.add_heading('Interview Analysis Report', 0)
+        title.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        
+        # Parse markdown and convert to DOCX
+        lines = markdown_report.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Handle headings
+            if line.startswith('# '):
+                doc.add_heading(line[2:], level=1)
+            elif line.startswith('## '):
+                doc.add_heading(line[3:], level=2)
+            elif line.startswith('### '):
+                doc.add_heading(line[4:], level=3)
+            elif line == '---':
+                continue  # Skip markdown separators
+            elif line.startswith('* **'):
+                # Bold bullet points
+                p = doc.add_paragraph(style='List Bullet')
+                text = line[2:]  # Remove '* '
+                # Simple bold formatting
+                if '**' in text:
+                    parts = text.split('**')
+                    for i, part in enumerate(parts):
+                        run = p.add_run(part)
+                        if i % 2 == 1:  # Odd indices are bold
+                            run.bold = True
+                else:
+                    p.add_run(text)
+            elif line.startswith('* '):
+                # Regular bullet points
+                doc.add_paragraph(line[2:], style='List Bullet 2')
+            elif line.startswith('    * '):
+                # Sub-bullets
+                doc.add_paragraph(line[6:], style='List Bullet 3')
+            else:
+                # Normal paragraph
+                doc.add_paragraph(line)
+        
+        # Save to BytesIO
+        docx_buffer = io.BytesIO()
+        doc.save(docx_buffer)
+        docx_buffer.seek(0)
+        
+        # Return as download
+        from fastapi.responses import StreamingResponse
+        
+        return StreamingResponse(
+            docx_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=interview_analysis_{int(time.time())}.docx"}
+        )
+        
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="python-docx not installed. Run: pip install python-docx"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate DOCX: {str(e)}")
 
 @app.get("/api/ping")
 async def ping():
