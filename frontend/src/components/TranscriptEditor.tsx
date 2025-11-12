@@ -368,7 +368,7 @@ export function TranscriptEditor({
             </div>
 
             {/* Right Side - Info Panel (40%) */}
-            <div className="col-span-2 bg-zinc-900/20 p-8 overflow-hidden h-full">
+            <div className="col-span-2 bg-zinc-900/20 p-8 overflow-y-auto h-full">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-white mb-2">Transcript Statistics</h3>
@@ -388,6 +388,35 @@ export function TranscriptEditor({
                       </span>
                     </div>
                   </div>
+                </div>
+
+                <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <h4 className="text-zinc-300 font-medium mb-3">Confidence Colors</h4>
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-100 font-medium">White</span>
+                      <span className="text-zinc-500">•</span>
+                      <span className="text-zinc-400">High confidence (≥95%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-300 font-medium">Light Gray</span>
+                      <span className="text-zinc-500">•</span>
+                      <span className="text-zinc-400">Good confidence (≥85%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-yellow-400 font-medium">Yellow</span>
+                      <span className="text-zinc-500">•</span>
+                      <span className="text-zinc-400">Medium confidence (≥75%)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-400 font-medium">Red</span>
+                      <span className="text-zinc-500">•</span>
+                      <span className="text-zinc-400">Low confidence - review!</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-3 italic">
+                    Hover over any word to see exact confidence percentage
+                  </p>
                 </div>
 
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
