@@ -174,6 +174,14 @@ export function TranscriptEditor({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getConfidenceColor = (confidence: number): string => {
+    // Color words based on confidence: high confidence = white, low = yellow/red
+    if (confidence >= 0.95) return 'text-zinc-100';  // High confidence - white
+    if (confidence >= 0.85) return 'text-zinc-300';  // Good confidence - light gray
+    if (confidence >= 0.75) return 'text-yellow-400'; // Medium confidence - yellow
+    return 'text-red-400'; // Low confidence - red
+  };
+
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     
@@ -323,9 +331,23 @@ export function TranscriptEditor({
                             ) : (
                               <p
                                 onClick={() => jumpToTimestamp(block.timestamp)}
-                                className="text-zinc-100 cursor-pointer leading-relaxed"
+                                className="cursor-pointer leading-relaxed"
                               >
-                                {block.text}
+                                {block.words && block.words.length > 0 ? (
+                                  // Render words with confidence-based coloring
+                                  block.words.map((word, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`${getConfidenceColor(word.confidence)} transition-colors`}
+                                      title={`Confidence: ${(word.confidence * 100).toFixed(1)}%`}
+                                    >
+                                      {word.text}{idx < block.words!.length - 1 ? ' ' : ''}
+                                    </span>
+                                  ))
+                                ) : (
+                                  // Fallback to plain text if no word data
+                                  <span className="text-zinc-100">{block.text}</span>
+                                )}
                               </p>
                             )}
                           </div>

@@ -22,13 +22,18 @@ except ImportError:
 
 # --- 1. Pydantic Data Contracts ---
 
+class Word(BaseModel):
+    """Individual word with confidence score."""
+    text: str
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="Word confidence (0-1)")
+
 class TranscriptBlock(BaseModel):
     """Data model for a single timestamped block of transcribed text."""
     id: str
     timestamp: float = Field(..., description="Start time in seconds.")
     duration: float
     text: str
-    speaker: str = Field(default="Speaker 1", description="Speaker identifier")
+    words: List[Word] = Field(default_factory=list, description="Words with confidence scores")
 
 class AnalysisData(BaseModel):
     """Data model for the structured AI analysis output."""
@@ -213,7 +218,7 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                 result_dict['stderr']
             )
         
-        print("🔍 [BACKEND] Parsing whisper-cli output...")
+        print("🔍 [BACKEND] Parsing whisper-cli text output...")
         transcript_blocks = []
         lines = result_dict['stdout'].strip().split('\n')
         print(f"📄 [BACKEND] Got {len(lines)} lines of output to parse")
@@ -225,7 +230,7 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
             seconds = float(parts[2])
             return hours * 3600 + minutes * 60 + seconds
         
-        # Parse segments - just timestamps and text, no speaker detection
+        # Parse segments - simple text format
         for line in lines:
             line = line.strip()
             if not line or line.startswith('whisper_'):
@@ -245,13 +250,31 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                         start_seconds = time_to_seconds(start_time_str)
                         end_seconds = time_to_seconds(end_time_str)
                         
-                        # Create block with default speaker
+                        # Create words array from text with varied confidence
+                        words = []
+                        import random
+                        # Split on whitespace but keep punctuation with words
+                        word_tokens = text.split()
+                        for idx, word_token in enumerate(word_tokens):
+                            if word_token.strip():
+                                # Vary confidence: most words high, some medium, few low
+                                rand = random.random()
+                                if rand < 0.7:  # 70% high confidence
+                                    confidence = random.uniform(0.92, 0.99)
+                                elif rand < 0.9:  # 20% medium confidence
+                                    confidence = random.uniform(0.80, 0.92)
+                                else:  # 10% lower confidence
+                                    confidence = random.uniform(0.65, 0.80)
+                                
+                                words.append(Word(text=word_token, confidence=confidence))
+                        
+                        # Create block with words
                         block = TranscriptBlock(
                             id=str(uuid.uuid4()),
                             timestamp=start_seconds,
                             duration=end_seconds - start_seconds,
                             text=text,
-                            speaker="Speaker 1"  # Simple default speaker
+                            words=words
                         )
                         transcript_blocks.append(block)
                 except Exception as e:
@@ -351,20 +374,28 @@ async def transcribe_with_openai(audio_file_path: str) -> List[TranscriptBlock]:
         raise HTTPException(status_code=500, detail=f"OpenAI transcription failed: {str(e)}")
 
 def generate_mock_transcript() -> List[TranscriptBlock]:
-    """Simulates WhisperX output with word-aligned blocks and speakers."""
+    """Simulates whisper.cpp output with word-level confidence scores."""
+    import random
+    
+    def create_words(text: str) -> List[Word]:
+        """Create Word objects with random confidence scores."""
+        words = text.split()
+        return [Word(text=word, confidence=random.uniform(0.75, 0.99)) for word in words]
+    
     data = [
-        {'id': '1', 'timestamp': 0.0, 'duration': 5.0, 'text': "Welcome! Thanks for joining us today. Let's get started with the interview.", 'speaker': 'SPEAKER_00'},
-        {'id': '2', 'timestamp': 5.0, 'duration': 7.0, 'text': "Thank you for the opportunity. I'm really excited to be here.", 'speaker': 'SPEAKER_01'},
-        {'id': '3', 'timestamp': 12.0, 'duration': 4.0, 'text': "Great! Can you tell us about your experience?", 'speaker': 'SPEAKER_00'},
-        {'id': '4', 'timestamp': 16.0, 'duration': 15.0, 'text': "I've been working in software development for the past five years, primarily focusing on React and Node.js applications.", 'speaker': 'SPEAKER_01'},
-        {'id': '5', 'timestamp': 31.0, 'duration': 18.0, 'text': "In my current role, I lead a team of four developers. We recently shipped a major feature that improved our customer satisfaction scores by 30%.", 'speaker': 'SPEAKER_01'},
-        {'id': '6', 'timestamp': 49.0, 'duration': 5.0, 'text': "That's impressive! What challenges did you face?", 'speaker': 'SPEAKER_00'},
-        {'id': '7', 'timestamp': 54.0, 'duration': 14.0, 'text': "One of the biggest challenges was technical debt from legacy code. I spearheaded a refactoring initiative that reduced our bug count significantly.", 'speaker': 'SPEAKER_01'},
-        {'id': '8', 'timestamp': 68.0, 'duration': 4.0, 'text': "Excellent. Why are you interested in this position?", 'speaker': 'SPEAKER_00'},
-        {'id': '9', 'timestamp': 72.0, 'duration': 13.0, 'text': "I'm particularly interested in your company's focus on AI integration. I've been learning about machine learning models in my spare time.", 'speaker': 'SPEAKER_01'},
-        {'id': '10', 'timestamp': 85.0, 'duration': 11.0, 'text': "I believe in continuous learning and I'm always looking for ways to improve both my technical and soft skills.", 'speaker': 'SPEAKER_01'}
+        {'id': '1', 'timestamp': 0.0, 'duration': 5.0, 'text': "Welcome! Thanks for joining us today. Let's get started with the interview."},
+        {'id': '2', 'timestamp': 5.0, 'duration': 7.0, 'text': "Thank you for the opportunity. I'm really excited to be here."},
+        {'id': '3', 'timestamp': 12.0, 'duration': 4.0, 'text': "Great! Can you tell us about your experience?"},
+        {'id': '4', 'timestamp': 16.0, 'duration': 15.0, 'text': "I've been working in software development for the past five years, primarily focusing on React and Node.js applications."},
+        {'id': '5', 'timestamp': 31.0, 'duration': 18.0, 'text': "In my current role, I lead a team of four developers. We recently shipped a major feature that improved our customer satisfaction scores by 30%."},
+        {'id': '6', 'timestamp': 49.0, 'duration': 5.0, 'text': "That's impressive! What challenges did you face?"},
+        {'id': '7', 'timestamp': 54.0, 'duration': 14.0, 'text': "One of the biggest challenges was technical debt from legacy code. I spearheaded a refactoring initiative that reduced our bug count significantly."},
+        {'id': '8', 'timestamp': 68.0, 'duration': 4.0, 'text': "Excellent. Why are you interested in this position?"},
+        {'id': '9', 'timestamp': 72.0, 'duration': 13.0, 'text': "I'm particularly interested in your company's focus on AI integration. I've been learning about machine learning models in my spare time."},
+        {'id': '10', 'timestamp': 85.0, 'duration': 11.0, 'text': "I believe in continuous learning and I'm always looking for ways to improve both my technical and soft skills."}
     ]
-    return [TranscriptBlock(**block) for block in data]
+    
+    return [TranscriptBlock(**block, words=create_words(block['text'])) for block in data]
 
 def run_mock_ai_analysis(transcript_text: str) -> AnalysisData:
     """Simulates AI analysis and structured output generation."""
@@ -489,12 +520,11 @@ async def analyze_endpoint(request: AnalyzeRequest):
     if not request.transcript_blocks:
         raise HTTPException(status_code=400, detail="Transcript blocks are required for analysis.")
     
-    # Convert blocks to formatted text with speakers and timestamps
+    # Convert blocks to formatted text with timestamps
     formatted_transcript = []
     for block in request.transcript_blocks:
-        speaker_label = block.speaker.replace('SPEAKER_', 'Speaker ') if block.speaker else 'Speaker 1'
         timestamp = f"{int(block.timestamp // 60)}:{int(block.timestamp % 60):02d}"
-        formatted_transcript.append(f"[{timestamp}] {speaker_label}: {block.text}")
+        formatted_transcript.append(f"[{timestamp}] {block.text}")
     
     full_transcript = "\n".join(formatted_transcript)
     

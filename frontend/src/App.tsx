@@ -5,12 +5,17 @@ import { AnalysisDashboard } from './components/AnalysisDashboard';
 
 export type Screen = 'upload' | 'editor' | 'analysis';
 
+export interface Word {
+  text: string;
+  confidence: number;
+}
+
 export interface TranscriptBlock {
   id: string;
   timestamp: number;
   duration: number;
   text: string;
-  speaker?: string;
+  words?: Word[];
 }
 
 export interface AnalysisData {
