@@ -12,24 +12,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 import json
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-# Transcription imports
-try:
-    import whisperx
-    import torch
-    WHISPERX_AVAILABLE = True
-except ImportError:
-    WHISPERX_AVAILABLE = False
-    print("WARNING: WhisperX not installed.")
-
-# OpenAI Whisper API
+# OpenAI Whisper API (optional)
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    print("WARNING: OpenAI not installed. Run: pip install openai")
+    print("INFO: OpenAI not installed (optional)")
 
 # --- 1. Pydantic Data Contracts ---
 
@@ -39,6 +28,7 @@ class TranscriptBlock(BaseModel):
     timestamp: float = Field(..., description="Start time in seconds.")
     duration: float
     text: str
+    speaker: str = Field(default="Speaker 1", description="Speaker identifier")
 
 class AnalysisData(BaseModel):
     """Data model for the structured AI analysis output."""
@@ -75,96 +65,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 3. WhisperX Configuration ---
-
-WHISPER_MODEL = None
-if WHISPERX_AVAILABLE:
-    if torch.cuda.is_available():
-        DEVICE = "cuda"
-        COMPUTE_TYPE = "float16"
-    else:
-        DEVICE = "cpu"
-        COMPUTE_TYPE = "float32" if torch.backends.mps.is_available() else "int8"
-else:
-    DEVICE = None
-    COMPUTE_TYPE = None
-
-def load_whisperx_model():
-    """Load WhisperX model on startup."""
-    global WHISPER_MODEL
-    if WHISPERX_AVAILABLE and WHISPER_MODEL is None:
-        WHISPER_MODEL = whisperx.load_model("base", DEVICE, compute_type=COMPUTE_TYPE)
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize WhisperX model when the app starts."""
-    if WHISPERX_AVAILABLE:
-        load_whisperx_model()
-
-# --- 4. Transcription Functions ---
-
-async def transcribe_with_whisperx_progress(audio_file_path: str, progress_callback=None):
-    """
-    Transcribe audio file using WhisperX with word-level timestamps and progress updates.
-    """
-    if not WHISPERX_AVAILABLE or WHISPER_MODEL is None:
-        raise HTTPException(status_code=500, detail="WhisperX is not available")
-    
-    try:
-        if progress_callback:
-            await progress_callback(10, "Loading audio file...")
-        
-        audio = whisperx.load_audio(audio_file_path)
-        
-        if progress_callback:
-            await progress_callback(25, "Transcribing with WhisperX...")
-        
-        result = WHISPER_MODEL.transcribe(audio, batch_size=16)
-        
-        if progress_callback:
-            await progress_callback(60, f"Aligning timestamps for {result.get('language', 'unknown')} language...")
-        
-        model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=DEVICE)
-        result = whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
-        
-        if progress_callback:
-            await progress_callback(80, "Converting to transcript blocks...")
-        
-        transcript_blocks = []
-        total_segments = len(result["segments"])
-        for idx, segment in enumerate(result["segments"]):
-            block = TranscriptBlock(
-                id=str(uuid.uuid4()),
-                timestamp=float(segment.get("start", 0.0)),
-                duration=float(segment.get("end", 0.0) - segment.get("start", 0.0)),
-                text=segment.get("text", "").strip()
-            )
-            transcript_blocks.append(block)
-            
-            if progress_callback and (idx + 1) % 5 == 0:
-                progress = 80 + int((idx + 1) / total_segments * 15)
-                await progress_callback(progress, f"Processing segments... {idx + 1}/{total_segments}")
-        
-        if progress_callback:
-            await progress_callback(95, "Finalizing...")
-        
-        return transcript_blocks
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+# --- 3. Transcription Functions ---
 
 async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None) -> List[TranscriptBlock]:
     """
-    Transcribe audio using whisper.cpp (local, FREE, Metal-accelerated on Apple Silicon)
+    Transcribe audio using whisper.cpp with timestamps
+    (local, FREE, Metal-accelerated on Apple Silicon)
     """
+    print(f"🎙️  [BACKEND] transcribe_with_whisper_cpp called for: {audio_file_path}")
     whisper_binary = "/opt/homebrew/bin/whisper-cli"
     model_path = os.path.join(os.path.dirname(__file__), "models", "ggml-base.bin")
     
     if not os.path.exists(whisper_binary):
+        print(f"❌ [BACKEND] ERROR: whisper-cli not found at {whisper_binary}")
         raise HTTPException(status_code=500, detail="whisper.cpp not installed. Run: brew install whisper-cpp")
     
     if not os.path.exists(model_path):
-        raise HTTPException(status_code=500, detail=f"Model not found at {model_path}. Download from huggingface.")
+        print(f"❌ [BACKEND] ERROR: Model not found at {model_path}")
+        raise HTTPException(status_code=500, detail=f"Model not found at {model_path}")
+    
+    print(f"📦 [BACKEND] Using model: {model_path}")
     
     try:
         cmd = [
@@ -177,9 +97,13 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
             "-f", audio_file_path,
         ]
         
+        print(f"🚀 [BACKEND] Running command: {' '.join(cmd)}")
+        
         loop = asyncio.get_event_loop()
         
         def run_with_progress():
+            import time
+            print("🎬 [BACKEND] Starting whisper-cli subprocess...")
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -190,21 +114,45 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
             
             stderr_output = []
             stdout_output = []
+            last_logged_progress = -10
+            last_activity_time = time.time()
+            timeout_seconds = 300  # 5 minutes without output = timeout
             
+            print("📊 [BACKEND] Monitoring transcription progress...")
             while True:
                 if process.poll() is not None:
+                    print("✅ [BACKEND] whisper-cli process completed")
+                    break
+                
+                # Check for timeout
+                if time.time() - last_activity_time > timeout_seconds:
+                    print(f"⏰ [BACKEND] Timeout! No output for {timeout_seconds}s, terminating process...")
+                    process.terminate()
+                    time.sleep(2)
+                    if process.poll() is None:
+                        print("💀 [BACKEND] Force killing hung process...")
+                        process.kill()
                     break
                 
                 if process.stderr:
                     line = process.stderr.readline()
                     if line:
                         stderr_output.append(line)
+                        last_activity_time = time.time()  # Reset timeout
+                        
+                        # Log interesting lines
                         if "progress" in line.lower() and "%" in line:
                             try:
                                 match = re.search(r'(\d+)%', line)
                                 if match:
                                     progress = int(match.group(1))
                                     scaled_progress = 10 + int(progress * 0.7)
+                                    
+                                    # Log every 10% to avoid spam
+                                    if progress >= last_logged_progress + 10:
+                                        print(f"🔄 [BACKEND] Transcription progress: {progress}% (scaled: {scaled_progress}%)")
+                                        last_logged_progress = progress
+                                    
                                     if progress_queue:
                                         try:
                                             asyncio.run_coroutine_threadsafe(
@@ -213,16 +161,38 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                                             )
                                         except:
                                             pass
-                            except:
-                                pass
+                            except Exception as e:
+                                print(f"⚠️  [BACKEND] Error parsing progress: {e}")
+                
+                # Also check stdout (whisper-cli outputs transcript there)
+                if process.stdout:
+                    # Use select or non-blocking read if available
+                    import select
+                    if select.select([process.stdout], [], [], 0.1)[0]:
+                        line = process.stdout.readline()
+                        if line:
+                            stdout_output.append(line)
+                            last_activity_time = time.time()
+                            # Log first few lines of transcript output
+                            if len(stdout_output) <= 5:
+                                print(f"📝 [BACKEND] Transcript output line {len(stdout_output)}: {line[:80].strip()}...")
             
+            print("📥 [BACKEND] Reading remaining output from whisper-cli...")
             remaining_stderr = process.stderr.read() if process.stderr else ""
             remaining_stdout = process.stdout.read() if process.stdout else ""
             
-            stderr_output.append(remaining_stderr)
-            stdout_output.append(remaining_stdout)
+            if remaining_stderr:
+                stderr_output.append(remaining_stderr)
+            if remaining_stdout:
+                stdout_output.append(remaining_stdout)
+                print(f"📝 [BACKEND] Got {len(remaining_stdout)} bytes of remaining stdout")
             
             returncode = process.wait()
+            print(f"🏁 [BACKEND] whisper-cli exit code: {returncode}")
+            
+            stdout_len = len(''.join(stdout_output))
+            stderr_len = len(''.join(stderr_output))
+            print(f"📝 [BACKEND] Output size: stdout={stdout_len} bytes, stderr={stderr_len} bytes")
             
             return {
                 'returncode': returncode,
@@ -230,9 +200,12 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                 'stderr': ''.join(stderr_output)
             }
         
+        print("⏳ [BACKEND] Waiting for whisper-cli to complete...")
         result_dict = await loop.run_in_executor(None, run_with_progress)
         
         if result_dict['returncode'] != 0:
+            print(f"❌ [BACKEND] whisper-cli failed with exit code {result_dict['returncode']}")
+            print(f"❌ [BACKEND] stderr: {result_dict['stderr'][:500]}")
             raise subprocess.CalledProcessError(
                 result_dict['returncode'],
                 cmd,
@@ -240,9 +213,19 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                 result_dict['stderr']
             )
         
+        print("🔍 [BACKEND] Parsing whisper-cli output...")
         transcript_blocks = []
         lines = result_dict['stdout'].strip().split('\n')
+        print(f"📄 [BACKEND] Got {len(lines)} lines of output to parse")
         
+        def time_to_seconds(time_str):
+            parts = time_str.split(':')
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            seconds = float(parts[2])
+            return hours * 3600 + minutes * 60 + seconds
+        
+        # Parse segments - just timestamps and text, no speaker detection
         for line in lines:
             line = line.strip()
             if not line or line.startswith('whisper_'):
@@ -252,31 +235,30 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                 try:
                     timestamp_part, text = line.split(']', 1)
                     timestamp_part = timestamp_part.strip('[]')
+                    text = text.strip()
                     
                     if '-->' in timestamp_part:
                         start_time_str, end_time_str = timestamp_part.split('-->')
                         start_time_str = start_time_str.strip()
                         end_time_str = end_time_str.strip()
                         
-                        def time_to_seconds(time_str):
-                            parts = time_str.split(':')
-                            hours = int(parts[0])
-                            minutes = int(parts[1])
-                            seconds = float(parts[2])
-                            return hours * 3600 + minutes * 60 + seconds
-                        
                         start_seconds = time_to_seconds(start_time_str)
                         end_seconds = time_to_seconds(end_time_str)
                         
+                        # Create block with default speaker
                         block = TranscriptBlock(
                             id=str(uuid.uuid4()),
                             timestamp=start_seconds,
                             duration=end_seconds - start_seconds,
-                            text=text.strip()
+                            text=text,
+                            speaker="Speaker 1"  # Simple default speaker
                         )
                         transcript_blocks.append(block)
-                except:
+                except Exception as e:
+                    print(f"⚠️  [BACKEND] Failed to parse line: {e}")
                     continue
+        
+        print(f"✅ [BACKEND] Created {len(transcript_blocks)} transcript blocks")
         
         if not transcript_blocks:
             full_text = result_dict['stdout'].strip()
@@ -369,15 +351,18 @@ async def transcribe_with_openai(audio_file_path: str) -> List[TranscriptBlock]:
         raise HTTPException(status_code=500, detail=f"OpenAI transcription failed: {str(e)}")
 
 def generate_mock_transcript() -> List[TranscriptBlock]:
-    """Simulates WhisperX output with word-aligned blocks."""
+    """Simulates WhisperX output with word-aligned blocks and speakers."""
     data = [
-        {'id': '1', 'timestamp': 0.0, 'duration': 12.0, 'text': "Hello, thank you for the opportunity to interview today. I'm really excited about this position."},
-        {'id': '2', 'timestamp': 12.0, 'duration': 15.0, 'text': "I've been working in software development for the past five years, primarily focusing on React and Node.js applications."},
-        {'id': '3', 'timestamp': 27.0, 'duration': 18.0, 'text': "In my current role, I lead a team of four developers. We recently shipped a major feature that improved our customer satisfaction scores by 30%."},
-        {'id': '4', 'timestamp': 45.0, 'duration': 14.0, 'text': "One of the biggest challenges we faced was technical debt from legacy code. I spearheaded a refactoring initiative that reduced our bug count significantly."},
-        {'id': '5', 'timestamp': 59.0, 'duration': 16.0, 'text': "I'm particularly interested in this role because of your company's focus on AI integration. I've been learning about machine learning models in my spare time."},
-        {'id': '6', 'timestamp': 75.0, 'duration': 13.0, 'text': "Communication is something I value highly. I run weekly sync meetings and maintain detailed documentation for all our projects."},
-        {'id': '7', 'timestamp': 88.0, 'duration': 11.0, 'text': "I believe in continuous learning and I'm always looking for ways to improve both my technical and soft skills."}
+        {'id': '1', 'timestamp': 0.0, 'duration': 5.0, 'text': "Welcome! Thanks for joining us today. Let's get started with the interview.", 'speaker': 'SPEAKER_00'},
+        {'id': '2', 'timestamp': 5.0, 'duration': 7.0, 'text': "Thank you for the opportunity. I'm really excited to be here.", 'speaker': 'SPEAKER_01'},
+        {'id': '3', 'timestamp': 12.0, 'duration': 4.0, 'text': "Great! Can you tell us about your experience?", 'speaker': 'SPEAKER_00'},
+        {'id': '4', 'timestamp': 16.0, 'duration': 15.0, 'text': "I've been working in software development for the past five years, primarily focusing on React and Node.js applications.", 'speaker': 'SPEAKER_01'},
+        {'id': '5', 'timestamp': 31.0, 'duration': 18.0, 'text': "In my current role, I lead a team of four developers. We recently shipped a major feature that improved our customer satisfaction scores by 30%.", 'speaker': 'SPEAKER_01'},
+        {'id': '6', 'timestamp': 49.0, 'duration': 5.0, 'text': "That's impressive! What challenges did you face?", 'speaker': 'SPEAKER_00'},
+        {'id': '7', 'timestamp': 54.0, 'duration': 14.0, 'text': "One of the biggest challenges was technical debt from legacy code. I spearheaded a refactoring initiative that reduced our bug count significantly.", 'speaker': 'SPEAKER_01'},
+        {'id': '8', 'timestamp': 68.0, 'duration': 4.0, 'text': "Excellent. Why are you interested in this position?", 'speaker': 'SPEAKER_00'},
+        {'id': '9', 'timestamp': 72.0, 'duration': 13.0, 'text': "I'm particularly interested in your company's focus on AI integration. I've been learning about machine learning models in my spare time.", 'speaker': 'SPEAKER_01'},
+        {'id': '10', 'timestamp': 85.0, 'duration': 11.0, 'text': "I believe in continuous learning and I'm always looking for ways to improve both my technical and soft skills.", 'speaker': 'SPEAKER_01'}
     ]
     return [TranscriptBlock(**block) for block in data]
 
@@ -435,15 +420,18 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
             
             # Priority: whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
             if os.path.exists("/opt/homebrew/bin/whisper-cli"):
+                print(f"🚀 [BACKEND] Starting whisper-cli transcription for: {temp_file.name}")
                 yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with whisper.cpp (FREE!)...'})}\n\n"
                 await asyncio.sleep(0.1)
                 
                 progress_queue = asyncio.Queue()
+                print("⚙️  [BACKEND] Creating transcription task...")
                 transcription_task = asyncio.create_task(
                     transcribe_with_whisper_cpp(temp_file.name, progress_queue)
                 )
                 
                 last_progress = 10
+                print("📡 [BACKEND] Streaming progress updates to frontend...")
                 while not transcription_task.done():
                     try:
                         progress_pct, message = await asyncio.wait_for(
@@ -452,76 +440,33 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
                         )
                         if progress_pct > last_progress:
                             last_progress = progress_pct
+                            print(f"📤 [BACKEND] Sending to frontend: {progress_pct}% - {message}")
                             yield f"data: {json.dumps({'progress': progress_pct, 'message': message})}\n\n"
                     except asyncio.TimeoutError:
                         pass
                 
+                print("⏳ [BACKEND] Awaiting final transcription result...")
                 transcript_blocks = await transcription_task
+                print(f"🎉 [BACKEND] whisper-cli complete! Created {len(transcript_blocks)} blocks")
                 yield f"data: {json.dumps({'progress': 90, 'message': 'Processing results...'})}\n\n"
                 await asyncio.sleep(0.1)
                 
-            elif OPENAI_AVAILABLE and os.getenv("OPENAI_API_KEY"):
-                yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with OpenAI Whisper API...'})}\n\n"
-                await asyncio.sleep(0.1)
-                
-                transcript_blocks = await transcribe_with_openai(temp_file.name)
-                yield f"data: {json.dumps({'progress': 90, 'message': 'Processing results...'})}\n\n"
-                await asyncio.sleep(0.1)
-                
-            elif WHISPERX_AVAILABLE:
-                yield f"data: {json.dumps({'progress': 10, 'message': 'Loading audio file...'})}\n\n"
-                await asyncio.sleep(0.1)
-                
-                loop = asyncio.get_event_loop()
-                with ThreadPoolExecutor() as executor:
-                    audio = await loop.run_in_executor(executor, whisperx.load_audio, temp_file.name)
-                    
-                    yield f"data: {json.dumps({'progress': 25, 'message': 'Transcribing with WhisperX...'})}\n\n"
-                    await asyncio.sleep(0.1)
-                    
-                    result = await loop.run_in_executor(
-                        executor,
-                        lambda: WHISPER_MODEL.transcribe(audio, batch_size=16)
-                    )
-                    
-                    yield f"data: {json.dumps({'progress': 60, 'message': f'Aligning timestamps ({result.get('language', 'unknown')})...'})}\n\n"
-                    await asyncio.sleep(0.1)
-                    
-                    model_a, metadata = await loop.run_in_executor(
-                        executor,
-                        lambda: whisperx.load_align_model(language_code=result["language"], device=DEVICE)
-                    )
-                    result = await loop.run_in_executor(
-                        executor,
-                        lambda: whisperx.align(result["segments"], model_a, metadata, audio, DEVICE, return_char_alignments=False)
-                    )
-                    
-                    yield f"data: {json.dumps({'progress': 80, 'message': 'Converting segments...'})}\n\n"
-                    await asyncio.sleep(0.1)
-                
-                transcript_blocks = []
-                total_segments = len(result["segments"])
-                for idx, segment in enumerate(result["segments"]):
-                    block = TranscriptBlock(
-                        id=str(uuid.uuid4()),
-                        timestamp=float(segment.get("start", 0.0)),
-                        duration=float(segment.get("end", 0.0) - segment.get("start", 0.0)),
-                        text=segment.get("text", "").strip()
-                    )
-                    transcript_blocks.append(block)
-                    
-                    if (idx + 1) % 5 == 0:
-                        progress = 80 + int((idx + 1) / total_segments * 15)
-                        yield f"data: {json.dumps({'progress': progress, 'message': f'Processing {idx + 1}/{total_segments} segments...'})}\n\n"
-                        await asyncio.sleep(0.05)
             else:
+                print("📋 [BACKEND] No transcription method available, using mock data")
                 yield f"data: {json.dumps({'progress': 50, 'message': 'Using mock data...'})}\n\n"
                 await asyncio.sleep(1)
                 transcript_blocks = generate_mock_transcript()
             
-            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete!', 'transcript': [block.model_dump() for block in transcript_blocks]})}\n\n"
+            print(f"📦 [BACKEND] Preparing final response with {len(transcript_blocks)} blocks...")
+            transcript_data = [block.model_dump() for block in transcript_blocks]
+            print(f"💾 [BACKEND] Serialized transcript size: {len(str(transcript_data))} chars")
+            print(f"🎬 [BACKEND] Sending 100% complete to frontend!")
+            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete!', 'transcript': transcript_data})}\n\n"
             
         except Exception as e:
+            print(f"💥 [BACKEND] ERROR in transcription: {str(e)}")
+            import traceback
+            print(f"📍 [BACKEND] Traceback:\n{traceback.format_exc()}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
         finally:
             if temp_file and os.path.exists(temp_file.name):
@@ -532,16 +477,29 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+class AnalyzeRequest(BaseModel):
+    """Request model for analysis endpoint."""
+    transcript_blocks: List[TranscriptBlock]
+
 @app.post("/api/analyze", response_model=AnalysisData)
-async def analyze_endpoint(transcript_text: str = Form(...)):
+async def analyze_endpoint(request: AnalyzeRequest):
     """
-    Takes the final, edited transcript text and returns the AI analysis.
+    Takes the final, edited transcript with timestamps and speakers, returns AI analysis.
     """
-    if not transcript_text:
-        raise HTTPException(status_code=400, detail="Transcript text is required for analysis.")
+    if not request.transcript_blocks:
+        raise HTTPException(status_code=400, detail="Transcript blocks are required for analysis.")
+    
+    # Convert blocks to formatted text with speakers and timestamps
+    formatted_transcript = []
+    for block in request.transcript_blocks:
+        speaker_label = block.speaker.replace('SPEAKER_', 'Speaker ') if block.speaker else 'Speaker 1'
+        timestamp = f"{int(block.timestamp // 60)}:{int(block.timestamp % 60):02d}"
+        formatted_transcript.append(f"[{timestamp}] {speaker_label}: {block.text}")
+    
+    full_transcript = "\n".join(formatted_transcript)
     
     time.sleep(1.5)  # Simulate AI analysis time
-    analysis_data = run_mock_ai_analysis(transcript_text)
+    analysis_data = run_mock_ai_analysis(full_transcript)
     
     return analysis_data
 

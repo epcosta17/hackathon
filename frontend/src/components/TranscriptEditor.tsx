@@ -178,15 +178,15 @@ export function TranscriptEditor({
     setIsAnalyzing(true);
     
     try {
-      // Collect the combined transcript text from all blocks
-      const fullTranscriptText = transcriptBlocks.map(block => block.text).join(' ');
-
-      const formData = new FormData();
-      formData.append("transcript_text", fullTranscriptText);
-
+      // Send full transcript with timestamps and speakers
       const response = await fetch('http://127.0.0.1:8000/api/analyze', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transcript_blocks: transcriptBlocks
+        }),
       });
 
       if (response.ok) {
@@ -300,39 +300,43 @@ export function TranscriptEditor({
                         ${isActive ? 'border-blue-500 bg-blue-500/5' : 'border-zinc-800 bg-zinc-900/30'}
                       `}
                     >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => jumpToTimestamp(block.timestamp)}
-                          className="text-xs text-zinc-500 hover:text-blue-400 transition-colors min-w-[3rem] pt-1"
-                        >
-                          {formatTime(block.timestamp)}
-                        </button>
-                        
-                        <div className="flex-1">
-                          {isEditing ? (
-                            <Textarea
-                              value={block.text}
-                              onChange={(e) => handleBlockEdit(block.id, e.target.value)}
-                              onBlur={() => setEditingBlockId(null)}
-                              autoFocus
-                              className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
-                            />
-                          ) : (
-                            <p
-                              onClick={() => jumpToTimestamp(block.timestamp)}
-                              className="text-zinc-100 cursor-pointer leading-relaxed"
-                            >
-                              {block.text}
-                            </p>
-                          )}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => jumpToTimestamp(block.timestamp)}
+                            className="text-xs text-zinc-500 hover:text-blue-400 transition-colors"
+                          >
+                            {formatTime(block.timestamp)}
+                          </button>
                         </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1">
+                            {isEditing ? (
+                              <Textarea
+                                value={block.text}
+                                onChange={(e) => handleBlockEdit(block.id, e.target.value)}
+                                onBlur={() => setEditingBlockId(null)}
+                                autoFocus
+                                className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
+                              />
+                            ) : (
+                              <p
+                                onClick={() => jumpToTimestamp(block.timestamp)}
+                                className="text-zinc-100 cursor-pointer leading-relaxed"
+                              >
+                                {block.text}
+                              </p>
+                            )}
+                          </div>
 
-                        <button
-                          onClick={() => setEditingBlockId(block.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-zinc-800 rounded"
-                        >
-                          <Edit2 className="w-4 h-4 text-zinc-400" />
-                        </button>
+                          <button
+                            onClick={() => setEditingBlockId(block.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-zinc-800 rounded"
+                          >
+                            <Edit2 className="w-4 h-4 text-zinc-400" />
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   );

@@ -10,6 +10,7 @@ export interface TranscriptBlock {
   timestamp: number;
   duration: number;
   text: string;
+  speaker?: string;
 }
 
 export interface AnalysisData {

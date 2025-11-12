@@ -4,11 +4,5 @@ uvicorn==0.32.0
 python-multipart==0.0.12
 pydantic==2.9.2
 
-# Optional: OpenAI Whisper API
+# Optional: OpenAI Whisper API (for cloud transcription)
 openai
-
-# Optional: WhisperX for local transcription
-# Uncomment if you want to use WhisperX instead of whisper.cpp
-# torch==2.8.0
-# torchaudio==2.8.0
-# git+https://github.com/m-bain/whisperx.git
