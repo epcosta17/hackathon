@@ -285,15 +285,21 @@ export function TranscriptEditor({
                 onMouseMove={handleSeekBarHover}
                 onMouseLeave={handleSeekBarLeave}
               >
-                <input
-                  type="range"
-                  min="0"
-                  max={duration}
-                  step="0.1"
-                  value={currentTime}
-                  onChange={handleScrub}
-                  className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:cursor-pointer"
-                />
+                <div className="relative w-full h-2 bg-zinc-800 rounded-lg overflow-hidden">
+                  <div 
+                    className="absolute h-full rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600"
+                    style={{ width: `${(currentTime / duration) * 100}%` }}
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max={duration}
+                    step="0.1"
+                    value={currentTime}
+                    onChange={handleScrub}
+                    className="absolute w-full h-2 appearance-none cursor-pointer bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:relative [&::-webkit-slider-thumb]:z-10"
+                  />
+                </div>
                 {hoverTime !== null && hoverPosition !== null && (
                   <div
                     className="absolute -top-10 transform -translate-x-1/2 bg-zinc-800 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap border border-zinc-700"
@@ -316,7 +322,7 @@ export function TranscriptEditor({
         <div className="max-w-[1800px] mx-auto h-full">
           <div className="grid grid-cols-5 h-full">
             {/* Left Side - Transcript (60%) */}
-            <div className="col-span-3 border-r border-zinc-800 flex flex-col h-full">
+            <div className="col-span-3 border-r border-zinc-800 flex flex-col h-full overflow-hidden">
               <div className="p-8 pb-4 flex items-center justify-between flex-shrink-0">
                 <h2 className="text-zinc-400 text-sm font-medium">
                   Transcript Segments ({transcriptBlocks.length})
@@ -325,7 +331,7 @@ export function TranscriptEditor({
                   Scroll to view all segments
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+              <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                 <div className="max-w-3xl space-y-4">
                 {transcriptBlocks.map((block) => {
                   const isActive = currentBlock?.id === block.id;

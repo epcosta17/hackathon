@@ -135,7 +135,7 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-w-screen bg-zinc-950">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-8 py-4">
@@ -198,7 +198,16 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                     >
                       <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
                       {hoveredTooltip === 'communication' && (
-                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                        <div 
+                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
+                          style={{ 
+                            width: '360px', 
+                            minWidth: '360px', 
+                            zIndex: 9999,
+                            backgroundColor: '#09090b',
+                            backdropFilter: 'none'
+                          }}
+                        >
                           {scoreExplanations.communication}
                         </div>
                       )}
@@ -233,7 +242,16 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                     >
                       <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
                       {hoveredTooltip === 'technical' && (
-                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                        <div 
+                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
+                          style={{ 
+                            width: '360px', 
+                            minWidth: '360px', 
+                            zIndex: 9999,
+                            backgroundColor: '#09090b',
+                            backdropFilter: 'none'
+                          }}
+                        >
                           {scoreExplanations.technical}
                         </div>
                       )}
@@ -253,10 +271,10 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
             </div>
 
             {/* Engagement Score */}
-            <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-800/30 rounded-lg p-6 relative">
+            <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-500/10 rounded-lg">
-                  <MessageSquare className="w-8 h-8 text-purple-400" />
+                <div className="p-3 bg-yellow-500/10 rounded-lg">
+                  <MessageSquare className="w-8 h-8 text-yellow-400" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -268,7 +286,16 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                     >
                       <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
                       {hoveredTooltip === 'engagement' && (
-                        <div className="absolute left-0 top-6 w-64 bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-xl z-50 text-xs text-zinc-300 leading-relaxed">
+                        <div 
+                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
+                          style={{ 
+                            width: '360px', 
+                            minWidth: '360px', 
+                            zIndex: 9999,
+                            backgroundColor: '#09090b',
+                            backdropFilter: 'none'
+                          }}
+                        >
                           {scoreExplanations.engagement}
                         </div>
                       )}
@@ -280,7 +307,10 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                       initial={{ width: 0 }}
                       animate={{ width: `${analysisData.statistics.engagementScore}%` }}
                       transition={{ duration: 1, delay: 0.5 }}
-                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                      className="h-full"
+                      style={{
+                        background: 'linear-gradient(to bottom right, #f59e0b, #eab308)'
+                      }}
                     />
                   </div>
                 </div>
@@ -304,15 +334,15 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
             </div>
             <div className="flex flex-col items-center min-w-[90px]">
               <div className="flex items-center gap-1 mb-1">
-                <MessageSquare className="w-4 h-4 text-purple-300" />
-                <p className="text-zinc-300 text-xs">Q&A Time</p>
+                <MessageSquare className="w-4 h-4 text-zinc-500" />
+                <p className="text-zinc-500 text-xs">Q&A Time</p>
               </div>
-              <p className="text-lg font-bold text-purple-300">{analysisData.statistics.qaTime}</p>
+              <p className="text-lg font-bold text-yellow-400">{analysisData.statistics.qaTime}</p>
             </div>
             <div className="flex flex-col items-center min-w-[80px]">
               <div className="flex items-center gap-1 mb-1">
-                <Users className="w-4 h-4 text-green-400" />
-                <p className="text-zinc-300 text-xs">Engagement</p>
+                <Users className="w-4 h-4 text-zinc-400" />
+                <p className="text-zinc-500 text-xs">Engagement</p>
               </div>
               <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
             </div>

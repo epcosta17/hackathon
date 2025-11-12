@@ -35,11 +35,11 @@ You are a professional Interview Analyst AI. Your task is to analyze the provide
   "technologies": [
     {
       "name": "TypeScript",
-      "timestamps": "17:33-68:33"
+      "timestamps": "17:33-25:45"
     },
     {
       "name": "React",
-      "timestamps": "09:32-68:36"
+      "timestamps": "09:32-15:20"
     }
   ],
   "qaTopics": [
@@ -72,6 +72,9 @@ You are a professional Interview Analyst AI. Your task is to analyze the provide
 **IMPORTANT NOTES:**
 1. Include ALL technologies mentioned or inferred (languages, frameworks, tools, databases, etc.)
 2. Add timestamp ranges (MM:SS-MM:SS) for when each technology was discussed
+   - Keep ranges realistic: typically 5-15 minutes per technology
+   - Use the FIRST major mention of each technology, not the entire interview duration
+   - Example: "TypeScript (17:33-25:45)" not "TypeScript (17:33-70:00)"
 3. Engagement Score = Engagement × 10 (capped at 100)
 4. Extract 3-5 key technical points that the interviewer emphasized
 5. Dynamically generate Q&A topic titles based on actual discussion
