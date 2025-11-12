@@ -5,7 +5,7 @@ import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
 
 interface UploadScreenProps {
-  onTranscriptionComplete: (blocks: TranscriptBlock[]) => void;
+  onTranscriptionComplete: (blocks: TranscriptBlock[], file: File) => void;
 }
 
 export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
@@ -51,17 +51,54 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
       const formData = new FormData();
       formData.append("audio_file", file);
 
-      const response = await fetch('http://127.0.0.1:8000/api/transcribe', {
+      // Use Server-Sent Events for real-time progress
+      const response = await fetch('http://127.0.0.1:8000/api/transcribe-stream', {
         method: 'POST',
         body: formData,
       });
 
-      if (response.ok) {
-        const blocks: TranscriptBlock[] = await response.json();
-        onTranscriptionComplete(blocks);
-      } else {
-        console.error('Transcription failed:', response.statusText);
-        alert('Transcription failed. Please try again.');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            
+            if (data.progress !== undefined) {
+              setProgress(data.progress);
+              console.log(`Progress: ${data.progress}% - ${data.message}`);
+            }
+            
+            if (data.transcript) {
+              // Transcription complete!
+              setTimeout(() => {
+                onTranscriptionComplete(data.transcript, file);
+              }, 500);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error during transcription:', error);
@@ -72,9 +109,9 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-zinc-950">
       {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-7xl mx-auto px-8 py-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
@@ -89,7 +126,7 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center p-8">
+      <main className="flex-1 min-h-0 flex items-center justify-center p-8 bg-zinc-950 overflow-auto">
         <div className="max-w-2xl w-full space-y-8">
           {/* Title Section */}
           <div className="text-center space-y-2">

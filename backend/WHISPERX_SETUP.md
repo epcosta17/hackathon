@@ -1,4 +1,4 @@
-# WhisperX Integration Guide
+# WhisperX Integration Guide (macOS)
 
 ## Current Status
 
@@ -16,30 +16,24 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 ## Optional: Installing WhisperX for Real Transcription
 
-WhisperX installation can be challenging on Windows. Here are your options:
+WhisperX works well on macOS. Here are your options:
 
-### Option 1: Try Direct Installation (May Fail on Windows)
-
-```bash
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install git+https://github.com/m-bain/whisperx.git
-```
-
-**Note:** This requires FFmpeg development libraries and Microsoft Visual C++ Build Tools.
-
-### Option 2: Use Linux/WSL (Recommended for Windows Users)
-
-If you're on Windows and need real transcription, consider using WSL (Windows Subsystem for Linux):
+### Option 1: Direct Installation on macOS (Recommended)
 
 ```bash
-# In WSL Ubuntu
-sudo apt update
-sudo apt install ffmpeg
+# Install FFmpeg using Homebrew
+brew install ffmpeg
+
+# Install PyTorch (CPU or MPS for Apple Silicon)
 pip install torch torchaudio
+
+# Install WhisperX
 pip install git+https://github.com/m-bain/whisperx.git
 ```
 
-### Option 3: Use Alternative Transcription Services
+**Note:** On Apple Silicon Macs (M1/M2/M3), PyTorch will automatically use the Metal Performance Shaders (MPS) backend for GPU acceleration.
+
+### Option 2: Use Alternative Transcription Services
 
 Instead of WhisperX, you could integrate:
 - OpenAI Whisper API
@@ -47,37 +41,48 @@ Instead of WhisperX, you could integrate:
 - Google Speech-to-Text
 - Azure Speech Service
 
-## Installation Steps (If Attempting WhisperX on Windows)
+## Installation Steps for WhisperX on macOS
 
-### 1. Navigate to the backend directory
+### 1. Install Homebrew (if not already installed)
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+### 2. Install FFmpeg
+```bash
+brew install ffmpeg
+```
+
+### 3. Navigate to the backend directory
 ```bash
 cd backend
 ```
 
-### 2. Activate your virtual environment (if using one)
+### 4. Activate your virtual environment (if using one)
 ```bash
-# Windows
-.venv\Scripts\activate
-
-# macOS/Linux
 source .venv/bin/activate
 ```
 
-### 3. Install dependencies
+### 5. Install PyTorch
+```bash
+# For Apple Silicon (M1/M2/M3) - automatically uses MPS acceleration
+pip install torch torchaudio
+
+# For Intel Macs - CPU only
+pip install torch torchaudio
+```
+
+### 6. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-**Note:** If you have a CUDA-capable GPU, you may want to install the GPU version of PyTorch first:
+### 7. Install WhisperX
 ```bash
-# For CUDA 11.8
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# For CUDA 12.1
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install git+https://github.com/m-bain/whisperx.git
 ```
 
-### 4. Start the server
+### 8. Start the server
 ```bash
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
@@ -95,8 +100,15 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 - ✅ Word-level timestamps for precise editing
 - ✅ Automatic language detection
 - ✅ Support for MP3 and WAV audio formats
-- ✅ GPU acceleration (if available)
+- ✅ MPS acceleration on Apple Silicon (M1/M2/M3)
 - ✅ Fallback to mock data if WhisperX is not installed
+
+## Performance on Apple Silicon
+
+Apple Silicon Macs (M1/M2/M3) provide excellent performance for WhisperX:
+- **MPS Backend**: PyTorch automatically uses Metal Performance Shaders for GPU acceleration
+- **Unified Memory**: Efficient memory usage across CPU and GPU
+- **Performance**: Comparable to NVIDIA GPUs for inference tasks
 
 ## Model Options
 
@@ -117,22 +129,37 @@ Available models (in order of size/accuracy):
 
 ### "WhisperX not available, using mock data"
 This means WhisperX couldn't be imported. Check that:
-1. All dependencies are installed: `pip install -r requirements.txt`
-2. FFmpeg is installed and in your PATH
-3. No errors occurred during installation
+1. FFmpeg is installed: `brew list ffmpeg`
+2. All dependencies are installed: `pip install -r requirements.txt`
+3. WhisperX is installed: `pip show whisperx`
+4. No errors occurred during installation
 
 ### Out of Memory Errors
-If you get OOM errors:
+If you get OOM errors (rare on Apple Silicon):
 1. Use a smaller model (e.g., `tiny` or `base`)
 2. Reduce batch size in the transcribe function
-3. Use CPU instead of GPU if GPU memory is limited
+3. Close other applications to free up memory
 
 ### Slow Transcription
 - First transcription is slower due to model loading
-- Use a GPU for 10-20x speed improvement
-- Use smaller models for faster processing
+- Apple Silicon Macs should provide fast transcription with MPS
+- Use smaller models for faster processing if needed
+
+### FFmpeg Not Found
+If you see FFmpeg errors:
+```bash
+# Check if FFmpeg is installed
+which ffmpeg
+
+# If not installed, install with Homebrew
+brew install ffmpeg
+
+# Verify installation
+ffmpeg -version
+```
 
 ## Testing
 
 Upload an audio file through the frontend to test the integration. The first request will take longer as models are downloaded and loaded.
+
 

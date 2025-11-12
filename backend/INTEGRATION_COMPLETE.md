@@ -48,8 +48,8 @@ Created two comprehensive guides:
 - Audio upload and processing flow works end-to-end
 
 ### 🔄 Optional Next Step:
-- Install WhisperX for real transcription (challenging on Windows)
-- **Recommended:** Use WSL or Linux for WhisperX
+- Install WhisperX for real transcription (works well on macOS)
+- **Recommended:** Direct installation on macOS with Homebrew
 - **Alternative:** Keep using mock data for development
 
 ## How to Use
@@ -78,27 +78,31 @@ curl -X POST http://127.0.0.1:8000/api/transcribe \
 
 ## Installing WhisperX (Optional)
 
-### Recommended: Use Linux/WSL
+### Recommended: Direct Installation on macOS
 
 ```bash
-# On WSL Ubuntu
-sudo apt update && sudo apt install ffmpeg
+# Install FFmpeg with Homebrew
+brew install ffmpeg
+
+# Install PyTorch (automatically uses MPS on Apple Silicon)
 pip install torch torchaudio
+
+# Install WhisperX
 pip install git+https://github.com/m-bain/whisperx.git
 ```
 
 Then restart your backend server, and it will automatically use WhisperX.
 
-### On Windows (Challenging):
+### macOS Advantages:
 
-WhisperX requires:
-1. FFmpeg development libraries (not just the binary)
-2. Microsoft Visual C++ Build Tools
-3. Compatible Python wheels for PyAV
+WhisperX works great on macOS:
+1. FFmpeg installs easily via Homebrew
+2. No complex build tools needed
+3. Apple Silicon (M1/M2/M3) provides GPU acceleration via MPS
+4. Simple, straightforward installation process
 
-**Easier alternatives for Windows:**
+**Alternative Options:**
 - Use the mock data (already working)
-- Run backend in WSL
 - Use OpenAI Whisper API instead
 - Use cloud transcription services (AssemblyAI, Azure, etc.)
 
@@ -160,9 +164,9 @@ async def transcribe_endpoint(audio_file: UploadFile = File(...)):
 - These provide better accuracy, speaker diarization, and no local setup
 
 ### If You Need WhisperX:
-- Use Linux/WSL environment
-- Or reach out for help with Windows setup
-- Or I can help integrate alternative transcription services
+- Install directly on macOS using Homebrew (see instructions above)
+- macOS provides excellent support for WhisperX
+- Apple Silicon Macs get automatic GPU acceleration via MPS
 
 ## Testing
 

@@ -9,57 +9,127 @@ interface TranscriptEditorProps {
   transcriptBlocks: TranscriptBlock[];
   setTranscriptBlocks: (blocks: TranscriptBlock[]) => void;
   onAnalysisComplete: (data: AnalysisData) => void;
+  audioFile: File | null;
 }
 
 export function TranscriptEditor({
   transcriptBlocks,
   setTranscriptBlocks,
   onAnalysisComplete,
+  audioFile,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration] = useState(100); // Mock duration
+  const [duration, setDuration] = useState(0);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [scrollBehavior, setScrollBehavior] = useState<'center' | 'start'>('center');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const activeBlockRef = useRef<HTMLDivElement | null>(null);
+  const userClickedSegment = useRef(false);
 
-  // Simulate audio playback
+  // Create audio URL from file
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= duration) {
-            setIsPlaying(false);
-            return duration;
-          }
-          return prev + 0.1;
-        });
-      }, 100);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+    if (audioFile) {
+      const url = URL.createObjectURL(audioFile);
+      setAudioUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
+  }, [audioFile]);
+
+  // Update current time from audio element
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', handleEnded);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', handleEnded);
     };
-  }, [isPlaying, duration]);
+  }, [audioUrl]);
+
+  const getCurrentBlock = () => {
+    return transcriptBlocks.find(
+      (block) => currentTime >= block.timestamp && currentTime < block.timestamp + block.duration
+    );
+  };
+
+  const currentBlock = getCurrentBlock();
+
+  // Auto-scroll to active block (only during natural playback or scrubbing)
+  useEffect(() => {
+    if (activeBlockRef.current && shouldAutoScroll && !userClickedSegment.current) {
+      activeBlockRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: scrollBehavior,
+      });
+    }
+    // Reset the flag after a brief delay
+    if (userClickedSegment.current) {
+      const timer = setTimeout(() => {
+        userClickedSegment.current = false;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentBlock?.id, shouldAutoScroll, scrollBehavior]);
 
   const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play();
+      // Re-enable auto-scroll when playing normally, center the active segment
+      setShouldAutoScroll(true);
+      setScrollBehavior('center'); // Center during normal playback
+    }
     setIsPlaying(!isPlaying);
   };
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newTime;
+    }
     setCurrentTime(newTime);
+    // Enable auto-scroll when scrubbing the player, scroll to top
+    setShouldAutoScroll(true);
+    setScrollBehavior('start'); // Scroll selected segment to the top
+    
+    // Force immediate scroll after a brief delay to ensure ref is set
+    setTimeout(() => {
+      if (activeBlockRef.current) {
+        activeBlockRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+    }, 50);
   };
 
   const jumpToTimestamp = (timestamp: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = timestamp;
+      audioRef.current.play();
+    }
     setCurrentTime(timestamp);
     setIsPlaying(true);
+    // Disable auto-scroll when clicking a segment
+    userClickedSegment.current = true;
+    setShouldAutoScroll(false);
   };
 
   const handleBlockEdit = (id: string, newText: string) => {
@@ -69,14 +139,6 @@ export function TranscriptEditor({
       )
     );
   };
-
-  const getCurrentBlock = () => {
-    return transcriptBlocks.find(
-      (block) => currentTime >= block.timestamp && currentTime < block.timestamp + block.duration
-    );
-  };
-
-  const currentBlock = getCurrentBlock();
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -115,9 +177,14 @@ export function TranscriptEditor({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-950">
+    <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
+      {/* Hidden Audio Element */}
+      {audioUrl && (
+        <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      )}
+      
       {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -137,7 +204,7 @@ export function TranscriptEditor({
       </header>
 
       {/* Audio Player */}
-      <div className="border-b border-zinc-800 bg-zinc-900/30">
+      <div className="border-b border-zinc-800 bg-zinc-900/30 flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-8 py-6">
           <div className="flex items-center gap-6">
             <Button
@@ -174,12 +241,21 @@ export function TranscriptEditor({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden min-h-0">
         <div className="max-w-[1800px] mx-auto h-full">
           <div className="grid grid-cols-5 h-full">
             {/* Left Side - Transcript (60%) */}
-            <div className="col-span-3 border-r border-zinc-800 overflow-y-auto p-8">
-              <div className="max-w-3xl space-y-4">
+            <div className="col-span-3 border-r border-zinc-800 flex flex-col h-full">
+              <div className="p-8 pb-4 flex items-center justify-between flex-shrink-0">
+                <h2 className="text-zinc-400 text-sm font-medium">
+                  Transcript Segments ({transcriptBlocks.length})
+                </h2>
+                <span className="text-xs text-zinc-500">
+                  Scroll to view all segments
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto px-8 pb-8 scroll-smooth" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+                <div className="max-w-3xl space-y-4">
                 {transcriptBlocks.map((block) => {
                   const isActive = currentBlock?.id === block.id;
                   const isEditing = editingBlockId === block.id;
@@ -187,6 +263,7 @@ export function TranscriptEditor({
                   return (
                     <motion.div
                       key={block.id}
+                      ref={isActive ? activeBlockRef : null}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className={`
@@ -231,11 +308,12 @@ export function TranscriptEditor({
                     </motion.div>
                   );
                 })}
+                </div>
               </div>
             </div>
 
             {/* Right Side - Info Panel (40%) */}
-            <div className="col-span-2 bg-zinc-900/20 p-8 overflow-y-auto">
+            <div className="col-span-2 bg-zinc-900/20 p-8 overflow-hidden h-full">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-white mb-2">Transcript Statistics</h3>

@@ -33,9 +33,11 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
 
-  const handleTranscriptionComplete = (blocks: TranscriptBlock[]) => {
+  const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File) => {
     setTranscriptBlocks(blocks);
+    setAudioFile(file);
     setCurrentScreen('editor');
   };
 
@@ -48,10 +50,11 @@ export default function App() {
     setCurrentScreen('upload');
     setTranscriptBlocks([]);
     setAnalysisData(null);
+    setAudioFile(null);
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="bg-zinc-950">
       {currentScreen === 'upload' && (
         <UploadScreen onTranscriptionComplete={handleTranscriptionComplete} />
       )}
@@ -60,6 +63,7 @@ export default function App() {
           transcriptBlocks={transcriptBlocks}
           setTranscriptBlocks={setTranscriptBlocks}
           onAnalysisComplete={handleAnalysisComplete}
+          audioFile={audioFile}
         />
       )}
       {currentScreen === 'analysis' && analysisData && (
