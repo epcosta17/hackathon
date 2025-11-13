@@ -732,7 +732,7 @@ export function TranscriptEditor({
                 onMouseMove={handleSeekBarHover}
                 onMouseLeave={handleSeekBarLeave}
               >
-                <div className="relative w-full h-16 bg-zinc-900/50 rounded-lg overflow-hidden border border-zinc-800/50">
+                <div className="relative w-full h-12 rounded-lg overflow-hidden">
                   {/* Waveform visualization */}
                   {waveformData.length > 0 ? (
                     <div className="absolute inset-0 flex items-center justify-between px-2 gap-[2px]">
