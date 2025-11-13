@@ -1,4 +1,4 @@
-# Backend - B2B AI Talent Analysis App
+# Backend - AI Interview Analysis Platform
 
 FastAPI backend for AI-powered interview analysis with local transcription, Google Gemini integration, and automated report generation.
 

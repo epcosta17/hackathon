@@ -1,6 +1,6 @@
-# Frontend - B2B AI Talent Analysis App
+# Frontend - AI Interview Analysis Platform
 
-Modern React frontend for the B2B AI Talent Analysis App with a beautiful, responsive UI based on the [Figma design](https://www.figma.com/design/oHlArZbdYorZZ6YhZPB9Tu/B2B-AI-Talent-Analysis-App).
+Modern React frontend for the AI Interview Analysis Platform with a beautiful, responsive UI featuring audio transcription, interactive editing, and comprehensive analysis dashboards.
 
 ## 🚀 Quick Start
 

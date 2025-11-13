@@ -1,4 +1,4 @@
-# B2B AI Talent Analysis App
+# AI Interview Analysis Platform
 
 An intelligent application for analyzing talent through interview transcripts. Upload audio interviews, get AI-powered transcriptions with timestamps, and receive comprehensive analysis of candidate skills, communication abilities, and technical competencies.
 
@@ -250,7 +250,6 @@ npm run build
 
 ## 🔗 Links
 
-- **Original Design**: [Figma](https://www.figma.com/design/oHlArZbdYorZZ6YhZPB9Tu/B2B-AI-Talent-Analysis-App)
 - **whisper.cpp**: [GitHub](https://github.com/ggerganov/whisper.cpp)
 - **FastAPI**: [Documentation](https://fastapi.tiangolo.com/)
 - **React**: [Documentation](https://react.dev/)
