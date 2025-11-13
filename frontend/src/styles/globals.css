@@ -1,11 +1,63 @@
 @import "tailwindcss";
 
 /* Prevent page scrolling - only allow scrolling in designated areas */
-html, body {
+html {
   margin: 0;
   padding: 0;
+  background-color: #09090b !important;
+  overflow: hidden;
+  height: 100%;
+  position: fixed;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #09090b !important;
+  overflow: hidden;
+  height: 100%;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  left: 0;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  background-color: #09090b !important;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+/* Ensure all backgrounds are dark */
+* {
+  box-sizing: border-box;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -100px;
+  left: -100px;
+  right: -100px;
+  bottom: -100px;
   background-color: #09090b;
-  overflow-x: hidden;
+  z-index: -1;
+}
+
+/* Extra backup background layer */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 200vh;
+  background-color: #09090b;
+  z-index: -2;
 }
 
 /* Custom Scrollbar Styles for Better UX */

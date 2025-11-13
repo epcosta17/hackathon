@@ -231,7 +231,7 @@ export function AnalysisDashboard({
   };
 
   return (
-    <div className="min-w-screen bg-zinc-950">
+    <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="w-full px-8 py-4">

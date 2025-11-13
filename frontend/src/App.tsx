@@ -151,11 +151,11 @@ export default function App() {
   };
 
   return (
-    <div className="bg-zinc-950">
+    <div className="bg-zinc-950 h-screen overflow-hidden">
       <Toaster position="top-right" />
       <AnimatePresence mode="wait">
         {currentScreen === 'upload' && (
-          <motion.div key="upload" {...pageTransition}>
+          <motion.div key="upload" {...pageTransition} className="h-full overflow-hidden">
             <UploadScreen 
               onTranscriptionComplete={handleTranscriptionComplete}
               onLoadInterview={handleLoadInterview}
@@ -163,7 +163,7 @@ export default function App() {
           </motion.div>
         )}
         {currentScreen === 'editor' && (
-          <motion.div key="editor" {...pageTransition}>
+          <motion.div key="editor" {...pageTransition} className="h-full overflow-hidden">
             <TranscriptEditor
               transcriptBlocks={transcriptBlocks}
               setTranscriptBlocks={setTranscriptBlocks}
@@ -176,7 +176,7 @@ export default function App() {
           </motion.div>
         )}
         {currentScreen === 'analysis' && analysisData && (
-          <motion.div key="analysis" {...pageTransition}>
+          <motion.div key="analysis" {...pageTransition} className="h-full overflow-hidden">
             <AnalysisDashboard
               analysisData={analysisData}
               transcriptBlocks={transcriptBlocks}
