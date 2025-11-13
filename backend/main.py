@@ -147,7 +147,8 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
         cmd = [
             whisper_binary,
             "-m", model_path,
-            "-t", "4",
+            "-t", "8",
+            "-p", "4",
             "-ml", "80",
             "-l", "auto",
             "-pp",

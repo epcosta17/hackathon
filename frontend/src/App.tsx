@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
@@ -95,26 +96,44 @@ export default function App() {
     setAudioFile(null);
   };
 
+  const pageTransition = {
+    initial: { opacity: 0, x: 20 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -20 },
+    transition: { 
+      duration: 0.4, 
+      ease: [0.43, 0.13, 0.23, 0.96]  // Custom easing for smooth feel
+    }
+  };
+
   return (
     <div className="bg-zinc-950">
-      {currentScreen === 'upload' && (
-        <UploadScreen onTranscriptionComplete={handleTranscriptionComplete} />
-      )}
-      {currentScreen === 'editor' && (
-        <TranscriptEditor
-          transcriptBlocks={transcriptBlocks}
-          setTranscriptBlocks={setTranscriptBlocks}
-          onAnalysisComplete={handleAnalysisComplete}
-          audioFile={audioFile}
-        />
-      )}
-      {currentScreen === 'analysis' && analysisData && (
-        <AnalysisDashboard
-          analysisData={analysisData}
-          transcriptBlocks={transcriptBlocks}
-          onBackToUpload={handleBackToUpload}
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {currentScreen === 'upload' && (
+          <motion.div key="upload" {...pageTransition}>
+            <UploadScreen onTranscriptionComplete={handleTranscriptionComplete} />
+          </motion.div>
+        )}
+        {currentScreen === 'editor' && (
+          <motion.div key="editor" {...pageTransition}>
+            <TranscriptEditor
+              transcriptBlocks={transcriptBlocks}
+              setTranscriptBlocks={setTranscriptBlocks}
+              onAnalysisComplete={handleAnalysisComplete}
+              audioFile={audioFile}
+            />
+          </motion.div>
+        )}
+        {currentScreen === 'analysis' && analysisData && (
+          <motion.div key="analysis" {...pageTransition}>
+            <AnalysisDashboard
+              analysisData={analysisData}
+              transcriptBlocks={transcriptBlocks}
+              onBackToUpload={handleBackToUpload}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

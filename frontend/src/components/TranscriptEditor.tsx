@@ -27,6 +27,7 @@ export function TranscriptEditor({
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null);
+  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
@@ -183,7 +184,7 @@ export function TranscriptEditor({
   const handleBlockEdit = (id: string, newText: string) => {
     setTranscriptBlocks(
       transcriptBlocks.map((block) =>
-        block.id === id ? { ...block, text: newText } : block
+        block.id === id ? { ...block, text: newText, words: [] } : block
       )
     );
   };
@@ -244,15 +245,15 @@ export function TranscriptEditor({
         <div className="max-w-[1800px] mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-white">Transcript Editor</h1>
-              <p className="text-zinc-400 text-sm">Review and refine the interview transcript</p>
+              <h1 className="text-white">Interview Transcript</h1>
+              <p className="text-zinc-400 text-sm">Review, edit, and verify the transcription</p>
             </div>
             <Button
               onClick={handleRunAnalysis}
               disabled={isAnalyzing}
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
               {isAnalyzing ? 'Analyzing...' : 'Run AI Analysis'}
             </Button>
           </div>
@@ -333,20 +334,33 @@ export function TranscriptEditor({
               </div>
               <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" style={{ maxHeight: 'calc(100vh - 260px)' }}>
                 <div className="max-w-3xl space-y-4">
-                {transcriptBlocks.map((block) => {
+                {transcriptBlocks.map((block, index) => {
                   const isActive = currentBlock?.id === block.id;
                   const isEditing = editingBlockId === block.id;
-
+                  const isHovered = hoveredBlockId === block.id;
+                  
                   return (
                     <motion.div
                       key={block.id}
                       data-block-id={block.id}
                       ref={isActive ? activeBlockRef : null}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ 
+                        opacity: 1, 
+                        x: 0,
+                        scale: isActive ? 1.02 : 1
+                      }}
+                      transition={{ 
+                        duration: 0.3,
+                        delay: Math.min(index * 0.03, 1),
+                        ease: [0.43, 0.13, 0.23, 0.96]
+                      }}
+                      whileHover={{ scale: 1.01 }}
+                      onMouseEnter={() => setHoveredBlockId(block.id)}
+                      onMouseLeave={() => setHoveredBlockId(null)}
                       className={`
-                        group relative p-4 rounded-lg border transition-all duration-200
-                        ${isActive ? 'border-blue-500 bg-blue-500/5' : 'border-zinc-800 bg-zinc-900/30'}
+                        relative p-4 rounded-lg border transition-all duration-200
+                        ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30'}
                       `}
                     >
                       <div className="space-y-2">
@@ -359,17 +373,17 @@ export function TranscriptEditor({
                           </button>
                         </div>
                         
-                        <div className="flex items-start gap-3">
-                          <div className="flex-1">
-                            {isEditing ? (
-                              <Textarea
-                                value={block.text}
-                                onChange={(e) => handleBlockEdit(block.id, e.target.value)}
-                                onBlur={() => setEditingBlockId(null)}
-                                autoFocus
-                                className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
-                              />
-                            ) : (
+                        {isEditing ? (
+                          <Textarea
+                            value={block.text}
+                            onChange={(e) => handleBlockEdit(block.id, e.target.value)}
+                            onBlur={() => setEditingBlockId(null)}
+                            autoFocus
+                            className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
+                          />
+                        ) : (
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1">
                               <p
                                 onClick={() => jumpToTimestamp(block.timestamp)}
                                 className="cursor-pointer leading-relaxed"
@@ -390,16 +404,24 @@ export function TranscriptEditor({
                                   <span className="text-zinc-100">{block.text}</span>
                                 )}
                               </p>
+                            </div>
+
+                            {isHovered && (
+                              <motion.button
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                transition={{ duration: 0.15 }}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setEditingBlockId(block.id)}
+                                className="p-2 hover:bg-zinc-800 rounded flex-shrink-0 transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4 text-zinc-400" />
+                              </motion.button>
                             )}
                           </div>
-
-                          <button
-                            onClick={() => setEditingBlockId(block.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-zinc-800 rounded"
-                          >
-                            <Edit2 className="w-4 h-4 text-zinc-400" />
-                          </button>
-                        </div>
+                        )}
                       </div>
                     </motion.div>
                   );

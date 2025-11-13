@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileAudio } from 'lucide-react';
+import { Upload, FileAudio, CheckCircle } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
@@ -13,6 +14,7 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -92,9 +94,10 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
             
             if (data.transcript) {
               // Transcription complete!
+              setIsComplete(true);
               setTimeout(() => {
                 onTranscriptionComplete(data.transcript, file);
-              }, 500);
+              }, 1500); // Give user time to see "Transcription Finished" message
             }
           }
         }
@@ -102,8 +105,8 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
     } catch (error) {
       console.error('Error during transcription:', error);
       alert('An error occurred during transcription. Please try again.');
-    } finally {
       setIsTranscribing(false);
+      setIsComplete(false);
     }
   };
 
@@ -112,37 +115,51 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-              <FileAudio className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <FileAudio className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-white">Interview Lens</h1>
+                <p className="text-zinc-400 text-sm">AI-Powered Interview Intelligence Platform</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-white">Talent X-Ray</h1>
-              <p className="text-zinc-400 text-sm">AI-Powered Talent Analysis</p>
-            </div>
-          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 min-h-0 flex items-center justify-center p-8 bg-zinc-950 overflow-auto">
-        <div className="max-w-2xl w-full space-y-8">
+        <motion.div 
+          className="max-w-2xl w-full space-y-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           {/* Title Section */}
-          <div className="text-center space-y-2">
-            <h2 className="text-white">Upload Interview Audio</h2>
+          <motion.div 
+            className="text-center space-y-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <h2 className="text-white">Analyze Your Interview</h2>
             <p className="text-zinc-400">
-              Transform raw interview recordings into structured talent profiles
+              Transform interview recordings into actionable insights and comprehensive reports
             </p>
-          </div>
+          </motion.div>
 
           {/* Upload Zone */}
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            whileHover={{ scale: isDragging || isTranscribing ? 1 : 1.02 }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={`
-              relative border-2 border-dashed rounded-xl p-16 transition-all duration-200
-              ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-700 bg-zinc-900/50'}
+              relative border-2 border-dashed rounded-xl p-16 transition-all duration-300
+              ${isDragging ? 'border-blue-500 bg-blue-500/10 scale-105' : 'border-zinc-700 bg-zinc-900/50'}
               ${file ? 'border-green-500 bg-green-500/5' : ''}
             `}
           >
@@ -154,12 +171,22 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
               disabled={isTranscribing}
             />
             
-            <div className="flex flex-col items-center gap-4">
+            <motion.div 
+              className="flex flex-col items-center gap-4"
+              key={file ? 'with-file' : 'no-file'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               {!file ? (
                 <>
-                  <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center">
+                  <motion.div 
+                    className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
                     <Upload className="w-8 h-8 text-zinc-400" />
-                  </div>
+                  </motion.div>
                   <div className="text-center">
                     <p className="text-white">Drop your audio file here</p>
                     <p className="text-zinc-500 text-sm mt-1">or click to browse</p>
@@ -168,9 +195,14 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
                 </>
               ) : (
                 <>
-                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+                  <motion.div 
+                    className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center"
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                  >
                     <FileAudio className="w-8 h-8 text-green-500" />
-                  </div>
+                  </motion.div>
                   <div className="text-center">
                     <p className="text-white">{file.name}</p>
                     <p className="text-zinc-500 text-sm mt-1">
@@ -179,29 +211,85 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
                   </div>
                 </>
               )}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
           {/* Progress Section */}
-          {isTranscribing && (
-            <div className="space-y-3 bg-zinc-900/50 rounded-xl p-6 border border-zinc-800">
+          {(isTranscribing || isComplete) && (
+            <motion.div 
+              className={`space-y-3 rounded-xl p-6 border transition-colors ${
+                isComplete 
+                  ? 'bg-green-500/10 border-green-500/30' 
+                  : 'bg-zinc-900/50 border-zinc-800'
+              }`}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-zinc-300">Transcribing audio...</span>
-                <span className="text-zinc-400">{progress}%</span>
+                <span className={`${isComplete ? 'text-green-400' : 'text-zinc-300'}`}>
+                  {isComplete ? 'Transcription complete!' : 'Transcribing audio...'}
+                </span>
+                <motion.span 
+                  className={`${isComplete ? 'text-green-400' : 'text-zinc-400'}`}
+                  key={progress}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {progress}%
+                </motion.span>
               </div>
-              <Progress value={progress} className="h-2" />
-            </div>
+              <div className="relative">
+                <Progress value={progress} className="h-2" />
+                {isComplete && (
+                  <div 
+                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-600 to-emerald-600 rounded-full transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                )}
+              </div>
+            </motion.div>
           )}
 
           {/* Action Button */}
-          <Button
-            onClick={startTranscription}
-            disabled={!file || isTranscribing}
-            className="w-full h-14 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0,
+              scale: isComplete ? [1, 1.05, 1] : 1
+            }}
+            transition={{ 
+              duration: 0.5, 
+              delay: 0.3,
+              scale: { duration: 0.4, ease: "easeInOut" }
+            }}
           >
-            {isTranscribing ? 'Processing...' : 'Start Transcription & Analysis'}
-          </Button>
-        </div>
+            <Button
+              onClick={startTranscription}
+              disabled={!file || isTranscribing}
+              className={`w-full h-14 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                isComplete 
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+                  : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+              }`}
+            >
+              {isComplete ? (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Transcription Finished
+                </>
+              ) : (
+                <>
+                  <FileAudio className={`w-5 h-5 mr-2 ${isTranscribing ? 'animate-pulse' : ''}`} />
+                  {isTranscribing ? 'Processing...' : 'Start Transcription & Analysis'}
+                </>
+              )}
+            </Button>
+          </motion.div>
+        </motion.div>
       </main>
     </div>
   );

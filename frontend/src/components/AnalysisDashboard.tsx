@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { AnalysisData } from '../App';
@@ -127,6 +128,21 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
 
   // Score tooltips
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const communicationRef = useRef<HTMLDivElement>(null);
+  const technicalRef = useRef<HTMLDivElement>(null);
+  const engagementRef = useRef<HTMLDivElement>(null);
+
+  const handleTooltipEnter = (type: string, ref: React.RefObject<HTMLDivElement>) => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setTooltipPosition({
+        top: rect.bottom + 8,
+        left: rect.left
+      });
+      setHoveredTooltip(type);
+    }
+  };
 
   const scoreExplanations = {
     communication: "Measures clarity of explanations, response quality, and overall dialogue flow throughout the interview.",
@@ -141,8 +157,8 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-white text-2xl font-bold">Interview Analysis Dashboard</h1>
-              <p className="text-zinc-400 text-sm">Comprehensive insights and recommendations</p>
+              <h1 className="text-white text-2xl font-bold">Interview Analysis Report</h1>
+              <p className="text-zinc-400 text-sm">AI-generated insights and evaluation metrics</p>
             </div>
             <div className="flex gap-3">
               <Button
@@ -151,7 +167,7 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                 className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
               >
                 <Download className="w-4 h-4 mr-2" />
-                {isDownloading ? 'Generating...' : 'Download DOCX'}
+                {isDownloading ? 'Generating...' : 'Download Report'}
               </Button>
               <Button
                 onClick={onBackToUpload}
@@ -172,18 +188,33 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ 
+            duration: 0.5,
+            delay: 0.1,
+            ease: [0.43, 0.13, 0.23, 0.96]
+          }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 mb-8"
         >
-          <div className="flex items-center gap-3 mb-6">
+          <motion.div 
+            className="flex items-center gap-3 mb-6"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
             <Brain className="w-6 h-6 text-cyan-400" />
             <h2 className="text-xl font-bold text-white">Expert Statistics</h2>
-          </div>
+          </motion.div>
 
           {/* Score Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Communication Score */}
-            <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative">
+            <motion.div 
+              className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-green-500/10 rounded-lg">
                   <TrendingUp className="w-8 h-8 text-green-400" />
@@ -192,25 +223,12 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-zinc-400 text-sm">Communication Score</p>
                     <div 
-                      className="relative"
-                      onMouseEnter={() => setHoveredTooltip('communication')}
+                      ref={communicationRef}
+                      className="relative cursor-help"
+                      onMouseEnter={() => handleTooltipEnter('communication', communicationRef)}
                       onMouseLeave={() => setHoveredTooltip(null)}
                     >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
-                      {hoveredTooltip === 'communication' && (
-                        <div 
-                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
-                          style={{ 
-                            width: '360px', 
-                            minWidth: '360px', 
-                            zIndex: 9999,
-                            backgroundColor: '#09090b',
-                            backdropFilter: 'none'
-                          }}
-                        >
-                          {scoreExplanations.communication}
-                        </div>
-                      )}
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
                     </div>
                   </div>
                   <p className="text-3xl font-bold text-white">{analysisData.statistics.communicationScore}</p>
@@ -224,10 +242,16 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Technical Depth */}
-            <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative">
+            <motion.div 
+              className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-500/10 rounded-lg">
                   <Code className="w-8 h-8 text-blue-400" />
@@ -236,25 +260,12 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-zinc-400 text-sm">Technical Depth</p>
                     <div 
-                      className="relative"
-                      onMouseEnter={() => setHoveredTooltip('technical')}
+                      ref={technicalRef}
+                      className="relative cursor-help"
+                      onMouseEnter={() => handleTooltipEnter('technical', technicalRef)}
                       onMouseLeave={() => setHoveredTooltip(null)}
                     >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
-                      {hoveredTooltip === 'technical' && (
-                        <div 
-                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
-                          style={{ 
-                            width: '360px', 
-                            minWidth: '360px', 
-                            zIndex: 9999,
-                            backgroundColor: '#09090b',
-                            backdropFilter: 'none'
-                          }}
-                        >
-                          {scoreExplanations.technical}
-                        </div>
-                      )}
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
                     </div>
                   </div>
                   <p className="text-3xl font-bold text-white">{analysisData.statistics.technicalDepthScore}</p>
@@ -268,10 +279,16 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Engagement Score */}
-            <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative">
+            <motion.div 
+              className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: 0.5 }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+            >
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-yellow-500/10 rounded-lg">
                   <MessageSquare className="w-8 h-8 text-yellow-400" />
@@ -280,25 +297,12 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-zinc-400 text-sm">Engagement Score</p>
                     <div 
-                      className="relative"
-                      onMouseEnter={() => setHoveredTooltip('engagement')}
+                      ref={engagementRef}
+                      className="relative cursor-help"
+                      onMouseEnter={() => handleTooltipEnter('engagement', engagementRef)}
                       onMouseLeave={() => setHoveredTooltip(null)}
                     >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300 cursor-help" />
-                      {hoveredTooltip === 'engagement' && (
-                        <div 
-                          className="absolute left-0 top-6 border border-zinc-700 rounded-lg p-3 shadow-2xl text-xs text-zinc-300"
-                          style={{ 
-                            width: '360px', 
-                            minWidth: '360px', 
-                            zIndex: 9999,
-                            backgroundColor: '#09090b',
-                            backdropFilter: 'none'
-                          }}
-                        >
-                          {scoreExplanations.engagement}
-                        </div>
-                      )}
+                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
                     </div>
                   </div>
                   <p className="text-3xl font-bold text-white">{analysisData.statistics.engagementScore}</p>
@@ -315,9 +319,14 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
-          <div className="flex flex-wrap justify-between items-center gap-x-8 gap-y-4">
+          <motion.div 
+            className="flex flex-wrap justify-between items-center gap-x-8 gap-y-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+          >
             <div className="flex flex-col items-center min-w-[80px]">
               <div className="flex items-center gap-1 mb-1">
                 <Clock className="w-4 h-4 text-zinc-500" />
@@ -378,14 +387,14 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
               </div>
               <p className="text-xl font-bold text-yellow-400">{analysisData.statistics.followUpQuestions}</p>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* General Comments */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.7, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
         >
           <button
@@ -580,6 +589,31 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
           </AnimatePresence>
         </motion.div>
       </main>
+
+      {/* Portal Tooltip - completely outside component tree to avoid parent opacity */}
+      {hoveredTooltip && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: `${tooltipPosition.top}px`,
+            left: `${tooltipPosition.left}px`,
+            width: '360px',
+            zIndex: 99999,
+            backgroundColor: '#09090b',
+            color: '#d4d4d8',
+            padding: '12px',
+            borderRadius: '8px',
+            border: '1px solid #3f3f46',
+            fontSize: '12px',
+            lineHeight: '1.5',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+            pointerEvents: 'none'
+          }}
+        >
+          {scoreExplanations[hoveredTooltip as keyof typeof scoreExplanations]}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
