@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home, StickyNote, Bookmark, Plus, Trash2, Download, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -69,6 +70,7 @@ export function TranscriptEditor({
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuPosition, setExportMenuPosition] = useState({ top: 0, right: 0 });
 
   // Create audio URL from file OR use direct URL for streaming
   // Optimized approach: Start with streaming, download chunks in parallel, then switch to blob
@@ -483,7 +485,6 @@ export function TranscriptEditor({
       audioRef.current.play();
     }
     setCurrentTime(timestamp);
-    setIsPlaying(true);
     
     // Find the block for this timestamp and scroll instantly (no animation)
     const targetBlock = transcriptBlocks.find(
@@ -765,138 +766,24 @@ export function TranscriptEditor({
                 {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
               </Button>
               
-              {/* Export Menu */}
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 16px',
-                    backgroundColor: '#27272a',
-                    border: '1px solid #3f3f46',
-                    borderRadius: '6px',
-                    color: 'white',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
+              {/* Export Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <Button
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setExportMenuPosition({
+                      top: rect.bottom + 8,
+                      right: window.innerWidth - rect.right,
+                    });
+                    setShowExportMenu(true);
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3f3f46'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27272a'}
+                  variant="outline"
+                  className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
                 >
-                  <Download size={16} />
+                  <Download className="w-4 h-4 mr-2" />
                   Export
-                  <ChevronDown size={14} />
-                </button>
-                
-                {showExportMenu && (
-                  <>
-                    <div 
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 999,
-                        backgroundColor: 'transparent'
-                      }}
-                      onClick={() => setShowExportMenu(false)}
-                    />
-                    <div 
-                      style={{
-                        position: 'fixed',
-                        top: '64px',
-                        right: '32px',
-                        width: '220px',
-                        backgroundColor: 'rgb(24, 24, 27)',
-                        border: '1px solid #3f3f46',
-                        borderRadius: '8px',
-                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
-                        zIndex: 1000,
-                        backdropFilter: 'none',
-                        opacity: 1
-                      }}
-                    >
-                      <button
-                        onClick={() => { exportAsText(); setShowExportMenu(false); }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          backgroundColor: 'rgb(24, 24, 27)',
-                          border: 'none',
-                          borderBottom: '1px solid #27272a',
-                          color: 'white',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          opacity: 1
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <FileText size={16} />
-                          <span style={{ fontWeight: 500 }}>Plain Text</span>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
-                          Export as .txt
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => { exportAsJSON(); setShowExportMenu(false); }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          backgroundColor: 'rgb(24, 24, 27)',
-                          border: 'none',
-                          borderBottom: '1px solid #27272a',
-                          color: 'white',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          opacity: 1
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <FileText size={16} />
-                          <span style={{ fontWeight: 500 }}>JSON</span>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
-                          With more Info
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => { exportAsSRT(); setShowExportMenu(false); }}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          backgroundColor: 'rgb(24, 24, 27)',
-                          border: 'none',
-                          color: 'white',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          borderRadius: '0 0 8px 8px',
-                          opacity: 1
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <FileText size={16} />
-                          <span style={{ fontWeight: 500 }}>SRT</span>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
-                          For video editing
-                        </div>
-                      </button>
-                    </div>
-                  </>
-                )}
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                </Button>
               </div>
             </div>
           </div>
@@ -1336,6 +1223,96 @@ export function TranscriptEditor({
           </div>
         </div>
       </div>
+      
+      {/* Export Menu Portal - This will render the menu outside of the header's stacking context */}
+      {showExportMenu && createPortal(
+        <>
+          {/* Backdrop */}
+          <div 
+            style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+            onClick={() => setShowExportMenu(false)}
+          />
+          {/* Menu */}
+          <div 
+            style={{
+              position: 'fixed',
+              top: `${exportMenuPosition.top}px`,
+              right: `${exportMenuPosition.right}px`,
+              width: '180px',
+              backgroundColor: 'rgb(24, 24, 27)',
+              border: '1px solid rgb(63, 63, 70)',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3)',
+              zIndex: 1000,
+              overflow: 'hidden'
+            }}
+          >
+            <button
+              onClick={() => { exportAsText(); setShowExportMenu(false); }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: 'none',
+                borderBottom: '1px solid rgb(39, 39, 42)',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer'
+              }}
+              className="bg-transparent hover:bg-zinc-700 transition-colors"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <FileText size={14} />
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>Plain Text</span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#a1a1aa', marginLeft: '22px' }}>
+                Export as .txt
+              </div>
+            </button>
+            <button
+              onClick={() => { exportAsJSON(); setShowExportMenu(false); }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: 'none',
+                borderBottom: '1px solid rgb(39, 39, 42)',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer'
+              }}
+              className="bg-transparent hover:bg-zinc-700 transition-colors"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <FileText size={14} />
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>JSON</span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#a1a1aa', marginLeft: '22px' }}>
+                With more Info
+              </div>
+            </button>
+            <button
+              onClick={() => { exportAsSRT(); setShowExportMenu(false); }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: 'none',
+                color: 'white',
+                textAlign: 'left',
+                cursor: 'pointer'
+              }}
+              className="bg-transparent hover:bg-zinc-700 transition-colors"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <FileText size={14} />
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>SRT</span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#a1a1aa', marginLeft: '22px' }}>
+                For video editing
+              </div>
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
