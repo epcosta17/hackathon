@@ -37,6 +37,19 @@ import { toast } from 'sonner';
       fetchInterviews();
     }, []);
 
+    // Debounced search effect
+    useEffect(() => {
+      const timeoutId = setTimeout(() => {
+        if (searchQuery.trim()) {
+          fetchInterviews(searchQuery);
+        } else {
+          fetchInterviews();
+        }
+      }, 500); // 500ms debounce delay
+
+      return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
+
     const fetchInterviews = async (search?: string) => {
       setIsLoadingInterviews(true);
       try {
@@ -56,14 +69,9 @@ import { toast } from 'sonner';
       }
     };
 
-    const handleSearch = useCallback((query: string) => {
+    const handleSearch = (query: string) => {
       setSearchQuery(query);
-      if (query.trim()) {
-        fetchInterviews(query);
-      } else {
-        fetchInterviews();
-      }
-    }, []);
+    };
 
     const handleDeleteInterview = async (id: number, e: React.MouseEvent) => {
       e.stopPropagation();
