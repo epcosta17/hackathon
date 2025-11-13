@@ -57,6 +57,37 @@ export function AnalysisDashboard({
     general: true,
   });
 
+  // Generate DOCX report when loading the dashboard
+  // This ensures the report is available even after backend restarts
+  useEffect(() => {
+    const generateReport = async () => {
+      if (analysisData && transcriptBlocks.length > 0) {
+        // Generate DOCX from existing analysis data (without re-analyzing)
+        try {
+          const response = await fetch('http://127.0.0.1:8000/api/generate-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              analysis_data: analysisData,
+              transcript_blocks: transcriptBlocks 
+            }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Update the docx_path if needed
+            if (data.docx_path) {
+              analysisData.docx_path = data.docx_path;
+            }
+            console.log('Report generation triggered for cache');
+          }
+        } catch (error) {
+          console.error('Failed to generate report:', error);
+        }
+      }
+    };
+    generateReport();
+  }, []); // Run once on mount
+
   // Don't auto-show dialog - let user click Save button when ready
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -183,9 +214,12 @@ export function AnalysisDashboard({
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
         toast.success('Report downloaded successfully!');
+      } else if (response.status === 404) {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.detail || 'Report not found. Please run analysis again to generate a new report.');
       } else {
         console.error('Download failed:', response.statusText);
-        toast.error('DOCX file not ready yet. Please wait a moment and try again.');
+        toast.error('Failed to download report. Please try again.');
       }
     } catch (error) {
       console.error('Error downloading report:', error);

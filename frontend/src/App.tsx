@@ -145,7 +145,7 @@ export default function App() {
         setAudioFile(null);
       }
       
-      setCurrentScreen('analysis');
+      setCurrentScreen('editor');
     } catch (err) {
       console.error('Failed to load interview:', err);
       toast.error('Failed to load interview. Please try again.');
@@ -164,7 +164,7 @@ export default function App() {
 
   return (
     <div className="bg-zinc-950 h-screen overflow-hidden">
-      <Toaster position="top-right" />
+      <Toaster position="bottom-right" />
       <AnimatePresence mode="wait">
         {currentScreen === 'upload' && (
           <motion.div key="upload" {...pageTransition} className="h-full overflow-hidden">

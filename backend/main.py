@@ -798,6 +798,31 @@ async def analyze_endpoint(request: AnalyzeRequest):
     
     return analysis_data
 
+class GenerateReportRequest(BaseModel):
+    """Request to generate DOCX from existing analysis."""
+    analysis_data: Dict
+    transcript_blocks: List[Dict]
+
+@app.post("/api/generate-report")
+async def generate_report_endpoint(request: GenerateReportRequest):
+    """Generate DOCX report from existing analysis data without re-analyzing."""
+    try:
+        # Convert dict to AnalysisData model
+        analysis_data = AnalysisData(**request.analysis_data)
+        
+        # Get full transcript
+        full_transcript = ' '.join([block.get('text', '') for block in request.transcript_blocks])
+        
+        # Generate unique cache key
+        cache_key = f"docx_{int(time.time())}_{hash(full_transcript)}"
+        
+        # Start DOCX generation in background
+        asyncio.create_task(generate_docx_async(analysis_data, full_transcript, cache_key))
+        
+        return {"docx_path": cache_key, "message": "Report generation started"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
 class DownloadRequest(BaseModel):
     """Request model for download endpoint."""
     docx_path: str
@@ -805,20 +830,17 @@ class DownloadRequest(BaseModel):
 @app.post("/api/download-report")
 async def download_report_endpoint(request: DownloadRequest):
     """
-    Download cached DOCX file or wait for it to be generated.
+    Download cached DOCX file. If not in cache, return error message.
+    Frontend should regenerate analysis to get a new report.
     """
     cache_key = request.docx_path
     
-    # Wait up to 5 seconds for DOCX to be generated if not in cache
-    max_wait = 50  # 50 * 0.1s = 5 seconds
-    wait_count = 0
-    
-    while cache_key not in docx_cache and wait_count < max_wait:
-        await asyncio.sleep(0.1)
-        wait_count += 1
-    
+    # Check if in cache
     if cache_key not in docx_cache:
-        raise HTTPException(status_code=404, detail="DOCX file not ready yet. Please try again.")
+        raise HTTPException(
+            status_code=404, 
+            detail="Report not found. Please run analysis again to generate a new report."
+        )
     
     # Get cached DOCX
     docx_data = docx_cache[cache_key]
