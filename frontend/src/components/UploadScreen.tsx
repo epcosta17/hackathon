@@ -1,11 +1,11 @@
-  import React, { useState, useCallback, useEffect } from 'react';
-  import { createPortal } from 'react-dom';
-  import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle } from 'lucide-react';
-  import { motion } from 'motion/react';
-  import { Button } from './ui/button';
-  import { Progress } from './ui/progress';
-  import { TranscriptBlock } from '../App';
-  import { toast } from 'sonner';
+import React, { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Button } from './ui/button';
+import { Progress } from './ui/progress';
+import { TranscriptBlock } from '../App';
+import { toast } from 'sonner';
 
   interface InterviewSummary {
     id: number;
@@ -29,7 +29,7 @@
     const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoadingInterviews, setIsLoadingInterviews] = useState(true);
-    const [isSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
     // Fetch interviews on mount
@@ -210,14 +210,19 @@
         {/* Fixed Sidebar - Previous Interviews */}
         <motion.aside
           initial={false}
-          animate={{ width: isSidebarOpen ? 280 : 280 }}
+          animate={{ width: isSidebarOpen ? 280 : 0 }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="border-r border-zinc-800 bg-zinc-900/20 flex-shrink-0 flex flex-col"
-          style={{ width: '280px' }}
+          className="border-r border-zinc-800 bg-zinc-900/20 flex-shrink-0 flex flex-col overflow-hidden"
         >
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-zinc-800/50 flex-shrink-0">
+          <div className="p-4 border-b border-zinc-800/50 flex-shrink-0 flex items-center justify-between">
             <h2 className="text-white text-sm font-semibold">Previous Interviews</h2>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Search Bar */}
@@ -279,7 +284,18 @@
         </motion.aside>
 
           {/* Main Upload Area */}
-          <div className="flex-1 flex items-center justify-center px-8 py-4">
+          <div className="flex-1 flex flex-col px-8 py-4">
+            {/* Hamburger button to open sidebar */}
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="self-start p-2 mb-4 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            
+            <div className="flex-1 flex items-center justify-center">
             <motion.div 
               className="max-w-2xl w-full space-y-8"
               initial={{ opacity: 0, y: 20 }}
@@ -441,6 +457,7 @@
               </Button>
             </motion.div>
             </motion.div>
+            </div>
           </div>
         </main>
 
