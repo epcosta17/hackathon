@@ -66,15 +66,74 @@ export function TranscriptEditor({
   const [isAddingNote, setIsAddingNote] = useState(false);
 
   // Create audio URL from file OR use direct URL for streaming
+  // Combined approach: Start with streaming, download in background, then switch to blob
   useEffect(() => {
     if (audioFile) {
-      // New transcription - create blob URL from file
+      // New transcription - create blob URL from file (already local)
       const url = URL.createObjectURL(audioFile);
       setLocalAudioUrl(url);
       return () => URL.revokeObjectURL(url);
     } else if (audioUrl) {
-      // Existing interview - use direct URL for streaming
+      // Existing interview - hybrid approach:
+      // 1. Start with streaming URL for instant playback
       setLocalAudioUrl(audioUrl);
+      
+      // 2. Download in background and switch to blob when ready
+      let blobUrl: string | null = null;
+      
+      const downloadAndCache = async () => {
+        try {
+          console.log('🔽 Starting background audio download...');
+          
+          // Show initial download toast
+          toast.info('Downloading audio for faster seeking...', {
+            duration: 1500,
+          });
+          
+          const response = await fetch(audioUrl);
+          const blob = await response.blob();
+          console.log('✅ Audio downloaded, switching to blob URL');
+          
+          // Create blob URL
+          blobUrl = URL.createObjectURL(blob);
+          
+          // Save current playback state before switching
+          const audio = audioRef.current;
+          const wasPlaying = audio && !audio.paused;
+          const savedTime = audio ? audio.currentTime : 0;
+          
+          // Switch to blob URL for better seeking performance
+          setLocalAudioUrl(blobUrl);
+          
+          // Restore playback state after a brief moment for the new URL to load
+          setTimeout(() => {
+            if (audio && blobUrl) {
+              audio.currentTime = savedTime;
+              if (wasPlaying) {
+                audio.play().catch(err => console.error('Failed to resume playback:', err));
+              }
+            }
+          }, 100);
+          
+          // Show success toast
+          toast.success('Audio cached - seeking is now instant!', {
+            duration: 2000,
+          });
+        } catch (error) {
+          console.error('Failed to download audio, continuing with streaming:', error);
+          // Keep using streaming URL if download fails
+        }
+      };
+      
+      downloadAndCache();
+      
+      // Cleanup blob URL when component unmounts or audioUrl changes
+      return () => {
+        if (blobUrl) {
+          console.log('🧹 Cleaning up blob URL');
+          URL.revokeObjectURL(blobUrl);
+        }
+      };
     } else {
       setLocalAudioUrl(null);
     }
