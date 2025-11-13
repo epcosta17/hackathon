@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle } from 'lucide-react';
+import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { AnalysisData } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,9 +16,10 @@ interface AnalysisDashboardProps {
   analysisData: AnalysisData;
   transcriptBlocks: any[];  // Not used anymore
   onBackToUpload: () => void;
+  onBackToEditor: () => void;
 }
 
-export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDashboardProps) {
+export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     keyPoints: true,
@@ -119,11 +120,25 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
     return 'text-green-400 bg-green-500/10 border-green-500/20';
   };
 
+  const getComplexityTextColor = (complexity: string) => {
+    if (complexity.includes('Expert')) return 'text-purple-400';
+    if (complexity.includes('Advanced')) return 'text-red-400';
+    if (complexity.includes('Intermediate')) return 'text-yellow-400';
+    return 'text-green-400';
+  };
+
   const getPaceColor = (pace: string) => {
     if (pace.includes('Intensive')) return 'text-red-400 bg-red-500/10 border-red-500/20';
     if (pace.includes('Fast')) return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
     if (pace.includes('Moderate')) return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
     return 'text-green-400 bg-green-500/10 border-green-500/20';
+  };
+
+  const getPaceTextColor = (pace: string) => {
+    if (pace.includes('Intensive')) return 'text-red-400';
+    if (pace.includes('Fast')) return 'text-orange-400';
+    if (pace.includes('Moderate')) return 'text-blue-400';
+    return 'text-green-400';
   };
 
   // Score tooltips
@@ -162,6 +177,14 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
             </div>
             <div className="flex gap-3">
               <Button
+                onClick={onBackToEditor}
+                variant="outline"
+                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Transcript
+              </Button>
+              <Button
                 onClick={handleDownloadReport}
                 disabled={isDownloading}
                 className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
@@ -175,7 +198,7 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
                 className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
               >
                 <Home className="w-4 h-4 mr-2" />
-                New Analysis
+                New Interview
               </Button>
             </div>
           </div>
@@ -355,23 +378,19 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
               </div>
               <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
             </div>
-            <div className="flex flex-col items-center min-w-[140px] -mt-[6px]">
-              <div className="flex items-center gap-1 mb-[7px]">
+            <div className="flex flex-col items-center min-w-[140px]">
+              <div className="flex items-center gap-1 mb-1">
                 <Zap className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Complexity</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border -mt-[1px] ${getComplexityColor(analysisData.statistics.complexity)}`}>
-                {analysisData.statistics.complexity}
-              </span>
+              <p className={`text-xl font-bold ${getComplexityTextColor(analysisData.statistics.complexity)}`}>{analysisData.statistics.complexity}</p>
             </div>
-            <div className="flex flex-col items-center min-w-[80px] -mt-[6px]">
-              <div className="flex items-center gap-1 mb-[7px]">
+            <div className="flex flex-col items-center min-w-[80px]">
+              <div className="flex items-center gap-1 mb-1">
                 <TrendingUp className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Pace</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border -mt-[1px] ${getPaceColor(analysisData.statistics.pace)}`}>
-                {analysisData.statistics.pace}
-              </span>
+              <p className={`text-xl font-bold ${getPaceTextColor(analysisData.statistics.pace)}`}>{analysisData.statistics.pace}</p>
             </div>
             <div className="flex flex-col items-center min-w-[70px]">
               <div className="flex items-center gap-1 mb-1">

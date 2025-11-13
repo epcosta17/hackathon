@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Edit2, Sparkles } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
@@ -9,14 +9,18 @@ interface TranscriptEditorProps {
   transcriptBlocks: TranscriptBlock[];
   setTranscriptBlocks: (blocks: TranscriptBlock[]) => void;
   onAnalysisComplete: (data: AnalysisData) => void;
+  onViewAnalysis: () => void;
   audioFile: File | null;
+  existingAnalysis: AnalysisData | null;
 }
 
 export function TranscriptEditor({
   transcriptBlocks,
   setTranscriptBlocks,
   onAnalysisComplete,
+  onViewAnalysis,
   audioFile,
+  existingAnalysis,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -248,14 +252,26 @@ export function TranscriptEditor({
               <h1 className="text-white">Interview Transcript</h1>
               <p className="text-zinc-400 text-sm">Review, edit, and verify the transcription</p>
             </div>
-            <Button
-              onClick={handleRunAnalysis}
-              disabled={isAnalyzing}
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
-            >
-              <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-              {isAnalyzing ? 'Analyzing...' : 'Run AI Analysis'}
-            </Button>
+            <div className="flex gap-3">
+              {existingAnalysis && (
+                <Button
+                  onClick={onViewAnalysis}
+                  variant="outline"
+                  className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Analysis
+                </Button>
+              )}
+              <Button
+                onClick={handleRunAnalysis}
+                disabled={isAnalyzing}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+              >
+                <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
+              </Button>
+            </div>
           </div>
         </div>
       </header>

@@ -1,5 +1,12 @@
 .venv/
 node_modules/
 backend/models/
-backend/__pycache__/
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.DS_Store

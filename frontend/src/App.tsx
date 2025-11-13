@@ -89,6 +89,10 @@ export default function App() {
     setCurrentScreen('analysis');
   };
 
+  const handleBackToEditor = () => {
+    setCurrentScreen('editor');
+  };
+
   const handleBackToUpload = () => {
     setCurrentScreen('upload');
     setTranscriptBlocks([]);
@@ -120,7 +124,9 @@ export default function App() {
               transcriptBlocks={transcriptBlocks}
               setTranscriptBlocks={setTranscriptBlocks}
               onAnalysisComplete={handleAnalysisComplete}
+              onViewAnalysis={() => setCurrentScreen('analysis')}
               audioFile={audioFile}
+              existingAnalysis={analysisData}
             />
           </motion.div>
         )}
@@ -130,6 +136,7 @@ export default function App() {
               analysisData={analysisData}
               transcriptBlocks={transcriptBlocks}
               onBackToUpload={handleBackToUpload}
+              onBackToEditor={handleBackToEditor}
             />
           </motion.div>
         )}
