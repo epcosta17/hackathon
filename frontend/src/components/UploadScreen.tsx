@@ -1,20 +1,98 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, FileAudio, CheckCircle } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
+import { toast } from 'sonner';
+
+interface InterviewSummary {
+  id: number;
+  title: string;
+  transcript_preview: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface UploadScreenProps {
   onTranscriptionComplete: (blocks: TranscriptBlock[], file: File) => void;
+  onLoadInterview: (id: number) => void;
 }
 
-export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
+export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: UploadScreenProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoadingInterviews, setIsLoadingInterviews] = useState(true);
+  const [isSidebarOpen] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  // Fetch interviews on mount
+  useEffect(() => {
+    fetchInterviews();
+  }, []);
+
+  const fetchInterviews = async (search?: string) => {
+    setIsLoadingInterviews(true);
+    try {
+      const url = search 
+        ? `http://127.0.0.1:8000/api/interviews?search=${encodeURIComponent(search)}`
+        : 'http://127.0.0.1:8000/api/interviews';
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setInterviews(data.interviews || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch interviews:', error);
+    } finally {
+      setIsLoadingInterviews(false);
+    }
+  };
+
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      fetchInterviews(query);
+    } else {
+      fetchInterviews();
+    }
+  }, []);
+
+  const handleDeleteInterview = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmId === null) return;
+    
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${deleteConfirmId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        fetchInterviews(searchQuery);
+        toast.success('Interview deleted successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to delete interview:', error);
+      toast.error('Failed to delete interview. Please try again.');
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -104,7 +182,7 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
       }
     } catch (error) {
       console.error('Error during transcription:', error);
-      alert('An error occurred during transcription. Please try again.');
+      toast.error('An error occurred during transcription. Please try again.');
       setIsTranscribing(false);
       setIsComplete(false);
     }
@@ -114,7 +192,7 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
     <div className="min-h-screen flex flex-col bg-zinc-950">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-8 py-6">
+        <div className="px-4 py-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
                 <FileAudio className="w-6 h-6 text-white" />
@@ -128,25 +206,104 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-0 flex items-center justify-center p-8 bg-zinc-950 overflow-auto">
-        <motion.div 
-          className="max-w-2xl w-full space-y-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+      <main className="flex-1 min-h-0 flex bg-zinc-950 overflow-hidden">
+        {/* Fixed Sidebar - Previous Interviews */}
+        <motion.aside
+          initial={false}
+          animate={{ width: isSidebarOpen ? 280 : 280 }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          className="border-r border-zinc-800 bg-zinc-900/20 flex-shrink-0 overflow-hidden"
         >
-          {/* Title Section */}
+          <div className="h-full flex flex-col overflow-hidden">
+            {/* Sidebar Header */}
+            <div className="p-4 flex-shrink-0 border-b border-zinc-800/50">
+              <h2 className="text-white text-sm font-semibold">Previous Interviews</h2>
+            </div>
+
+            {/* Sidebar Content */}
+            {isSidebarOpen && (
+              <div className="flex-1 flex flex-col min-h-0 px-4 pt-4 pb-4 space-y-3">
+                {/* Search Bar */}
+                <div className="relative flex-shrink-0">
+                  <input
+                    type="text"
+                    placeholder="Search ..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-900/30 hover:bg-zinc-900/50 focus:bg-zinc-900 border-2   border-zinc-800 focus:border-cyan-500 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none transition-all"
+                  />
+                </div>
+
+                {/* Interviews List - Scrollable */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden -mx-4 px-4">
+                  <div className="space-y-2">
+                  {isLoadingInterviews ? (
+                    <div className="text-center py-8 text-zinc-500 text-sm">
+                      Loading...
+                    </div>
+                  ) : interviews.length === 0 ? (
+                    <div className="text-center py-8 text-zinc-500 text-sm">
+                      {searchQuery ? 'No interviews found' : 'No saved interviews yet'}
+                    </div>
+                  ) : (
+                    interviews.map((interview) => (
+                      <motion.div
+                        key={interview.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={() => onLoadInterview(interview.id)}
+                        className="p-3 hover:bg-zinc-900/50 rounded-lg cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white text-sm font-medium truncate group-hover:text-cyan-400 transition-colors">
+                              {interview.title}
+                            </h3>
+                            <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
+                              {interview.transcript_preview}
+                            </p>
+                            <div className="flex items-center gap-1 mt-1 text-xs text-zinc-600">
+                              <Clock className="w-3 h-3" />
+                              <span>{formatDate(interview.created_at)}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => handleDeleteInterview(interview.id, e)}
+                            className="p-1 text-zinc-600 hover:text-red-400 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.aside>
+
+        {/* Main Upload Area */}
+        <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
           <motion.div 
-            className="text-center space-y-2"
+            className="max-w-2xl w-full space-y-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{ duration: 0.5 }}
           >
-            <h2 className="text-white">Analyze Your Interview</h2>
-            <p className="text-zinc-400">
-              Transform interview recordings into actionable insights and comprehensive reports
-            </p>
-          </motion.div>
+            {/* Title Section */}
+            <motion.div 
+              className="text-center space-y-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <h2 className="text-white">Analyze Your Interview</h2>
+              <p className="text-zinc-400">
+                Transform interview recordings into actionable insights and comprehensive reports
+              </p>
+            </motion.div>
 
           {/* Upload Zone */}
           <motion.div
@@ -289,8 +446,107 @@ export function UploadScreen({ onTranscriptionComplete }: UploadScreenProps) {
               )}
             </Button>
           </motion.div>
-        </motion.div>
+          </motion.div>
+        </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId !== null && typeof document !== 'undefined' && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#18181b',
+              border: '1px solid #3f3f46',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '420px',
+              margin: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #dc2626, #991b1b)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertTriangle style={{ width: '24px', height: '24px', color: 'white' }} />
+              </div>
+              <div>
+                <h3 style={{ 
+                  fontSize: '18px', 
+                  fontWeight: 'bold', 
+                  color: 'white',
+                  marginBottom: '4px'
+                }}>
+                  Delete Interview
+                </h3>
+                <p style={{ 
+                  color: '#a1a1aa', 
+                  fontSize: '14px',
+                  margin: 0
+                }}>
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+            
+            <p style={{ 
+              color: '#d4d4d8', 
+              marginBottom: '24px',
+              fontSize: '14px',
+              lineHeight: '1.5'
+            }}>
+              Are you sure you want to permanently delete this interview? All analysis data will be lost.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <Button
+                onClick={() => setDeleteConfirmId(null)}
+                variant="outline"
+                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDelete}
+                style={{
+                  background: 'linear-gradient(to right, #ef4444, #f43f5e)',
+                  color: 'white',
+                  border: 'none'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #e11d48)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #f43f5e)'}
+              >
+                <Trash2 className="w-4 h-4 mr-1.5" />
+                Delete
+              </Button>
+            </div>
+          </motion.div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

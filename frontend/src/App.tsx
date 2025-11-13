@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
+import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 
 export type Screen = 'upload' | 'editor' | 'analysis';
 
@@ -77,6 +79,7 @@ export default function App() {
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
 
   const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File) => {
     setTranscriptBlocks(blocks);
@@ -98,6 +101,43 @@ export default function App() {
     setTranscriptBlocks([]);
     setAnalysisData(null);
     setAudioFile(null);
+    setCurrentInterviewId(null);
+  };
+
+  const handleLoadInterview = async (interviewId: number) => {
+    try {
+      // Fetch interview data
+      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}`);
+      const interview = await response.json();
+      
+      setTranscriptBlocks(interview.transcript_words);
+      setAnalysisData(interview.analysis_data);
+      setCurrentInterviewId(interviewId);
+      
+      // Load audio file if it exists
+      if (interview.audio_url) {
+        try {
+          // Use the full URL/path from the database
+          const audioResponse = await fetch(`http://127.0.0.1:8000${interview.audio_url}`);
+          const audioBlob = await audioResponse.blob();
+          // Extract filename from URL
+          const filename = interview.audio_url.split('/').pop() || 'audio.mp3';
+          const audioFile = new File([audioBlob], filename, { type: audioBlob.type });
+          setAudioFile(audioFile);
+        } catch (audioErr) {
+          console.error('Failed to load audio file:', audioErr);
+          // Continue without audio file
+          setAudioFile(null);
+        }
+      } else {
+        setAudioFile(null);
+      }
+      
+      setCurrentScreen('analysis');
+    } catch (err) {
+      console.error('Failed to load interview:', err);
+      toast.error('Failed to load interview. Please try again.');
+    }
   };
 
   const pageTransition = {
@@ -112,10 +152,14 @@ export default function App() {
 
   return (
     <div className="bg-zinc-950">
+      <Toaster position="top-right" />
       <AnimatePresence mode="wait">
         {currentScreen === 'upload' && (
           <motion.div key="upload" {...pageTransition}>
-            <UploadScreen onTranscriptionComplete={handleTranscriptionComplete} />
+            <UploadScreen 
+              onTranscriptionComplete={handleTranscriptionComplete}
+              onLoadInterview={handleLoadInterview}
+            />
           </motion.div>
         )}
         {currentScreen === 'editor' && (
@@ -125,6 +169,7 @@ export default function App() {
               setTranscriptBlocks={setTranscriptBlocks}
               onAnalysisComplete={handleAnalysisComplete}
               onViewAnalysis={() => setCurrentScreen('analysis')}
+              onBackToUpload={handleBackToUpload}
               audioFile={audioFile}
               existingAnalysis={analysisData}
             />
@@ -137,6 +182,9 @@ export default function App() {
               transcriptBlocks={transcriptBlocks}
               onBackToUpload={handleBackToUpload}
               onBackToEditor={handleBackToEditor}
+              currentInterviewId={currentInterviewId}
+              onSaveInterview={setCurrentInterviewId}
+              audioFile={audioFile}
             />
           </motion.div>
         )}

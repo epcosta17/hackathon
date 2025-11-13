@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft } from 'lucide-react';
+import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, Check, BarChart3, PlusCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { AnalysisData } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { 
   SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql, 
   SiJest, SiDocker, SiKubernetes, SiGithubactions, SiFigma, SiPython, 
@@ -14,13 +15,28 @@ import {
 
 interface AnalysisDashboardProps {
   analysisData: AnalysisData;
-  transcriptBlocks: any[];  // Not used anymore
+  transcriptBlocks: any[];
   onBackToUpload: () => void;
   onBackToEditor: () => void;
+  currentInterviewId: number | null;
+  onSaveInterview: (id: number) => void;
+  audioFile: File | null;
 }
 
-export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor }: AnalysisDashboardProps) {
+export function AnalysisDashboard({ 
+  analysisData, 
+  transcriptBlocks, 
+  onBackToUpload, 
+  onBackToEditor, 
+  currentInterviewId,
+  onSaveInterview,
+  audioFile
+}: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [interviewTitle, setInterviewTitle] = useState('');
+  const [isSaved, setIsSaved] = useState(!!currentInterviewId);
   const [expandedSections, setExpandedSections] = useState({
     keyPoints: true,
     coding: true,
@@ -28,6 +44,8 @@ export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor
     qa: true,
     general: true,
   });
+
+  // Don't auto-show dialog - let user click Save button when ready
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -73,9 +91,55 @@ export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor
 
   // No parsing needed - we get JSON directly from the API!
 
+  const handleSaveInterview = async () => {
+    if (!interviewTitle.trim()) {
+      toast.error('Please enter a title for this interview');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get full transcript text
+      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
+
+      // Create FormData to send both JSON data and audio file
+      const formData = new FormData();
+      formData.append('title', interviewTitle);
+      formData.append('transcript_text', transcriptText);
+      formData.append('transcript_words', JSON.stringify(transcriptBlocks));
+      formData.append('analysis_data', JSON.stringify(analysisData));
+      
+      // Add audio file if available
+      if (audioFile) {
+        formData.append('audio_file', audioFile);
+      }
+
+      const response = await fetch('http://127.0.0.1:8000/api/interviews', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        onSaveInterview(result.id);
+        setIsSaved(true);
+        setShowSaveDialog(false);
+        toast.success('Interview saved successfully!');
+      } else {
+        console.error('Save failed:', response.statusText);
+        toast.error('Failed to save interview. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving interview:', error);
+      toast.error('An error occurred while saving the interview.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDownloadReport = async () => {
     if (!analysisData.docx_path) {
-      alert('DOCX file not ready yet. Please wait a moment and try again.');
+      toast.error('DOCX file not ready yet. Please wait a moment and try again.');
       return;
     }
 
@@ -101,13 +165,14 @@ export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        toast.success('Report downloaded successfully!');
       } else {
         console.error('Download failed:', response.statusText);
-        alert('DOCX file not ready yet. Please wait a moment and try again.');
+        toast.error('DOCX file not ready yet. Please wait a moment and try again.');
       }
     } catch (error) {
       console.error('Error downloading report:', error);
-      alert('An error occurred while downloading the report.');
+      toast.error('An error occurred while downloading the report.');
     } finally {
       setIsDownloading(false);
     }
@@ -169,36 +234,56 @@ export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor
     <div className="min-w-screen bg-zinc-950">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-white text-2xl font-bold">Interview Analysis Report</h1>
-              <p className="text-zinc-400 text-sm">AI-generated insights and evaluation metrics</p>
+        <div className="w-full px-8 py-4">
+          <div className="flex items-center justify-between gap-8">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-white text-2xl font-bold">Interview Analysis Report</h1>
+                <p className="text-zinc-400 text-sm">AI-generated insights and evaluation metrics</p>
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-shrink-0">
+              <Button
+                onClick={onBackToUpload}
+                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
               <Button
                 onClick={onBackToEditor}
-                variant="outline"
-                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Transcript
               </Button>
+              {!isSaved && (
+                <Button
+                  onClick={() => setShowSaveDialog(true)}
+                  disabled={isSaving}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSaving ? 'Saving...' : 'Save Interview'}
+                </Button>
+              )}
+              <Button
+                onClick={onBackToUpload}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              >
+                <PlusCircle className="w-4 h-4 mr-2" />
+                New Interview
+              </Button>
               <Button
                 onClick={handleDownloadReport}
                 disabled={isDownloading}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Download className="w-4 h-4 mr-2" />
                 {isDownloading ? 'Generating...' : 'Download Report'}
-              </Button>
-              <Button
-                onClick={onBackToUpload}
-                variant="outline"
-                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                New Interview
               </Button>
             </div>
           </div>
@@ -630,6 +715,99 @@ export function AnalysisDashboard({ analysisData, onBackToUpload, onBackToEditor
           }}
         >
           {scoreExplanations[hoveredTooltip as keyof typeof scoreExplanations]}
+        </div>,
+        document.body
+      )}
+
+      {/* Save Interview Dialog */}
+      {showSaveDialog && typeof document !== 'undefined' && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={() => setShowSaveDialog(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#18181b',
+              border: '1px solid #3f3f46',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '100%',
+              maxWidth: '480px',
+              margin: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            <h3 style={{ 
+              fontSize: '20px', 
+              fontWeight: 'bold', 
+              color: 'white', 
+              marginBottom: '8px' 
+            }}>
+              Save Interview
+            </h3>
+            <p style={{ 
+              color: '#a1a1aa', 
+              marginBottom: '20px',
+              fontSize: '14px' 
+            }}>
+              Give this interview analysis a memorable title
+            </p>
+            <input
+              type="text"
+              value={interviewTitle}
+              onChange={(e) => setInterviewTitle(e.target.value)}
+              placeholder="e.g., Senior React Developer - John Smith"
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                backgroundColor: '#27272a',
+                border: '1px solid #52525b',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '14px',
+                outline: 'none',
+                marginBottom: '24px'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
+              onBlur={(e) => e.target.style.borderColor = '#52525b'}
+              autoFocus
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && interviewTitle.trim()) {
+                  handleSaveInterview();
+                }
+              }}
+            />
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <Button
+                onClick={() => setShowSaveDialog(false)}
+                variant="outline"
+                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveInterview}
+                disabled={isSaving || !interviewTitle.trim()}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4 mr-1.5" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </motion.div>
         </div>,
         document.body
       )}

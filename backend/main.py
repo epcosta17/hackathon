@@ -16,6 +16,17 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import io
 
+# Import database functions
+from database import (
+    init_db,
+    save_interview,
+    update_interview,
+    get_interview,
+    get_interviews,
+    get_interview_summaries,
+    delete_interview
+)
+
 # Load environment variables from multiple possible locations
 load_dotenv()  # Load from current directory
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))  # Load from backend/.env
@@ -121,6 +132,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on app startup"""
+    init_db()
+    print("✅ Database initialized")
 
 # --- 3. Transcription Functions ---
 
@@ -816,6 +834,150 @@ async def download_report_endpoint(request: DownloadRequest):
 async def ping():
     """Simple endpoint to check API health."""
     return {"message": "pong"}
+
+# --- Database Endpoints ---
+
+class SaveInterviewRequest(BaseModel):
+    """Request model for saving interview."""
+    title: str
+    transcript_text: str
+    transcript_words: List[Dict]
+    analysis_data: Dict
+
+class UpdateInterviewRequest(BaseModel):
+    """Request model for updating interview."""
+    interview_id: int
+    title: Optional[str] = None
+    transcript_text: Optional[str] = None
+    transcript_words: Optional[List[Dict]] = None
+    analysis_data: Optional[Dict] = None
+
+@app.post("/api/interviews")
+async def create_interview(
+    title: str = Form(...),
+    transcript_text: str = Form(...),
+    transcript_words: str = Form(...),
+    analysis_data: str = Form(...),
+    audio_file: Optional[UploadFile] = File(None)
+):
+    """Save a new interview to the database."""
+    try:
+        # Parse JSON strings
+        transcript_words_data = json.loads(transcript_words)
+        analysis_data_dict = json.loads(analysis_data)
+        
+        # Save audio file if provided
+        audio_url = None
+        if audio_file:
+            # Generate unique filename
+            file_extension = os.path.splitext(audio_file.filename)[1]
+            audio_filename = f"{uuid.uuid4()}{file_extension}"
+            
+            # DEVELOPMENT: Save locally and use API path
+            audio_dir = os.path.join(os.path.dirname(__file__), "audio_files")
+            os.makedirs(audio_dir, exist_ok=True)
+            audio_path = os.path.join(audio_dir, audio_filename)
+            
+            with open(audio_path, "wb") as f:
+                content = await audio_file.read()
+                f.write(content)
+            
+            audio_url = f"/api/audio/{audio_filename}"
+            
+            # PRODUCTION: Upload to S3/cloud storage and store full URL
+            # Example for S3:
+            # s3_client.upload_fileobj(audio_file.file, 'bucket-name', audio_filename)
+            # audio_url = f"https://your-bucket.s3.amazonaws.com/{audio_filename}"
+            # 
+            # Example for Cloudinary:
+            # result = cloudinary.uploader.upload(audio_file.file, resource_type="video")
+            # audio_url = result['secure_url']
+        
+        interview_id = save_interview(
+            title=title,
+            transcript_text=transcript_text,
+            transcript_words=transcript_words_data,
+            analysis_data=analysis_data_dict,
+            audio_url=audio_url
+        )
+        return {"id": interview_id, "message": "Interview saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save interview: {str(e)}")
+
+@app.put("/api/interviews/{interview_id}")
+async def update_interview_endpoint(interview_id: int, request: UpdateInterviewRequest):
+    """Update an existing interview."""
+    try:
+        success = update_interview(
+            interview_id=interview_id,
+            title=request.title,
+            transcript_text=request.transcript_text,
+            transcript_words=request.transcript_words,
+            analysis_data=request.analysis_data
+        )
+        if not success:
+            raise HTTPException(status_code=404, detail="Interview not found")
+        return {"message": "Interview updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update interview: {str(e)}")
+
+@app.get("/api/interviews/{interview_id}")
+async def get_interview_endpoint(interview_id: int):
+    """Get a single interview by ID."""
+    try:
+        interview = get_interview(interview_id)
+        if not interview:
+            raise HTTPException(status_code=404, detail="Interview not found")
+        return interview
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve interview: {str(e)}")
+
+@app.get("/api/interviews")
+async def list_interviews(search: Optional[str] = None, limit: int = 50, offset: int = 0):
+    """Get list of interviews with optional search."""
+    try:
+        interviews = get_interview_summaries(search=search, limit=limit, offset=offset)
+        return {"interviews": interviews, "count": len(interviews)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve interviews: {str(e)}")
+
+@app.delete("/api/interviews/{interview_id}")
+async def delete_interview_endpoint(interview_id: int):
+    """Delete an interview."""
+    try:
+        success = delete_interview(interview_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Interview not found")
+        return {"message": "Interview deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete interview: {str(e)}")
+
+@app.get("/api/audio/{audio_filename}")
+async def get_audio_file(audio_filename: str):
+    """Serve an audio file."""
+    try:
+        audio_dir = os.path.join(os.path.dirname(__file__), "audio_files")
+        audio_path = os.path.join(audio_dir, audio_filename)
+        
+        if not os.path.exists(audio_path):
+            raise HTTPException(status_code=404, detail="Audio file not found")
+        
+        # Determine media type based on file extension
+        file_extension = os.path.splitext(audio_filename)[1].lower()
+        media_type = "audio/mpeg" if file_extension == ".mp3" else "audio/wav"
+        
+        from fastapi.responses import FileResponse
+        return FileResponse(audio_path, media_type=media_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to serve audio file: {str(e)}")
 
 # --- 6. Uvicorn Runner ---
 

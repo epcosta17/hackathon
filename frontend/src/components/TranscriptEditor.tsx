@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Edit2, Sparkles, Eye } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
+import { toast } from 'sonner';
 
 interface TranscriptEditorProps {
   transcriptBlocks: TranscriptBlock[];
   setTranscriptBlocks: (blocks: TranscriptBlock[]) => void;
   onAnalysisComplete: (data: AnalysisData) => void;
   onViewAnalysis: () => void;
+  onBackToUpload: () => void;
   audioFile: File | null;
   existingAnalysis: AnalysisData | null;
 }
@@ -19,6 +21,7 @@ export function TranscriptEditor({
   setTranscriptBlocks,
   onAnalysisComplete,
   onViewAnalysis,
+  onBackToUpload,
   audioFile,
   existingAnalysis,
 }: TranscriptEditorProps) {
@@ -225,13 +228,14 @@ export function TranscriptEditor({
       if (response.ok) {
         const data: AnalysisData = await response.json();
         onAnalysisComplete(data);
+        toast.success('Analysis completed successfully!');
       } else {
         console.error('Analysis failed:', response.statusText);
-        alert('Analysis failed. Please try again.');
+        toast.error('Analysis failed. Please try again.');
       }
     } catch (error) {
       console.error('Error during analysis:', error);
-      alert('An error occurred during analysis. Please try again.');
+      toast.error('An error occurred during analysis. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -248,16 +252,27 @@ export function TranscriptEditor({
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-white">Interview Transcript</h1>
-              <p className="text-zinc-400 text-sm">Review, edit, and verify the transcription</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-white">Interview Transcript</h1>
+                <p className="text-zinc-400 text-sm">Review, edit, and verify the transcription</p>
+              </div>
             </div>
             <div className="flex gap-3">
+              <Button
+                onClick={onBackToUpload}
+                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
               {existingAnalysis && (
                 <Button
                   onClick={onViewAnalysis}
-                  variant="outline"
-                  className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   View Analysis
