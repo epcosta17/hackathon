@@ -219,11 +219,23 @@ import { toast } from 'sonner';
         <motion.aside
           initial={false}
           animate={{ width: isSidebarOpen ? 280 : 0 }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          transition={{ 
+            duration: 0.35, 
+            ease: 'easeInOut',
+            delay: isSidebarOpen ? 0 : 0.2
+          }}
           className="border-r border-zinc-800 bg-zinc-900/20 flex-shrink-0 flex flex-col overflow-hidden"
         >
           {/* Sidebar Header */}
-          <div className="p-4 border-b border-zinc-800/50 flex-shrink-0 flex items-center justify-between">
+          <motion.div 
+            className="p-4 border-b border-zinc-800/50 flex-shrink-0 flex items-center justify-between"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+            transition={{ 
+              duration: 0.2,
+              delay: isSidebarOpen ? 0.3 : 0
+            }}
+          >
             <h2 className="text-white text-sm font-semibold">Previous Interviews</h2>
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -231,18 +243,32 @@ import { toast } from 'sonner';
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
+          </motion.div>
 
           {/* Search Bar */}
-          <div className="px-4 pt-4 flex-shrink-0">
+          <motion.div 
+            className="px-4 pt-4 flex-shrink-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+            transition={{ 
+              duration: 0.2,
+              delay: isSidebarOpen ? 0.35 : 0
+            }}
+          >
             <input
               type="text"
               placeholder="Search ..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-900/30 hover:bg-zinc-900/50 focus:bg-zinc-900 border-2 border-zinc-800 focus:border-cyan-500 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none transition-all"
+              style={{ boxShadow: 'none', outline: 'none' }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.boxShadow = 'none';
+              }}
+              onBlur={(e) => e.target.style.borderColor = '#27272a'}
+              className="w-full px-3 py-2 bg-zinc-900/30 hover:bg-zinc-900/50 focus:bg-zinc-900 border-2 border-zinc-800 rounded-lg text-white text-sm placeholder-zinc-500 transition-all"
             />
-          </div>
+          </motion.div>
 
           {/* Interviews List */}
           <div className="px-4 pt-4 pb-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
@@ -256,11 +282,20 @@ import { toast } from 'sonner';
                         {searchQuery ? 'No interviews found' : 'No saved interviews yet'}
                       </div>
                     ) : (
-                      interviews.map((interview) => (
+                      interviews.map((interview, index) => (
                         <motion.div
                           key={interview.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ 
+                            opacity: isSidebarOpen ? 1 : 0, 
+                            y: isSidebarOpen ? 0 : 20 
+                          }}
+                          transition={{ 
+                            duration: isSidebarOpen ? 0.4 : 0.2,
+                            delay: isSidebarOpen ? 0.4 + (index * 0.1) : 0,
+                            ease: [0.43, 0.13, 0.23, 0.96]
+                          }}
+                          whileHover={{ scale: 1.02 }}
                           onClick={() => onLoadInterview(interview.id)}
                           className="p-3 hover:bg-zinc-900/50 rounded-lg cursor-pointer transition-colors group"
                         >

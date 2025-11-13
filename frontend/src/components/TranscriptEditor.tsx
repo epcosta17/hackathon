@@ -25,6 +25,8 @@ interface TranscriptEditorProps {
   audioFile: File | null;
   existingAnalysis: AnalysisData | null;
   currentInterviewId: number | null;
+  notes: Note[];
+  setNotes: (notes: Note[]) => void;
 }
 
 export function TranscriptEditor({
@@ -36,6 +38,8 @@ export function TranscriptEditor({
   audioFile,
   existingAnalysis,
   currentInterviewId,
+  notes,
+  setNotes,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -53,8 +57,7 @@ export function TranscriptEditor({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const notesScrollRef = useRef<HTMLDivElement | null>(null);
   
-  // Notes and Bookmarks state
-  const [notes, setNotes] = useState<Note[]>([]);
+  // Notes and Bookmarks state  
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
@@ -75,7 +78,10 @@ export function TranscriptEditor({
   }, [currentInterviewId]);
 
   const fetchNotes = async () => {
-    if (!currentInterviewId) return;
+    if (!currentInterviewId) {
+      // If no interview ID, keep local notes
+      return;
+    }
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`);
       if (response.ok) {
@@ -88,8 +94,27 @@ export function TranscriptEditor({
   };
 
   const addNote = async (isBookmark: boolean = false) => {
-    if (!currentInterviewId || (!newNoteContent.trim() && !isBookmark)) return;
+    if (!newNoteContent.trim() && !isBookmark) return;
     
+    // If no interview ID, store locally
+    if (!currentInterviewId) {
+      const newNote: Note = {
+        id: Date.now(), // Temporary ID
+        interview_id: 0,
+        timestamp: currentTime,
+        content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
+        is_bookmark: isBookmark,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setNotes([...notes, newNote]);
+      setNewNoteContent('');
+      setIsAddingNote(false);
+      toast.success(isBookmark ? 'Bookmark added!' : 'Note added!');
+      return;
+    }
+    
+    // If interview exists, save to backend
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`, {
         method: 'POST',
@@ -114,6 +139,14 @@ export function TranscriptEditor({
   };
 
   const deleteNote = async (noteId: number) => {
+    // If no interview ID, delete from local state
+    if (!currentInterviewId) {
+      setNotes(notes.filter(note => note.id !== noteId));
+      toast.success('Note deleted!');
+      return;
+    }
+    
+    // If interview exists, delete from backend
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/notes/${noteId}`, {
         method: 'DELETE',
@@ -136,7 +169,27 @@ export function TranscriptEditor({
     }
     setCurrentTime(timestamp);
     setIsPlaying(true);
-    // Keep auto-scroll enabled when clicking a note/bookmark
+    
+    // Find the block for this timestamp and scroll instantly (no animation)
+    const targetBlock = transcriptBlocks.find(
+      (block) => timestamp >= block.timestamp && timestamp < block.timestamp + block.duration
+    ) || transcriptBlocks
+      .filter(b => b.timestamp <= timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    
+    if (targetBlock) {
+      setTimeout(() => {
+        const element = document.querySelector(`[data-block-id="${targetBlock.id}"]`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'auto', // Instant scroll
+            block: 'start',
+          });
+        }
+      }, 50);
+    }
+    
+    // Keep auto-scroll enabled for future playback
     setAutoScrollEnabled(true);
   };
 
@@ -526,11 +579,17 @@ export function TranscriptEditor({
                       No notes yet. Click + to add one!
                     </p>
                   ) : (
-                    notes.map((note) => (
+                    notes.map((note, index) => (
                       <motion.div
                         key={note.id}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
+                        transition={{ 
+                          duration: 0.4,
+                          delay: index * 0.1,
+                          ease: [0.43, 0.13, 0.23, 0.96]
+                        }}
+                        whileHover={{ scale: 1.02 }}
                         className="bg-zinc-900/50 p-3 rounded-lg hover:bg-zinc-900/70 transition-colors group"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">

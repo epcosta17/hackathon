@@ -13,6 +13,16 @@ import {
   SiTailwindcss, SiBootstrap, SiAmazon, SiGooglecloud
 } from 'react-icons/si';
 
+interface Note {
+  id: number;
+  interview_id: number;
+  timestamp: number;
+  content: string;
+  is_bookmark: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface AnalysisDashboardProps {
   analysisData: AnalysisData;
   transcriptBlocks: any[];
@@ -21,6 +31,7 @@ interface AnalysisDashboardProps {
   currentInterviewId: number | null;
   onSaveInterview: (id: number) => void;
   audioFile: File | null;
+  notes: Note[];
 }
 
 export function AnalysisDashboard({ 
@@ -30,7 +41,8 @@ export function AnalysisDashboard({
   onBackToEditor, 
   currentInterviewId,
   onSaveInterview,
-  audioFile
+  audioFile,
+  notes
 }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -108,6 +120,11 @@ export function AnalysisDashboard({
       formData.append('transcript_text', transcriptText);
       formData.append('transcript_words', JSON.stringify(transcriptBlocks));
       formData.append('analysis_data', JSON.stringify(analysisData));
+      
+      // Add notes if available
+      if (notes.length > 0) {
+        formData.append('notes', JSON.stringify(notes));
+      }
       
       // Add audio file if available
       if (audioFile) {
@@ -778,9 +795,13 @@ export function AnalysisDashboard({
                 color: 'white',
                 fontSize: '14px',
                 outline: 'none',
+                boxShadow: 'none',
                 marginBottom: '24px'
               }}
-              onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3b82f6';
+                e.target.style.boxShadow = 'none';
+              }}
               onBlur={(e) => e.target.style.borderColor = '#52525b'}
               autoFocus
               onKeyPress={(e) => {

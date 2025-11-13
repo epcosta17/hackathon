@@ -862,6 +862,7 @@ async def create_interview(
     transcript_text: str = Form(...),
     transcript_words: str = Form(...),
     analysis_data: str = Form(...),
+    notes: Optional[str] = Form(None),
     audio_file: Optional[UploadFile] = File(None)
 ):
     """Save a new interview to the database."""
@@ -869,6 +870,7 @@ async def create_interview(
         # Parse JSON strings
         transcript_words_data = json.loads(transcript_words)
         analysis_data_dict = json.loads(analysis_data)
+        notes_data = json.loads(notes) if notes else []
         
         # Save audio file if provided
         audio_url = None
@@ -904,6 +906,17 @@ async def create_interview(
             analysis_data=analysis_data_dict,
             audio_url=audio_url
         )
+        
+        # Save notes if provided
+        if notes_data:
+            for note in notes_data:
+                add_note(
+                    interview_id=interview_id,
+                    timestamp=note.get('timestamp', 0),
+                    content=note.get('content', ''),
+                    is_bookmark=note.get('is_bookmark', False)
+                )
+        
         return {"id": interview_id, "message": "Interview saved successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save interview: {str(e)}")

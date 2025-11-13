@@ -21,6 +21,16 @@ export interface TranscriptBlock {
   words?: Word[];
 }
 
+export interface Note {
+  id: number;
+  interview_id: number;
+  timestamp: number;
+  content: string;
+  is_bookmark: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Technology {
   name: string;
   timestamps?: string;
@@ -80,6 +90,7 @@ export default function App() {
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File) => {
     setTranscriptBlocks(blocks);
@@ -102,6 +113,7 @@ export default function App() {
     setAnalysisData(null);
     setAudioFile(null);
     setCurrentInterviewId(null);
+    setNotes([]);
   };
 
   const handleLoadInterview = async (interviewId: number) => {
@@ -173,6 +185,8 @@ export default function App() {
               audioFile={audioFile}
               existingAnalysis={analysisData}
               currentInterviewId={currentInterviewId}
+              notes={notes}
+              setNotes={setNotes}
             />
           </motion.div>
         )}
@@ -186,6 +200,7 @@ export default function App() {
               currentInterviewId={currentInterviewId}
               onSaveInterview={setCurrentInterviewId}
               audioFile={audioFile}
+              notes={notes}
             />
           </motion.div>
         )}
