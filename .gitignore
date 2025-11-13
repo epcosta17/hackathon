@@ -17,3 +17,7 @@ backend/interviews.db
 
 # Audio files
 backend/audio_files/
+
+# AI Models (too large for GitHub - download with script)
+backend/ai/ggml-base.bin
+backend/ai/*.bin
