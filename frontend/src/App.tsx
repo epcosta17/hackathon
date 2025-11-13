@@ -89,12 +89,16 @@ export default function App() {
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
 
   const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File) => {
     setTranscriptBlocks(blocks);
     setAudioFile(file);
+    setAudioUrl(null); // Clear URL when using new file
+    setAudioDuration(null); // Clear stored duration for new file
     setCurrentScreen('editor');
   };
 
@@ -112,43 +116,52 @@ export default function App() {
     setTranscriptBlocks([]);
     setAnalysisData(null);
     setAudioFile(null);
+    setAudioUrl(null);
+    setAudioDuration(null);
     setCurrentInterviewId(null);
     setNotes([]);
   };
 
   const handleLoadInterview = async (interviewId: number) => {
+    console.time('Load Interview');
     try {
       // Fetch interview data
+      console.time('Fetch Interview Data');
       const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}`);
       const interview = await response.json();
+      console.timeEnd('Fetch Interview Data');
       
+      console.time('Set State');
       setTranscriptBlocks(interview.transcript_words);
       setAnalysisData(interview.analysis_data);
       setCurrentInterviewId(interviewId);
       
-      // Load audio file if it exists
+      // Use audio URL directly for streaming - no download needed!
+      // Browser handles streaming automatically
+      setAudioFile(null);
       if (interview.audio_url) {
-        try {
-          // Use the full URL/path from the database
-          const audioResponse = await fetch(`http://127.0.0.1:8000${interview.audio_url}`);
-          const audioBlob = await audioResponse.blob();
-          // Extract filename from URL
-          const filename = interview.audio_url.split('/').pop() || 'audio.mp3';
-          const audioFile = new File([audioBlob], filename, { type: audioBlob.type });
-          setAudioFile(audioFile);
-        } catch (audioErr) {
-          console.error('Failed to load audio file:', audioErr);
-          // Continue without audio file
-          setAudioFile(null);
-        }
+        setAudioUrl(`http://127.0.0.1:8000${interview.audio_url}`);
       } else {
-        setAudioFile(null);
+        setAudioUrl(null);
       }
       
+      // Set stored audio duration if available
+      if (interview.audio_duration) {
+        setAudioDuration(interview.audio_duration);
+      } else {
+        setAudioDuration(null);
+      }
+      
+      console.timeEnd('Set State');
+      
+      // Show the screen immediately - audio will stream when played
+      console.log('Setting screen to editor');
       setCurrentScreen('editor');
+      console.timeEnd('Load Interview');
     } catch (err) {
       console.error('Failed to load interview:', err);
       toast.error('Failed to load interview. Please try again.');
+      console.timeEnd('Load Interview');
     }
   };
 
@@ -183,6 +196,8 @@ export default function App() {
               onViewAnalysis={() => setCurrentScreen('analysis')}
               onBackToUpload={handleBackToUpload}
               audioFile={audioFile}
+              audioUrl={audioUrl}
+              audioDuration={audioDuration}
               existingAnalysis={analysisData}
               currentInterviewId={currentInterviewId}
               notes={notes}

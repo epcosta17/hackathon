@@ -163,26 +163,36 @@ export function AnalysisDashboard({
       // Get full transcript text
       const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
 
+      console.log('handleSaveInterview - currentInterviewId:', currentInterviewId);
+
       if (currentInterviewId) {
         // UPDATE existing interview
+        console.log('Updating interview:', currentInterviewId);
+        const requestBody = {
+          interview_id: currentInterviewId,
+          title: interviewTitle,
+          transcript_text: transcriptText,
+          transcript_words: transcriptBlocks,
+          analysis_data: analysisData,
+        };
+        console.log('PUT request body:', requestBody);
+        
         const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            interview_id: currentInterviewId,
-            title: interviewTitle,
-            transcript_text: transcriptText,
-            transcript_words: transcriptBlocks,
-            analysis_data: analysisData,
-          }),
+          body: JSON.stringify(requestBody),
         });
 
+        console.log('PUT response status:', response.status);
         if (response.ok) {
+          const result = await response.json();
+          console.log('Update successful:', result);
           setIsSaved(true);
           setShowSaveDialog(false);
           toast.success('Interview updated successfully!');
         } else {
-          console.error('Update failed:', response.statusText);
+          const errorText = await response.text();
+          console.error('Update failed:', response.statusText, errorText);
           toast.error('Failed to update interview. Please try again.');
         }
       } else {

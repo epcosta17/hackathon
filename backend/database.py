@@ -27,6 +27,7 @@ def init_db():
             transcript_words TEXT NOT NULL,
             analysis_data TEXT NOT NULL,
             audio_url TEXT,
+            audio_duration REAL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -54,6 +55,14 @@ def init_db():
         # Column already exists or table has audio_filename
         pass
     
+    # Add audio_duration column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE interviews ADD COLUMN audio_duration REAL')
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    
     # Migrate audio_filename to audio_url if needed
     try:
         cursor.execute("SELECT audio_filename FROM interviews LIMIT 1")
@@ -71,6 +80,20 @@ def init_db():
     conn.commit()
     conn.close()
 
+def calculate_audio_duration(transcript_words: List[Dict[str, Any]]) -> Optional[float]:
+    """Calculate total audio duration from transcript blocks"""
+    if not transcript_words or len(transcript_words) == 0:
+        return None
+    
+    # Find the last block
+    last_block = transcript_words[-1]
+    
+    # Duration is the last block's timestamp + its duration
+    if 'timestamp' in last_block and 'duration' in last_block:
+        return last_block['timestamp'] + last_block['duration']
+    
+    return None
+
 def save_interview(
     title: str,
     transcript_text: str,
@@ -84,15 +107,19 @@ def save_interview(
     
     now = datetime.utcnow().isoformat()
     
+    # Calculate audio duration from transcript blocks
+    audio_duration = calculate_audio_duration(transcript_words)
+    
     cursor.execute('''
-        INSERT INTO interviews (title, transcript_text, transcript_words, analysis_data, audio_url, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO interviews (title, transcript_text, transcript_words, analysis_data, audio_url, audio_duration, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         title,
         transcript_text,
         json.dumps(transcript_words),
         json.dumps(analysis_data),
         audio_url,
+        audio_duration,
         now,
         now
     ))
@@ -132,6 +159,17 @@ def update_interview(
     except (KeyError, IndexError):
         current_audio_url = None
     
+    # Safely get current audio_duration
+    try:
+        current_audio_duration = row['audio_duration']
+    except (KeyError, IndexError):
+        current_audio_duration = None
+    
+    # Calculate new audio duration if transcript_words are being updated
+    new_audio_duration = current_audio_duration
+    if transcript_words is not None:
+        new_audio_duration = calculate_audio_duration(transcript_words)
+    
     cursor.execute('''
         UPDATE interviews 
         SET title = ?,
@@ -139,6 +177,7 @@ def update_interview(
             transcript_words = ?,
             analysis_data = ?,
             audio_url = ?,
+            audio_duration = ?,
             updated_at = ?
         WHERE id = ?
     ''', (
@@ -147,6 +186,7 @@ def update_interview(
         json.dumps(transcript_words) if transcript_words is not None else row['transcript_words'],
         json.dumps(analysis_data) if analysis_data is not None else row['analysis_data'],
         audio_url if audio_url is not None else current_audio_url,
+        new_audio_duration,
         now,
         interview_id
     ))
@@ -175,6 +215,12 @@ def get_interview(interview_id: int) -> Optional[Dict[str, Any]]:
     except (KeyError, IndexError):
         audio_url = None
     
+    # Safely get audio_duration (may not exist in older records)
+    try:
+        audio_duration = row['audio_duration']
+    except (KeyError, IndexError):
+        audio_duration = None
+    
     return {
         'id': row['id'],
         'title': row['title'],
@@ -182,6 +228,7 @@ def get_interview(interview_id: int) -> Optional[Dict[str, Any]]:
         'transcript_words': json.loads(row['transcript_words']),
         'analysis_data': json.loads(row['analysis_data']),
         'audio_url': audio_url,
+        'audio_duration': audio_duration,
         'created_at': row['created_at'],
         'updated_at': row['updated_at']
     }

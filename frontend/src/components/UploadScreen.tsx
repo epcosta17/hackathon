@@ -274,13 +274,29 @@ import { toast } from 'sonner';
           <div className="px-4 pt-4 pb-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
             <div className="space-y-2">
                     {isLoadingInterviews ? (
-                      <div className="text-center py-8 text-zinc-500 text-sm">
+                      <motion.div 
+                        className="text-center py-8 text-zinc-500 text-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+                        transition={{ 
+                          duration: 0.2,
+                          delay: isSidebarOpen ? 0.4 : 0
+                        }}
+                      >
                         Loading...
-                      </div>
+                      </motion.div>
                     ) : interviews.length === 0 ? (
-                      <div className="text-center py-8 text-zinc-500 text-sm">
+                      <motion.div 
+                        className="text-center py-8 text-zinc-500 text-sm"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+                        transition={{ 
+                          duration: 0.2,
+                          delay: isSidebarOpen ? 0.4 : 0
+                        }}
+                      >
                         {searchQuery ? 'No interviews found' : 'No saved interviews yet'}
-                      </div>
+                      </motion.div>
                     ) : (
                       interviews.map((interview, index) => (
                         <motion.div

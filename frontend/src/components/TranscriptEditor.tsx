@@ -23,6 +23,8 @@ interface TranscriptEditorProps {
   onViewAnalysis: () => void;
   onBackToUpload: () => void;
   audioFile: File | null;
+  audioUrl: string | null;
+  audioDuration: number | null;
   existingAnalysis: AnalysisData | null;
   currentInterviewId: number | null;
   notes: Note[];
@@ -36,6 +38,8 @@ export function TranscriptEditor({
   onViewAnalysis,
   onBackToUpload,
   audioFile,
+  audioUrl,
+  audioDuration,
   existingAnalysis,
   currentInterviewId,
   notes,
@@ -46,7 +50,7 @@ export function TranscriptEditor({
   const [duration, setDuration] = useState(0);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null);
@@ -61,18 +65,32 @@ export function TranscriptEditor({
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  // Create audio URL from file
+  // Create audio URL from file OR use direct URL for streaming
   useEffect(() => {
     if (audioFile) {
+      // New transcription - create blob URL from file
       const url = URL.createObjectURL(audioFile);
-      setAudioUrl(url);
+      setLocalAudioUrl(url);
       return () => URL.revokeObjectURL(url);
+    } else if (audioUrl) {
+      // Existing interview - use direct URL for streaming
+      setLocalAudioUrl(audioUrl);
+    } else {
+      setLocalAudioUrl(null);
     }
-  }, [audioFile]);
+  }, [audioFile, audioUrl]);
+  
+  // Set stored duration immediately if available (from database)
+  useEffect(() => {
+    if (audioDuration) {
+      setDuration(audioDuration);
+    }
+  }, [audioDuration]);
 
   // Fetch notes when interview is loaded
   useEffect(() => {
     if (currentInterviewId) {
+      console.time('Fetch Notes');
       fetchNotes();
     }
   }, [currentInterviewId]);
@@ -87,9 +105,11 @@ export function TranscriptEditor({
       if (response.ok) {
         const data = await response.json();
         setNotes(data.notes || []);
+        console.timeEnd('Fetch Notes');
       }
     } catch (error) {
       console.error('Failed to fetch notes:', error);
+      console.timeEnd('Fetch Notes');
     }
   };
 
@@ -199,19 +219,32 @@ export function TranscriptEditor({
     if (!audio) return;
 
     const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
+    const updateDuration = () => {
+      if (isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
     const handleEnded = () => setIsPlaying(false);
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('durationchange', updateDuration);
+    audio.addEventListener('canplay', updateDuration);
     audio.addEventListener('ended', handleEnded);
+
+    // Try to get duration immediately if already loaded
+    if (isFinite(audio.duration)) {
+      setDuration(audio.duration);
+    }
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('durationchange', updateDuration);
+      audio.removeEventListener('canplay', updateDuration);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioUrl]);
+  }, [localAudioUrl]);
 
   const getCurrentBlock = () => {
     // First try exact match
@@ -343,6 +376,10 @@ export function TranscriptEditor({
   };
 
   const formatTime = (seconds: number) => {
+    // Handle invalid values (NaN, Infinity, negative, etc.)
+    if (!isFinite(seconds) || seconds < 0) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -390,8 +427,8 @@ export function TranscriptEditor({
   return (
     <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
       {/* Hidden Audio Element */}
-      {audioUrl && (
-        <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      {localAudioUrl && (
+        <audio ref={audioRef} src={localAudioUrl} preload="metadata" />
       )}
       
       {/* Header */}
@@ -444,7 +481,9 @@ export function TranscriptEditor({
             <Button
               onClick={togglePlayPause}
               variant="outline"
-              className="w-12 h-12 rounded-full bg-zinc-800 border-zinc-700 hover:bg-zinc-700 p-0"
+              className="w-12 h-12 rounded-full bg-zinc-800 border-zinc-700 hover:bg-zinc-700 p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!localAudioUrl}
+              title={!localAudioUrl ? 'No audio available' : ''}
             >
               {isPlaying ? (
                 <Pause className="w-5 h-5 text-white" />
