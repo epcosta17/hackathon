@@ -272,30 +272,49 @@ import { toast } from 'sonner';
 
           {/* Interviews List */}
           <div className="px-4 pt-4 pb-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-            <div className="space-y-2">
+            <div className="space-y-2" style={{ paddingTop: interviews.length === 0 ? '50px' : '0' }}>
                     {isLoadingInterviews ? (
-                      <motion.div 
-                        className="text-center py-8 text-zinc-500 text-sm"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: isSidebarOpen ? 1 : 0 }}
-                        transition={{ 
-                          duration: 0.2,
-                          delay: isSidebarOpen ? 0.4 : 0
-                        }}
-                      >
-                        Loading...
-                      </motion.div>
+                      // Skeleton loaders
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700/50"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+                            transition={{ 
+                              duration: 0.2,
+                              delay: isSidebarOpen ? 0.3 + (i * 0.1) : 0
+                            }}
+                          >
+                            <div className="h-4 bg-zinc-700/50 rounded w-3/4 mb-2 animate-pulse"></div>
+                            <div className="h-3 bg-zinc-700/30 rounded w-1/2 animate-pulse"></div>
+                          </motion.div>
+                        ))}
+                      </div>
                     ) : interviews.length === 0 ? (
                       <motion.div 
-                        className="text-center py-8 text-zinc-500 text-sm"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: isSidebarOpen ? 1 : 0 }}
+                        className="text-center py-12 px-4"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: isSidebarOpen ? 1 : 0, y: isSidebarOpen ? 0 : 10 }}
                         transition={{ 
-                          duration: 0.2,
+                          duration: 0.3,
                           delay: isSidebarOpen ? 0.4 : 0
                         }}
                       >
-                        {searchQuery ? 'No interviews found' : 'No saved interviews yet'}
+                        {searchQuery ? (
+                          <>
+                            <div className="text-4xl mb-3">🔍</div>
+                            <div className="text-zinc-400 text-sm font-medium mb-1">No interviews found</div>
+                            <div className="text-zinc-500 text-xs">Try a different search term</div>
+                          </>
+                        ) : (
+                          <>
+                            <FileAudio className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+                            <div className="text-zinc-400 text-sm font-medium mb-1">No saved interviews yet</div>
+                            <div className="text-zinc-500 text-xs">Upload an audio file to get started</div>
+                          </>
+                        )}
                       </motion.div>
                     ) : (
                       interviews.map((interview, index) => (

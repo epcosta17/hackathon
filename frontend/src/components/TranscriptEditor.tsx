@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home, StickyNote, Bookmark, Plus, Trash2 } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home, StickyNote, Bookmark, Plus, Trash2, Download, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
@@ -68,6 +68,7 @@ export function TranscriptEditor({
   // Notes and Bookmarks state  
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Create audio URL from file OR use direct URL for streaming
   // Optimized approach: Start with streaming, download chunks in parallel, then switch to blob
@@ -412,6 +413,70 @@ export function TranscriptEditor({
     }
   };
 
+  // Export functions
+  const exportAsText = () => {
+    const text = transcriptBlocks.map(block => block.text).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcript-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported as TXT');
+    setShowExportMenu(false);
+  };
+
+  const exportAsJSON = () => {
+    const data = {
+      transcript: transcriptBlocks,
+      notes: notes,
+      duration: duration,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcript-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported as JSON');
+    setShowExportMenu(false);
+  };
+
+  const exportAsSRT = () => {
+    const srtContent = transcriptBlocks.map((block, index) => {
+      const startTime = formatSRTTime(block.timestamp);
+      const endTime = formatSRTTime(block.timestamp + block.duration);
+      return `${index + 1}\n${startTime} --> ${endTime}\n${block.text}\n`;
+    }).join('\n');
+    
+    const blob = new Blob([srtContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcript-${Date.now()}.srt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Transcript exported as SRT');
+    setShowExportMenu(false);
+  };
+
+  const formatSRTTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const millis = Math.floor((seconds % 1) * 1000);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(millis).padStart(3, '0')}`;
+  };
+
   const jumpToNote = (timestamp: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = timestamp;
@@ -699,6 +764,140 @@ export function TranscriptEditor({
                 <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
                 {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
               </Button>
+              
+              {/* Export Menu */}
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    backgroundColor: '#27272a',
+                    border: '1px solid #3f3f46',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3f3f46'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27272a'}
+                >
+                  <Download size={16} />
+                  Export
+                  <ChevronDown size={14} />
+                </button>
+                
+                {showExportMenu && (
+                  <>
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 999,
+                        backgroundColor: 'transparent'
+                      }}
+                      onClick={() => setShowExportMenu(false)}
+                    />
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: '64px',
+                        right: '32px',
+                        width: '220px',
+                        backgroundColor: 'rgb(24, 24, 27)',
+                        border: '1px solid #3f3f46',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                        zIndex: 1000,
+                        backdropFilter: 'none',
+                        opacity: 1
+                      }}
+                    >
+                      <button
+                        onClick={() => { exportAsText(); setShowExportMenu(false); }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          backgroundColor: 'rgb(24, 24, 27)',
+                          border: 'none',
+                          borderBottom: '1px solid #27272a',
+                          color: 'white',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          opacity: 1
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <FileText size={16} />
+                          <span style={{ fontWeight: 500 }}>Plain Text</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
+                          Export as .txt
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { exportAsJSON(); setShowExportMenu(false); }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          backgroundColor: 'rgb(24, 24, 27)',
+                          border: 'none',
+                          borderBottom: '1px solid #27272a',
+                          color: 'white',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          opacity: 1
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <FileText size={16} />
+                          <span style={{ fontWeight: 500 }}>JSON</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
+                          With more Info
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => { exportAsSRT(); setShowExportMenu(false); }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          backgroundColor: 'rgb(24, 24, 27)',
+                          border: 'none',
+                          color: 'white',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          borderRadius: '0 0 8px 8px',
+                          opacity: 1
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(39, 39, 42)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgb(24, 24, 27)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <FileText size={16} />
+                          <span style={{ fontWeight: 500 }}>SRT</span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#a1a1aa', marginLeft: '24px' }}>
+                          For video editing
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -894,9 +1093,11 @@ export function TranscriptEditor({
               >
                 <div className="space-y-3">
                   {notes.length === 0 ? (
-                    <p className="text-zinc-500 text-sm text-center py-8">
-                      No notes yet. Click + to add one!
-                    </p>
+                    <div className="text-center py-12 px-4">
+                      <FileText className="w-8 h-8 text-zinc-600 mx-auto mb-4" />
+                      <div className="text-zinc-400 text-sm font-medium mb-1">No notes or bookmarks yet</div>
+                      <div className="text-zinc-500 text-xs">Use the buttons above to add notes or bookmarks</div>
+                    </div>
                   ) : (
                     notes.map((note, index) => (
                       <motion.div
@@ -1051,26 +1252,36 @@ export function TranscriptEditor({
             {/* Right Side - Info Panel (35%) */}
             <div className="bg-zinc-900/20 p-8 overflow-y-auto h-full flex-shrink-0" style={{ width: '35%' }}>
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-white mb-2">Transcript Statistics</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
-                      <span className="text-zinc-400 text-sm">Total Blocks</span>
-                      <span className="text-white">{transcriptBlocks.length}</span>
+                {/* How to Use - Top */}
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <h4 className="text-blue-400 mb-3 font-semibold">How to Use</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Transcript</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li>• Click any timestamp to jump to that point</li>
+                        <li>• Click the edit icon to modify text</li>
+                        <li>• Active block highlights as audio plays</li>
+                      </ul>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
-                      <span className="text-zinc-400 text-sm">Duration</span>
-                      <span className="text-white">{formatTime(duration)}</span>
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Notes & Bookmarks</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <Plus className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
+                        <li>• Click any note/bookmark to jump & play</li>
+                        <li>• Hover to delete notes</li>
+                      </ul>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
-                      <span className="text-zinc-400 text-sm">Word Count</span>
-                      <span className="text-white">
-                        {transcriptBlocks.reduce((acc, block) => acc + block.text.split(' ').length, 0)}
-                      </span>
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Analysis</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li>• Click "Run AI Analysis" when ready</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
 
+                {/* Confidence Colors - Middle */}
                 <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
                   <h4 className="text-zinc-300 font-medium mb-3">Confidence Colors</h4>
                   <div className="space-y-2.5 text-sm">
@@ -1100,30 +1311,23 @@ export function TranscriptEditor({
                   </p>
                 </div>
 
-                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <h4 className="text-blue-400 mb-3 font-semibold">How to Use</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <h5 className="text-white text-sm font-medium mb-2">Transcript</h5>
-                      <ul className="text-zinc-300 text-sm space-y-1.5">
-                        <li>• Click any timestamp to jump to that point</li>
-                        <li>• Click the edit icon to modify text</li>
-                        <li>• Active block highlights as audio plays</li>
-                      </ul>
+                {/* Statistics - Bottom */}
+                <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <h4 className="text-zinc-300 font-medium mb-3">Transcript Statistics</h4>
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Total Blocks</span>
+                      <span className="text-white font-medium">{transcriptBlocks.length}</span>
                     </div>
-                    <div>
-                      <h5 className="text-white text-sm font-medium mb-2">Notes & Bookmarks</h5>
-                      <ul className="text-zinc-300 text-sm space-y-1.5">
-                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <Plus className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
-                        <li>• Click any note/bookmark to jump & play</li>
-                        <li>• Hover to delete notes</li>
-                      </ul>
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Duration</span>
+                      <span className="text-white font-medium">{formatTime(duration)}</span>
                     </div>
-                    <div>
-                      <h5 className="text-white text-sm font-medium mb-2">Analysis</h5>
-                      <ul className="text-zinc-300 text-sm space-y-1.5">
-                        <li>• Click "Run AI Analysis" when ready</li>
-                      </ul>
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400">Word Count</span>
+                      <span className="text-white font-medium">
+                        {transcriptBlocks.reduce((acc, block) => acc + block.text.split(' ').length, 0)}
+                      </span>
                     </div>
                   </div>
                 </div>
