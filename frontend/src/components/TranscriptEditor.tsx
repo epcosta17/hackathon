@@ -25,6 +25,7 @@ interface TranscriptEditorProps {
   audioFile: File | null;
   audioUrl: string | null;
   audioDuration: number | null;
+  waveformData: number[] | null;
   existingAnalysis: AnalysisData | null;
   currentInterviewId: number | null;
   notes: Note[];
@@ -40,6 +41,7 @@ export function TranscriptEditor({
   audioFile,
   audioUrl,
   audioDuration,
+  waveformData: waveformDataProp,
   existingAnalysis,
   currentInterviewId,
   notes,
@@ -55,6 +57,8 @@ export function TranscriptEditor({
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null);
   const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [isGeneratingWaveform, setIsGeneratingWaveform] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +234,88 @@ export function TranscriptEditor({
       setDuration(audioDuration);
     }
   }, [audioDuration]);
+  
+  // Use pre-generated waveform from props (from database or transcription)
+  useEffect(() => {
+    if (waveformDataProp && waveformDataProp.length > 0) {
+      console.log('✨ Using pre-generated waveform with', waveformDataProp.length, 'bars');
+      setWaveformData(waveformDataProp);
+    }
+  }, [waveformDataProp]);
+  
+  // Generate waveform visualization when audio is cached locally (fallback)
+  useEffect(() => {
+    const generateWaveform = async () => {
+      // Skip if we already have waveform data
+      if (waveformData.length > 0) {
+        return;
+      }
+      
+      if (!localAudioUrl || !localAudioUrl.startsWith('blob:') || isGeneratingWaveform) {
+        return;
+      }
+      
+      try {
+        setIsGeneratingWaveform(true);
+        console.log('🎵 Generating waveform visualization...');
+        
+        // Fetch audio data
+        const response = await fetch(localAudioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Create audio context
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // Get channel data (use first channel)
+        const channelData = audioBuffer.getChannelData(0);
+        const samples = 250; // Number of bars to display (increased for more detail)
+        const blockSize = Math.floor(channelData.length / samples);
+        const waveform: number[] = [];
+        
+        // Calculate RMS (Root Mean Square) for each block for smoother visualization
+        for (let i = 0; i < samples; i++) {
+          const start = blockSize * i;
+          let sum = 0;
+          
+          for (let j = 0; j < blockSize; j++) {
+            const sample = channelData[start + j];
+            sum += sample * sample;
+          }
+          
+          const rms = Math.sqrt(sum / blockSize);
+          waveform.push(rms);
+        }
+        
+        // Normalize to 0-1 range
+        const max = Math.max(...waveform);
+        const normalized = waveform.map(val => val / max);
+        
+        setWaveformData(normalized);
+        console.log('✅ Waveform generated with 250 bars (high detail)');
+        
+        // Save to database if we have an interview ID
+        if (currentInterviewId) {
+          try {
+            await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/waveform`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(normalized),
+            });
+            console.log('💾 Waveform saved to database for next time');
+          } catch (error) {
+            console.error('Failed to save waveform:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to generate waveform:', error);
+      } finally {
+        setIsGeneratingWaveform(false);
+      }
+    };
+    
+    generateWaveform();
+  }, [localAudioUrl, currentInterviewId, waveformData.length]);
 
   // Fetch notes when interview is loaded
   useEffect(() => {
@@ -646,11 +732,51 @@ export function TranscriptEditor({
                 onMouseMove={handleSeekBarHover}
                 onMouseLeave={handleSeekBarLeave}
               >
-                <div className="relative w-full h-2 bg-zinc-800 rounded-lg overflow-hidden">
-                  <div 
-                    className="absolute h-full rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600"
-                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                  />
+                <div className="relative w-full h-16 bg-zinc-900/50 rounded-lg overflow-hidden border border-zinc-800/50">
+                  {/* Waveform visualization */}
+                  {waveformData.length > 0 ? (
+                    <div className="absolute inset-0 flex items-center justify-between px-2 gap-[2px]">
+                      {waveformData.map((amplitude, index) => {
+                        const progress = (currentTime / duration) * 100;
+                        const barProgress = (index / waveformData.length) * 100;
+                        const isPlayed = barProgress <= progress;
+                        const height = Math.max(amplitude * 100, 4); // Min 4% height
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="flex items-center justify-center transition-colors duration-150"
+                            style={{
+                              height: '100%',
+                              width: '3px',
+                            }}
+                          >
+                            <div
+                              className="w-full rounded-full transition-all duration-150"
+                              style={{
+                                height: `${height}%`,
+                                backgroundColor: isPlayed 
+                                  ? 'rgb(59, 130, 246)' // Blue for played
+                                  : 'rgb(63, 63, 70)', // Zinc-700 for unplayed
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    // Fallback to simple progress bar while waveform loads
+                    <div className="absolute inset-0 flex items-center px-2">
+                      <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 transition-all duration-150"
+                          style={{ width: `${(currentTime / duration) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Invisible range input for seeking */}
                   <input
                     type="range"
                     min="0"
@@ -658,8 +784,18 @@ export function TranscriptEditor({
                     step="0.1"
                     value={currentTime}
                     onChange={handleScrub}
-                    className="absolute w-full h-2 appearance-none cursor-pointer bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:relative [&::-webkit-slider-thumb]:z-10"
+                    className="absolute inset-0 w-full h-full appearance-none cursor-pointer bg-transparent opacity-0 z-10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:opacity-100"
                   />
+                  
+                  {/* Playhead indicator */}
+                  {waveformData.length > 0 && (
+                    <div 
+                      className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none z-20"
+                      style={{ left: `${(currentTime / duration) * 100}%` }}
+                    >
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-3 h-3 bg-white rounded-full shadow-lg" />
+                    </div>
+                  )}
                 </div>
                 {hoverTime !== null && hoverPosition !== null && (
                   <div

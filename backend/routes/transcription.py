@@ -73,11 +73,20 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
                 await asyncio.sleep(1)
                 transcript_blocks = generate_mock_transcript()
             
+            # Generate waveform visualization (fast, while audio file still exists)
+            print(f"🎵 [BACKEND] Generating waveform visualization...")
+            yield f"data: {json.dumps({'progress': 92, 'message': 'Generating waveform...'})}\n\n"
+            await asyncio.sleep(0.1)
+            
+            from services.waveform_service import generate_waveform_universal
+            waveform_data = generate_waveform_universal(temp_file.name, samples=250)
+            print(f"✅ [BACKEND] Waveform generated with {len(waveform_data)} bars")
+            
             print(f"📦 [BACKEND] Preparing final response with {len(transcript_blocks)} blocks...")
             transcript_data = [block.model_dump() for block in transcript_blocks]
             print(f"💾 [BACKEND] Serialized transcript size: {len(str(transcript_data))} chars")
             print(f"🎬 [BACKEND] Sending 100% complete to frontend!")
-            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete!', 'transcript': transcript_data})}\n\n"
+            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete!', 'transcript': transcript_data, 'waveform': waveform_data})}\n\n"
             
         except Exception as e:
             print(f"💥 [BACKEND] ERROR in transcription: {str(e)}")

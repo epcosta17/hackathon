@@ -182,7 +182,7 @@ import { toast } from 'sonner';
                 // Transcription complete!
                 setIsComplete(true);
                 setTimeout(() => {
-                  onTranscriptionComplete(data.transcript, file);
+                  onTranscriptionComplete(data.transcript, file, data.waveform);
                 }, 1500); // Give user time to see "Transcription Finished" message
               }
             }

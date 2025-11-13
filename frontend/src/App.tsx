@@ -91,14 +91,24 @@ export default function App() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
+  const [waveformData, setWaveformData] = useState<number[] | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
 
-  const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File) => {
+  const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File, waveform?: number[]) => {
     setTranscriptBlocks(blocks);
     setAudioFile(file);
     setAudioUrl(null); // Clear URL when using new file
     setAudioDuration(null); // Clear stored duration for new file
+    
+    // Store waveform data if provided (from backend generation)
+    if (waveform && waveform.length > 0) {
+      setWaveformData(waveform);
+      console.log('✨ Received waveform from backend with', waveform.length, 'bars');
+    } else {
+      setWaveformData(null);
+    }
+    
     setCurrentScreen('editor');
   };
 
@@ -118,6 +128,7 @@ export default function App() {
     setAudioFile(null);
     setAudioUrl(null);
     setAudioDuration(null);
+    setWaveformData(null);
     setCurrentInterviewId(null);
     setNotes([]);
   };
@@ -150,6 +161,14 @@ export default function App() {
         setAudioDuration(interview.audio_duration);
       } else {
         setAudioDuration(null);
+      }
+      
+      // Set waveform data if available (from database)
+      if (interview.waveform_data && interview.waveform_data.length > 0) {
+        setWaveformData(interview.waveform_data);
+        console.log('✨ Loaded waveform from database with', interview.waveform_data.length, 'bars');
+      } else {
+        setWaveformData(null);
       }
       
       console.timeEnd('Set State');
@@ -198,6 +217,7 @@ export default function App() {
               audioFile={audioFile}
               audioUrl={audioUrl}
               audioDuration={audioDuration}
+              waveformData={waveformData}
               existingAnalysis={analysisData}
               currentInterviewId={currentInterviewId}
               notes={notes}
@@ -216,6 +236,7 @@ export default function App() {
               onSaveInterview={setCurrentInterviewId}
               audioFile={audioFile}
               notes={notes}
+              waveformData={waveformData}
             />
           </motion.div>
         )}

@@ -25,6 +25,7 @@ async def create_interview(
     transcript_words: str = Form(...),
     analysis_data: str = Form(...),
     notes: Optional[str] = Form(None),
+    waveform_data: Optional[str] = Form(None),
     audio_file: Optional[UploadFile] = File(None)
 ):
     """Save a new interview to the database."""
@@ -33,6 +34,7 @@ async def create_interview(
         transcript_words_data = json.loads(transcript_words)
         analysis_data_dict = json.loads(analysis_data)
         notes_data = json.loads(notes) if notes else []
+        waveform_data_list = json.loads(waveform_data) if waveform_data else None
         
         # Save audio file if provided
         audio_url = None
@@ -57,7 +59,8 @@ async def create_interview(
             transcript_text=transcript_text,
             transcript_words=transcript_words_data,
             analysis_data=analysis_data_dict,
-            audio_url=audio_url
+            audio_url=audio_url,
+            waveform_data=waveform_data_list
         )
         
         # Save notes if provided
@@ -134,4 +137,27 @@ async def delete_interview_endpoint(interview_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete interview: {str(e)}")
+
+
+@router.post("/interviews/{interview_id}/waveform")
+async def save_waveform(interview_id: int, waveform_data: list):
+    """Save waveform visualization data for an interview."""
+    try:
+        from database import get_db
+        import json
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            'UPDATE interviews SET waveform_data = ? WHERE id = ?',
+            (json.dumps(waveform_data), interview_id)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "Waveform saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save waveform: {str(e)}")
 

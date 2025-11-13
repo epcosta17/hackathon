@@ -28,6 +28,7 @@ def init_db():
             analysis_data TEXT NOT NULL,
             audio_url TEXT,
             audio_duration REAL,
+            waveform_data TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -58,6 +59,14 @@ def init_db():
     # Add audio_duration column if it doesn't exist (for existing databases)
     try:
         cursor.execute('ALTER TABLE interviews ADD COLUMN audio_duration REAL')
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
+    
+    # Add waveform_data column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE interviews ADD COLUMN waveform_data TEXT')
         conn.commit()
     except sqlite3.OperationalError:
         # Column already exists
@@ -99,7 +108,8 @@ def save_interview(
     transcript_text: str,
     transcript_words: List[Dict[str, Any]],
     analysis_data: Dict[str, Any],
-    audio_url: Optional[str] = None
+    audio_url: Optional[str] = None,
+    waveform_data: Optional[List[float]] = None
 ) -> int:
     """Save a new interview to the database"""
     conn = get_db()
@@ -110,9 +120,12 @@ def save_interview(
     # Calculate audio duration from transcript blocks
     audio_duration = calculate_audio_duration(transcript_words)
     
+    # Serialize waveform data if provided
+    waveform_json = json.dumps(waveform_data) if waveform_data else None
+    
     cursor.execute('''
-        INSERT INTO interviews (title, transcript_text, transcript_words, analysis_data, audio_url, audio_duration, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO interviews (title, transcript_text, transcript_words, analysis_data, audio_url, audio_duration, waveform_data, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         title,
         transcript_text,
@@ -120,6 +133,7 @@ def save_interview(
         json.dumps(analysis_data),
         audio_url,
         audio_duration,
+        waveform_json,
         now,
         now
     ))
@@ -221,6 +235,14 @@ def get_interview(interview_id: int) -> Optional[Dict[str, Any]]:
     except (KeyError, IndexError):
         audio_duration = None
     
+    # Safely get waveform_data (may not exist in older records)
+    try:
+        waveform_data = row['waveform_data']
+        if waveform_data:
+            waveform_data = json.loads(waveform_data)
+    except (KeyError, IndexError, json.JSONDecodeError):
+        waveform_data = None
+    
     return {
         'id': row['id'],
         'title': row['title'],
@@ -229,6 +251,7 @@ def get_interview(interview_id: int) -> Optional[Dict[str, Any]]:
         'analysis_data': json.loads(row['analysis_data']),
         'audio_url': audio_url,
         'audio_duration': audio_duration,
+        'waveform_data': waveform_data,
         'created_at': row['created_at'],
         'updated_at': row['updated_at']
     }

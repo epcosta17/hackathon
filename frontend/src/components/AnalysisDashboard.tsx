@@ -32,6 +32,7 @@ interface AnalysisDashboardProps {
   onSaveInterview: (id: number) => void;
   audioFile: File | null;
   notes: Note[];
+  waveformData: number[] | null;
 }
 
 export function AnalysisDashboard({ 
@@ -42,7 +43,8 @@ export function AnalysisDashboard({
   currentInterviewId,
   onSaveInterview,
   audioFile,
-  notes
+  notes,
+  waveformData
 }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -206,6 +208,11 @@ export function AnalysisDashboard({
         // Add notes if available
         if (notes.length > 0) {
           formData.append('notes', JSON.stringify(notes));
+        }
+        
+        // Add waveform data if available
+        if (waveformData && waveformData.length > 0) {
+          formData.append('waveform_data', JSON.stringify(waveformData));
         }
         
         // Add audio file if available
