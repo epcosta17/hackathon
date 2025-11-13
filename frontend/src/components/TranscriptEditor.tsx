@@ -38,6 +38,7 @@ export function TranscriptEditor({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Create audio URL from file
   useEffect(() => {
@@ -91,18 +92,19 @@ export function TranscriptEditor({
 
   const currentBlock = getCurrentBlock();
 
-  // Auto-scroll to active block during playback
+  // Scroll active segment to top whenever it changes (same logic as clicking player)
   useEffect(() => {
     if (autoScrollEnabled && currentBlock?.id) {
-      // Use requestAnimationFrame to ensure ref is attached after React updates DOM
-      requestAnimationFrame(() => {
-        if (activeBlockRef.current) {
-          activeBlockRef.current.scrollIntoView({
-            behavior: 'auto', // Instant jump, no animation
+      // Use the same scrolling logic as handleScrub
+      setTimeout(() => {
+        const element = document.querySelector(`[data-block-id="${currentBlock.id}"]`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth', // Smooth scrolling during playback
             block: 'start',
           });
         }
-      });
+      }, 50);
     }
   }, [currentBlock?.id, autoScrollEnabled]);
 
@@ -184,8 +186,8 @@ export function TranscriptEditor({
     }
     setCurrentTime(timestamp);
     setIsPlaying(true);
-    // Disable auto-scroll when clicking a segment
-    setAutoScrollEnabled(false);
+    // Keep auto-scroll enabled when clicking a segment
+    setAutoScrollEnabled(true);
   };
 
   const handleBlockEdit = (id: string, newText: string) => {
@@ -363,7 +365,13 @@ export function TranscriptEditor({
                   Scroll to view all segments
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+              <div 
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" 
+                style={{ maxHeight: 'calc(100vh - 260px)' }}
+                onWheel={() => setAutoScrollEnabled(false)}
+                onTouchMove={() => setAutoScrollEnabled(false)}
+              >
                 <div className="max-w-3xl space-y-4">
                 {transcriptBlocks.map((block, index) => {
                   const isActive = currentBlock?.id === block.id;
