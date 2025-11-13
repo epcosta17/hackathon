@@ -3,8 +3,8 @@ import os
 import json
 import asyncio
 import tempfile
-from fastapi import APIRouter, File, UploadFile, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request
+from fastapi.responses import StreamingResponse, Response
 from pathlib import Path
 
 router = APIRouter(prefix="/api", tags=["transcription"])
@@ -95,8 +95,8 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
 
 
 @router.get("/audio/{audio_filename}")
-async def get_audio_file(audio_filename: str):
-    """Serve an audio file."""
+async def get_audio_file(audio_filename: str, request: Request):
+    """Serve an audio file with HTTP Range request support for parallel chunk downloading."""
     try:
         audio_dir = Path(__file__).parent.parent / "audio_files"
         audio_path = audio_dir / audio_filename
@@ -104,14 +104,68 @@ async def get_audio_file(audio_filename: str):
         if not audio_path.exists():
             raise HTTPException(status_code=404, detail="Audio file not found")
         
+        # Get file size
+        file_size = audio_path.stat().st_size
+        
         # Determine content type
         content_type = "audio/mpeg" if audio_filename.endswith(".mp3") else "audio/wav"
         
-        def iterfile():
-            with open(audio_path, mode="rb") as file_like:
-                yield from file_like
+        # Parse Range header
+        range_header = request.headers.get("range")
         
-        return StreamingResponse(iterfile(), media_type=content_type)
+        if range_header:
+            # Parse range header (format: "bytes=start-end")
+            range_match = range_header.replace("bytes=", "").split("-")
+            start = int(range_match[0]) if range_match[0] else 0
+            end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
+            
+            # Ensure valid range
+            start = max(0, start)
+            end = min(end, file_size - 1)
+            content_length = end - start + 1
+            
+            # Read the requested chunk
+            def iter_chunk():
+                with open(audio_path, mode="rb") as file_like:
+                    file_like.seek(start)
+                    remaining = content_length
+                    chunk_size = 8192  # 8KB chunks
+                    while remaining > 0:
+                        read_size = min(chunk_size, remaining)
+                        data = file_like.read(read_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+            
+            # Return 206 Partial Content
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+            }
+            return StreamingResponse(
+                iter_chunk(),
+                status_code=206,
+                media_type=content_type,
+                headers=headers
+            )
+        else:
+            # No range request - serve full file
+            def iterfile():
+                with open(audio_path, mode="rb") as file_like:
+                    yield from file_like
+            
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+            }
+            return StreamingResponse(
+                iterfile(),
+                media_type=content_type,
+                headers=headers
+            )
+            
     except HTTPException:
         raise
     except Exception as e:
