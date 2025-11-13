@@ -88,6 +88,24 @@ export function AnalysisDashboard({
     generateReport();
   }, []); // Run once on mount
 
+  // Load interview title for existing interviews
+  useEffect(() => {
+    const loadInterviewTitle = async () => {
+      if (currentInterviewId) {
+        try {
+          const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`);
+          if (response.ok) {
+            const interview = await response.json();
+            setInterviewTitle(interview.title || '');
+          }
+        } catch (error) {
+          console.error('Failed to load interview title:', error);
+        }
+      }
+    };
+    loadInterviewTitle();
+  }, [currentInterviewId]);
+
   // Don't auto-show dialog - let user click Save button when ready
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -145,41 +163,65 @@ export function AnalysisDashboard({
       // Get full transcript text
       const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
 
-      // Create FormData to send both JSON data and audio file
-      const formData = new FormData();
-      formData.append('title', interviewTitle);
-      formData.append('transcript_text', transcriptText);
-      formData.append('transcript_words', JSON.stringify(transcriptBlocks));
-      formData.append('analysis_data', JSON.stringify(analysisData));
-      
-      // Add notes if available
-      if (notes.length > 0) {
-        formData.append('notes', JSON.stringify(notes));
-      }
-      
-      // Add audio file if available
-      if (audioFile) {
-        formData.append('audio_file', audioFile);
-      }
+      if (currentInterviewId) {
+        // UPDATE existing interview
+        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            interview_id: currentInterviewId,
+            title: interviewTitle,
+            transcript_text: transcriptText,
+            transcript_words: transcriptBlocks,
+            analysis_data: analysisData,
+          }),
+        });
 
-      const response = await fetch('http://127.0.0.1:8000/api/interviews', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        onSaveInterview(result.id);
-        setIsSaved(true);
-        setShowSaveDialog(false);
-        toast.success('Interview saved successfully!');
+        if (response.ok) {
+          setIsSaved(true);
+          setShowSaveDialog(false);
+          toast.success('Interview updated successfully!');
+        } else {
+          console.error('Update failed:', response.statusText);
+          toast.error('Failed to update interview. Please try again.');
+        }
       } else {
-        console.error('Save failed:', response.statusText);
-        toast.error('Failed to save interview. Please try again.');
+        // CREATE new interview
+        const formData = new FormData();
+        formData.append('title', interviewTitle);
+        formData.append('transcript_text', transcriptText);
+        formData.append('transcript_words', JSON.stringify(transcriptBlocks));
+        formData.append('analysis_data', JSON.stringify(analysisData));
+        
+        // Add notes if available
+        if (notes.length > 0) {
+          formData.append('notes', JSON.stringify(notes));
+        }
+        
+        // Add audio file if available
+        if (audioFile) {
+          formData.append('audio_file', audioFile);
+        }
+
+        const response = await fetch('http://127.0.0.1:8000/api/interviews', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          onSaveInterview(result.id);
+          setIsSaved(true);
+          setShowSaveDialog(false);
+          toast.success('Interview saved successfully!');
+        } else {
+          console.error('Save failed:', response.statusText);
+          toast.error('Failed to save interview. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error saving interview:', error);
-      toast.error('An error occurred while saving the interview.');
+      toast.error(currentInterviewId ? 'An error occurred while updating the interview.' : 'An error occurred while saving the interview.');
     } finally {
       setIsSaving(false);
     }
@@ -806,7 +848,7 @@ export function AnalysisDashboard({
               color: 'white', 
               marginBottom: '8px' 
             }}>
-              Save Interview
+              {currentInterviewId ? 'Update Interview' : 'Save Interview'}
             </h3>
             <p style={{ 
               color: '#a1a1aa', 
@@ -859,7 +901,7 @@ export function AnalysisDashboard({
                 className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4 mr-1.5" />
-                {isSaving ? 'Saving...' : 'Save'}
+                {isSaving ? (currentInterviewId ? 'Updating...' : 'Saving...') : (currentInterviewId ? 'Update' : 'Save')}
               </Button>
             </div>
           </motion.div>

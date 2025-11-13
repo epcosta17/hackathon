@@ -1,27 +1,46 @@
 # B2B AI Talent Analysis App
 
-An intelligent application for analyzing talent through interview transcripts. Upload audio interviews, get AI-powered transcriptions, and receive detailed analysis of candidate skills, communication abilities, and potential.
+An intelligent application for analyzing talent through interview transcripts. Upload audio interviews, get AI-powered transcriptions with timestamps, and receive comprehensive analysis of candidate skills, communication abilities, and technical competencies.
 
-## 🚀 Quick Start (macOS)
+## ✨ Features
+
+- 🎤 **Audio Upload** - Support for MP3 and WAV files up to 100MB
+- 📝 **Smart Transcription** - Automatic speech-to-text with word-level timestamps using whisper.cpp
+- ✏️ **Interactive Editor** - Edit transcripts with precision, add notes and bookmarks
+- 🤖 **AI Analysis** - Comprehensive talent assessment powered by Google Gemini:
+  - Technical skills evaluation
+  - Communication and attitude analysis
+  - Coding challenge insights
+  - Key technical emphasis points
+  - Interview statistics and metrics
+- 📊 **Beautiful Dashboards** - Modern UI with detailed visualizations
+- 💾 **Interview Management** - Save, search, and revisit past interviews
+- 📄 **Report Generation** - Download detailed analysis reports as DOCX files
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-1. **Homebrew** - macOS package manager
+1. **Homebrew** (macOS package manager)
    ```bash
-   # Install Homebrew if not already installed
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
 
-2. **Python 3.8+**
+2. **Python 3.12+**
    ```bash
    brew install python3
    python3 --version
    ```
 
-3. **Node.js 16+**
+3. **Node.js 18+**
    ```bash
    brew install node
    node --version
+   ```
+
+4. **whisper.cpp** (for local transcription)
+   ```bash
+   brew install whisper-cpp
    ```
 
 ### Installation
@@ -32,18 +51,29 @@ An intelligent application for analyzing talent through interview transcripts. U
 # Navigate to backend directory
 cd backend
 
-# Create virtual environment (recommended)
+# Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Download Whisper model (only needed once)
+cd ai
+./download-ggml-model.sh
+cd ..
+
+# Optional: Add Google Gemini API key for AI analysis
+# Create a .env file in the backend directory:
+echo "GEMINI_API_KEY=your_api_key_here" > .env
+
 # Start the backend server
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+python main.py
 ```
 
 The backend will be available at `http://127.0.0.1:8000`
+
+Interactive API docs: `http://127.0.0.1:8000/`
 
 #### 2. Frontend Setup
 
@@ -54,7 +84,7 @@ Open a new terminal window:
 cd frontend
 
 # Install dependencies
-npm i
+npm install
 
 # Start the development server
 npm run dev
@@ -62,104 +92,82 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`
 
-## 📋 Features
-
-- 🎤 **Audio Upload**: Support for MP3 and WAV files
-- 📝 **Smart Transcription**: Automatic speech-to-text with word-level timestamps
-- ✏️ **Interactive Editor**: Edit transcripts with precision
-- 🤖 **AI Analysis**: Comprehensive talent assessment including:
-  - Technical skills evaluation
-  - Communication analysis
-  - Problem-solving assessment
-  - Cultural fit indicators
-  - Hiring recommendations
-- 📊 **Beautiful Dashboards**: Modern UI with detailed visualizations
-
 ## 🏗️ Project Structure
 
 ```
 hackathon/
 ├── backend/                      # Python FastAPI backend
-│   ├── main.py                  # API endpoints and logic
-│   ├── requirements.txt         # Python dependencies
-│   ├── WHISPERX_SETUP.md       # WhisperX installation guide
-│   └── INTEGRATION_COMPLETE.md # Integration documentation
+│   ├── main.py                  # Application entry point
+│   ├── database.py              # SQLite database operations
+│   ├── models/
+│   │   └── schemas.py          # Pydantic data models
+│   ├── services/
+│   │   ├── transcription_service.py  # Audio transcription
+│   │   ├── analysis_service.py       # AI analysis
+│   │   └── docx_service.py          # Report generation
+│   ├── routes/
+│   │   ├── transcription.py    # Transcription endpoints
+│   │   ├── analysis.py         # Analysis endpoints
+│   │   ├── interviews.py       # Interview CRUD
+│   │   └── notes.py            # Notes & bookmarks
+│   ├── ai/
+│   │   ├── ggml-base.bin      # Whisper model
+│   │   └── PROMPT_JSON.md     # AI prompts
+│   └── requirements.txt
 │
 └── frontend/                    # React TypeScript frontend
     ├── src/
-    │   ├── components/         # React components
+    │   ├── components/
     │   │   ├── UploadScreen.tsx
     │   │   ├── TranscriptEditor.tsx
     │   │   └── AnalysisDashboard.tsx
-    │   └── App.tsx            # Main application
+    │   └── App.tsx
     ├── package.json
-    └── README.md
+    └── vite.config.ts
 ```
 
 ## 🔧 Technology Stack
 
 ### Backend
 - **FastAPI** - Modern Python web framework
-- **WhisperX** - Advanced speech recognition (optional)
+- **whisper.cpp** - Fast, local speech recognition (Metal-accelerated on Apple Silicon)
+- **Google Gemini** - AI-powered interview analysis
+- **SQLite** - Local database for interviews and notes
+- **python-docx** - Report generation
 - **Pydantic** - Data validation
-- **Uvicorn** - ASGI server
 
 ### Frontend
-- **React** - UI framework
+- **React 18** - UI framework
 - **TypeScript** - Type safety
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **shadcn/ui** - Component library
+- **Vite** - Lightning-fast build tool
+- **Tailwind CSS** - Utility-first styling
+- **shadcn/ui** - Beautiful component library
+- **Framer Motion** - Smooth animations
 
-## 🎯 Optional: WhisperX Installation
+## 🎯 Usage
 
-The app works with mock transcription data by default. For real transcription:
-
-```bash
-# Install FFmpeg
-brew install ffmpeg
-
-# Activate your virtual environment
-cd backend
-source .venv/bin/activate
-
-# Install PyTorch (MPS acceleration on Apple Silicon)
-pip install torch torchaudio
-
-# Install WhisperX
-pip install git+https://github.com/m-bain/whisperx.git
-
-# Restart the backend server
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-### macOS Performance
-
-- **Apple Silicon (M1/M2/M3)**: Automatic GPU acceleration via Metal Performance Shaders (MPS)
-- **Intel Macs**: CPU-based processing (still fast for smaller models)
-
-See `backend/WHISPERX_SETUP.md` for detailed instructions.
-
-## 🧪 Testing the Application
-
-1. **Start both servers** (backend and frontend)
+1. **Start both servers** (backend and frontend in separate terminals)
 2. **Open your browser** to `http://localhost:5173`
-3. **Upload an audio file** (MP3 or WAV)
-4. **View the transcript** in the editor
-5. **Run analysis** to get AI insights
-6. **Review results** in the dashboard
+3. **Upload an audio file** (MP3 or WAV) of an interview
+4. **Review the transcript** - Edit, add notes, or bookmark important moments
+5. **Run AI analysis** - Get comprehensive insights
+6. **Save the interview** - Access it anytime from "Previous Interviews"
+7. **Download report** - Export analysis as a Word document
 
 ## 📖 API Documentation
 
 Once the backend is running, visit:
-- **Interactive API docs**: `http://127.0.0.1:8000/docs`
+- **Interactive API docs**: `http://127.0.0.1:8000/`
 - **Alternative docs**: `http://127.0.0.1:8000/redoc`
 
 ### Key Endpoints
 
 - `GET /api/ping` - Health check
-- `POST /api/transcribe` - Upload audio for transcription
-- `POST /api/analyze` - Analyze transcript and get insights
+- `POST /api/transcribe-stream` - Upload audio for transcription (SSE stream)
+- `POST /api/analyze` - Analyze transcript with AI
+- `POST /api/interviews` - Save interview with notes
+- `GET /api/interviews` - List and search interviews
+- `POST /api/download-report` - Download DOCX report
 
 ## 🐛 Troubleshooting
 
@@ -167,22 +175,27 @@ Once the backend is running, visit:
 
 **Port 8000 already in use:**
 ```bash
-# Find and kill the process
 lsof -ti:8000 | xargs kill -9
-
-# Or use a different port
-uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-**WhisperX import errors:**
+**whisper.cpp not found:**
 ```bash
-# Verify FFmpeg installation
-which ffmpeg
-ffmpeg -version
+brew install whisper-cpp
+```
 
-# Reinstall WhisperX
-pip uninstall whisperx
-pip install git+https://github.com/m-bain/whisperx.git
+**Model not found:**
+```bash
+cd backend/ai
+./download-ggml-model.sh
+```
+
+**Python dependencies issues:**
+```bash
+cd backend
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ### Frontend Issues
@@ -195,22 +208,22 @@ pip install git+https://github.com/m-bain/whisperx.git
 ```bash
 cd frontend
 rm -rf node_modules package-lock.json
-npm i
+npm install
 ```
 
 **Cannot connect to backend:**
 - Ensure backend is running on port 8000
-- Check browser console for CORS errors
-- Verify API URL in network requests
+- Check browser console for errors
+- Verify both servers are running
 
-## 🚀 Deployment
+## 🚢 Deployment
 
 ### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
 
-# For production, use gunicorn or similar
+# For production, use a production ASGI server
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -220,47 +233,32 @@ cd frontend
 npm run build
 
 # Deploy the dist/ directory to your hosting service
-# (Netlify, Vercel, AWS S3, etc.)
+# (Vercel, Netlify, AWS S3, etc.)
 ```
 
-## 📝 Development Tips
+## 💡 Performance Notes
 
-### Backend Development
-- Use `--reload` flag for auto-reload during development
-- Check logs in terminal for debugging
-- Test endpoints with the interactive docs at `/docs`
+### Apple Silicon (M1/M2/M3/M4)
+- whisper.cpp automatically uses Metal for GPU acceleration
+- Transcription is significantly faster than real-time
+- No additional configuration needed
 
-### Frontend Development
-- Hot reload is enabled by default with Vite
-- Use React DevTools for component debugging
-- Check browser console for errors
-
-## 🤝 Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Test thoroughly
-4. Submit a pull request
-
-## 📄 License
-
-See individual component licenses for details.
+### Intel Macs
+- CPU-based processing
+- Still fast for the base model
+- Consider using smaller audio files for best performance
 
 ## 🔗 Links
 
 - **Original Design**: [Figma](https://www.figma.com/design/oHlArZbdYorZZ6YhZPB9Tu/B2B-AI-Talent-Analysis-App)
-- **WhisperX**: [GitHub](https://github.com/m-bain/whisperx)
+- **whisper.cpp**: [GitHub](https://github.com/ggerganov/whisper.cpp)
 - **FastAPI**: [Documentation](https://fastapi.tiangolo.com/)
 - **React**: [Documentation](https://react.dev/)
 
-## 💡 Support
+## 📄 License
 
-For detailed setup instructions:
-- Backend: See `backend/WHISPERX_SETUP.md`
-- Frontend: See `frontend/README.md`
-- Integration: See `backend/INTEGRATION_COMPLETE.md`
+MIT License - See individual component licenses for details.
 
 ---
 
-**Built with ❤️ for macOS**
-
+**Built with ❤️ for intelligent talent analysis**
