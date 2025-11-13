@@ -32,6 +32,19 @@ def init_db():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interview_id INTEGER NOT NULL,
+            timestamp REAL NOT NULL,
+            content TEXT NOT NULL,
+            is_bookmark INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (interview_id) REFERENCES interviews (id) ON DELETE CASCADE
+        )
+    ''')
+    
     # Add audio_url column if it doesn't exist (for existing databases)
     # Try both old column name (audio_filename) and new (audio_url) for migration
     try:
@@ -265,6 +278,99 @@ def delete_interview(interview_id: int) -> bool:
     cursor = conn.cursor()
     
     cursor.execute('DELETE FROM interviews WHERE id = ?', (interview_id,))
+    deleted = cursor.rowcount > 0
+    
+    conn.commit()
+    conn.close()
+    
+    return deleted
+
+# Notes and Bookmarks Functions
+
+def add_note(interview_id: int, timestamp: float, content: str, is_bookmark: bool = False) -> int:
+    """Add a note or bookmark to an interview"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    now = datetime.utcnow().isoformat()
+    
+    cursor.execute('''
+        INSERT INTO notes (interview_id, timestamp, content, is_bookmark, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (interview_id, timestamp, content, 1 if is_bookmark else 0, now, now))
+    
+    note_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return note_id
+
+def update_note(note_id: int, content: Optional[str] = None, is_bookmark: Optional[bool] = None) -> bool:
+    """Update an existing note"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM notes WHERE id = ?', (note_id,))
+    row = cursor.fetchone()
+    
+    if not row:
+        conn.close()
+        return False
+    
+    now = datetime.utcnow().isoformat()
+    
+    cursor.execute('''
+        UPDATE notes 
+        SET content = ?,
+            is_bookmark = ?,
+            updated_at = ?
+        WHERE id = ?
+    ''', (
+        content if content is not None else row['content'],
+        (1 if is_bookmark else 0) if is_bookmark is not None else row['is_bookmark'],
+        now,
+        note_id
+    ))
+    
+    conn.commit()
+    conn.close()
+    
+    return True
+
+def get_notes(interview_id: int) -> List[Dict[str, Any]]:
+    """Get all notes for an interview"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT * FROM notes 
+        WHERE interview_id = ?
+        ORDER BY timestamp ASC
+    ''', (interview_id,))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    results = []
+    for row in rows:
+        results.append({
+            'id': row['id'],
+            'interview_id': row['interview_id'],
+            'timestamp': row['timestamp'],
+            'content': row['content'],
+            'is_bookmark': bool(row['is_bookmark']),
+            'created_at': row['created_at'],
+            'updated_at': row['updated_at']
+        })
+    
+    return results
+
+def delete_note(note_id: int) -> bool:
+    """Delete a note"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('DELETE FROM notes WHERE id = ?', (note_id,))
     deleted = cursor.rowcount > 0
     
     conn.commit()

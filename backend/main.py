@@ -24,7 +24,11 @@ from database import (
     get_interview,
     get_interviews,
     get_interview_summaries,
-    delete_interview
+    delete_interview,
+    add_note,
+    update_note,
+    get_notes,
+    delete_note
 )
 
 # Load environment variables from multiple possible locations
@@ -957,6 +961,63 @@ async def delete_interview_endpoint(interview_id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete interview: {str(e)}")
+
+# --- Notes and Bookmarks Endpoints ---
+
+class NoteCreate(BaseModel):
+    """Request to create a note."""
+    timestamp: float
+    content: str
+    is_bookmark: bool = False
+
+class NoteUpdate(BaseModel):
+    """Request to update a note."""
+    content: Optional[str] = None
+    is_bookmark: Optional[bool] = None
+
+@app.post("/api/interviews/{interview_id}/notes")
+async def create_note(interview_id: int, note: NoteCreate):
+    """Add a note or bookmark to an interview."""
+    try:
+        note_id = add_note(interview_id, note.timestamp, note.content, note.is_bookmark)
+        return {"id": note_id, "message": "Note created successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create note: {str(e)}")
+
+@app.get("/api/interviews/{interview_id}/notes")
+async def get_interview_notes(interview_id: int):
+    """Get all notes for an interview."""
+    try:
+        notes = get_notes(interview_id)
+        return {"notes": notes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get notes: {str(e)}")
+
+@app.put("/api/notes/{note_id}")
+async def update_note_endpoint(note_id: int, note: NoteUpdate):
+    """Update an existing note."""
+    try:
+        success = update_note(note_id, note.content, note.is_bookmark)
+        if not success:
+            raise HTTPException(status_code=404, detail="Note not found")
+        return {"message": "Note updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update note: {str(e)}")
+
+@app.delete("/api/notes/{note_id}")
+async def delete_note_endpoint(note_id: int):
+    """Delete a note."""
+    try:
+        success = delete_note(note_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Note not found")
+        return {"message": "Note deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete note: {str(e)}")
 
 @app.get("/api/audio/{audio_filename}")
 async def get_audio_file(audio_filename: str):

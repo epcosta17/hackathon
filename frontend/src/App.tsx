@@ -172,6 +172,7 @@ export default function App() {
               onBackToUpload={handleBackToUpload}
               audioFile={audioFile}
               existingAnalysis={analysisData}
+              currentInterviewId={currentInterviewId}
             />
           </motion.div>
         )}

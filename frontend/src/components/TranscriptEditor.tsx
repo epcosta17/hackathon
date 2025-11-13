@@ -1,10 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home, StickyNote, Bookmark, Plus, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+
+interface Note {
+  id: number;
+  interview_id: number;
+  timestamp: number;
+  content: string;
+  is_bookmark: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 interface TranscriptEditorProps {
   transcriptBlocks: TranscriptBlock[];
@@ -14,6 +24,7 @@ interface TranscriptEditorProps {
   onBackToUpload: () => void;
   audioFile: File | null;
   existingAnalysis: AnalysisData | null;
+  currentInterviewId: number | null;
 }
 
 export function TranscriptEditor({
@@ -24,6 +35,7 @@ export function TranscriptEditor({
   onBackToUpload,
   audioFile,
   existingAnalysis,
+  currentInterviewId,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -39,6 +51,12 @@ export function TranscriptEditor({
   const activeBlockRef = useRef<HTMLDivElement | null>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const notesScrollRef = useRef<HTMLDivElement | null>(null);
+  
+  // Notes and Bookmarks state
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
   // Create audio URL from file
   useEffect(() => {
@@ -48,6 +66,79 @@ export function TranscriptEditor({
       return () => URL.revokeObjectURL(url);
     }
   }, [audioFile]);
+
+  // Fetch notes when interview is loaded
+  useEffect(() => {
+    if (currentInterviewId) {
+      fetchNotes();
+    }
+  }, [currentInterviewId]);
+
+  const fetchNotes = async () => {
+    if (!currentInterviewId) return;
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`);
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data.notes || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notes:', error);
+    }
+  };
+
+  const addNote = async (isBookmark: boolean = false) => {
+    if (!currentInterviewId || (!newNoteContent.trim() && !isBookmark)) return;
+    
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timestamp: currentTime,
+          content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
+          is_bookmark: isBookmark,
+        }),
+      });
+      
+      if (response.ok) {
+        await fetchNotes();
+        setNewNoteContent('');
+        setIsAddingNote(false);
+        toast.success(isBookmark ? 'Bookmark added!' : 'Note added!');
+      }
+    } catch (error) {
+      console.error('Failed to add note:', error);
+      toast.error('Failed to add note');
+    }
+  };
+
+  const deleteNote = async (noteId: number) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/notes/${noteId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        await fetchNotes();
+        toast.success('Note deleted!');
+      }
+    } catch (error) {
+      console.error('Failed to delete note:', error);
+      toast.error('Failed to delete note');
+    }
+  };
+
+  const jumpToNote = (timestamp: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = timestamp;
+      audioRef.current.play();
+    }
+    setCurrentTime(timestamp);
+    setIsPlaying(true);
+    // Keep auto-scroll enabled when clicking a note/bookmark
+    setAutoScrollEnabled(true);
+  };
 
   // Update current time from audio element
   useEffect(() => {
@@ -94,7 +185,7 @@ export function TranscriptEditor({
 
   // Scroll active segment to top whenever it changes (same logic as clicking player)
   useEffect(() => {
-    if (autoScrollEnabled && currentBlock?.id) {
+    if (autoScrollEnabled && currentBlock?.id && isPlaying) {
       // Use the same scrolling logic as handleScrub
       setTimeout(() => {
         const element = document.querySelector(`[data-block-id="${currentBlock.id}"]`);
@@ -106,7 +197,7 @@ export function TranscriptEditor({
         }
       }, 50);
     }
-  }, [currentBlock?.id, autoScrollEnabled]);
+  }, [currentBlock?.id, autoScrollEnabled, isPlaying]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -352,11 +443,121 @@ export function TranscriptEditor({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden min-h-0">
-        <div className="max-w-[1800px] mx-auto h-full">
-          <div className="grid grid-cols-5 h-full">
-            {/* Left Side - Transcript (60%) */}
-            <div className="col-span-3 border-r border-zinc-800 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-hidden min-h-0 flex">
+        <div className="w-full flex">
+          <div className="flex w-full h-full">
+            {/* Left Side - Notes & Bookmarks (20%) */}
+            <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden bg-zinc-900/10 flex-shrink-0" style={{ width: '20%' }}>
+              <div className="p-6 pb-4 flex items-center justify-between flex-shrink-0">
+                <h2 className="text-zinc-400 text-sm font-medium">Notes & Bookmarks</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => addNote(true)}
+                    className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
+                    title="Add Bookmark"
+                  >
+                    <Bookmark className="w-4 h-4 text-yellow-400 hover:text-yellow-300 transition-colors" />
+                  </button>
+                  <button
+                    onClick={() => setIsAddingNote(!isAddingNote)}
+                    className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
+                    title="Add Note"
+                  > 
+                    <Plus className="w-4 h-4 text-blue-400 hover:text-blue-300 transition-colors" />
+                  </button>
+                </div>
+              </div>
+              
+              {isAddingNote && (
+                <div className="px-6 pb-6 flex-shrink-0">
+                  <div className="bg-zinc-900 p-3 rounded-lg border border-zinc-700">
+                    <Textarea
+                      value={newNoteContent}
+                      onChange={(e) => setNewNoteContent(e.target.value)}
+                      placeholder="Add a note at current time..."
+                      style={{
+                        backgroundColor: '#27272a',
+                        borderColor: '#52525b',
+                        padding: '10px 14px',
+                        outline: 'none',
+                        boxShadow: 'none',
+                      }}
+                      className="text-sm text-white mb-3"
+                      rows={3}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                      onBlur={(e) => e.currentTarget.style.borderColor = '#52525b'}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <Button
+                        onClick={() => {
+                          setIsAddingNote(false);
+                          setNewNoteContent('');
+                        }}
+                        size="sm"
+                        variant="outline"
+                        className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => addNote(false)}
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                      >
+                        <StickyNote className="w-3.5 h-3.5 mr-1.5" />
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div
+                ref={notesScrollRef}
+                className="flex-1 overflow-y-auto px-6 pb-6"
+                style={{ maxHeight: 'calc(100vh - 300px)' }}
+              >
+                <div className="space-y-3">
+                  {notes.length === 0 ? (
+                    <p className="text-zinc-500 text-sm text-center py-8">
+                      No notes yet. Click + to add one!
+                    </p>
+                  ) : (
+                    notes.map((note) => (
+                      <motion.div
+                        key={note.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-zinc-900/50 p-3 rounded-lg hover:bg-zinc-900/70 transition-colors group"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <button
+                            onClick={() => jumpToNote(note.timestamp)}
+                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                          >
+                            {note.is_bookmark ? <Bookmark className="w-3 h-3 fill-zinc-400 text-zinc-400" /> : <StickyNote className="w-3 h-3 text-zinc-400" />}
+                            {formatTime(note.timestamp)}
+                          </button>
+                          <button
+                            onClick={() => deleteNote(note.id)}
+                            className="p-1 text-zinc-600 hover:text-red-400 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="text-zinc-300 text-sm leading-relaxed">{note.content}</p>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Middle - Transcript (45%) */}
+            <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden flex-shrink-0" style={{ width: '45%' }}>
               <div className="p-8 pb-4 flex items-center justify-between flex-shrink-0">
                 <h2 className="text-zinc-400 text-sm font-medium">
                   Transcript Segments ({transcriptBlocks.length})
@@ -367,7 +568,7 @@ export function TranscriptEditor({
               </div>
               <div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-hidden" 
+                className="flex-1 overflow-y-auto px-8 pt-6 pb-8 scrollbar-hidden" 
                 style={{ maxHeight: 'calc(100vh - 260px)' }}
                 onWheel={() => setAutoScrollEnabled(false)}
                 onTouchMove={() => setAutoScrollEnabled(false)}
@@ -469,8 +670,8 @@ export function TranscriptEditor({
               </div>
             </div>
 
-            {/* Right Side - Info Panel (40%) */}
-            <div className="col-span-2 bg-zinc-900/20 p-8 overflow-y-auto h-full">
+            {/* Right Side - Info Panel (35%) */}
+            <div className="bg-zinc-900/20 p-8 overflow-y-auto h-full flex-shrink-0" style={{ width: '35%' }}>
               <div className="space-y-6">
                 <div>
                   <h3 className="text-white mb-2">Transcript Statistics</h3>
@@ -522,13 +723,31 @@ export function TranscriptEditor({
                 </div>
 
                 <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <h4 className="text-blue-400 mb-2">How to Use</h4>
-                  <ul className="text-zinc-300 text-sm space-y-2">
-                    <li>• Click any timestamp to jump to that point</li>
-                    <li>• Click the edit icon to modify text</li>
-                    <li>• Active block highlights as audio plays</li>
-                    <li>• Click "Run AI Analysis" when ready</li>
-                  </ul>
+                  <h4 className="text-blue-400 mb-3 font-semibold">How to Use</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Transcript</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li>• Click any timestamp to jump to that point</li>
+                        <li>• Click the edit icon to modify text</li>
+                        <li>• Active block highlights as audio plays</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Notes & Bookmarks</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <Plus className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
+                        <li>• Click any note/bookmark to jump & play</li>
+                        <li>• Hover to delete notes</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="text-white text-sm font-medium mb-2">Analysis</h5>
+                      <ul className="text-zinc-300 text-sm space-y-1.5">
+                        <li>• Click "Run AI Analysis" when ready</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
