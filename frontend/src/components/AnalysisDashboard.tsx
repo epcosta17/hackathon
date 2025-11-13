@@ -133,7 +133,7 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
   const technicalRef = useRef<HTMLDivElement>(null);
   const engagementRef = useRef<HTMLDivElement>(null);
 
-  const handleTooltipEnter = (type: string, ref: React.RefObject<HTMLDivElement>) => {
+  const handleTooltipEnter = (type: string, ref: React.RefObject<HTMLDivElement | null>) => {
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
       setTooltipPosition({
@@ -355,21 +355,21 @@ export function AnalysisDashboard({ analysisData, onBackToUpload }: AnalysisDash
               </div>
               <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
             </div>
-            <div className="flex flex-col items-center min-w-[140px]">
-              <div className="flex items-center gap-1 mb-1">
+            <div className="flex flex-col items-center min-w-[140px] -mt-[6px]">
+              <div className="flex items-center gap-1 mb-[7px]">
                 <Zap className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Complexity</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getComplexityColor(analysisData.statistics.complexity)}`}>
+              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border -mt-[1px] ${getComplexityColor(analysisData.statistics.complexity)}`}>
                 {analysisData.statistics.complexity}
               </span>
             </div>
-            <div className="flex flex-col items-center min-w-[80px]">
-              <div className="flex items-center gap-1 mb-1">
+            <div className="flex flex-col items-center min-w-[80px] -mt-[6px]">
+              <div className="flex items-center gap-1 mb-[7px]">
                 <TrendingUp className="w-4 h-4 text-zinc-500" />
                 <p className="text-zinc-500 text-xs">Pace</p>
               </div>
-              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getPaceColor(analysisData.statistics.pace)}`}>
+              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border -mt-[1px] ${getPaceColor(analysisData.statistics.pace)}`}>
                 {analysisData.statistics.pace}
               </span>
             </div>
