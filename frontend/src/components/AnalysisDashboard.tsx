@@ -29,10 +29,13 @@ interface AnalysisDashboardProps {
   onBackToUpload: () => void;
   onBackToEditor: () => void;
   currentInterviewId: number | null;
+  currentInterviewTitle: string;
   onSaveInterview: (id: number) => void;
   audioFile: File | null;
   notes: Note[];
   waveformData: number[] | null;
+  hasNewAnalysis: boolean;
+  onAnalysisSaved: () => void;
 }
 
 export function AnalysisDashboard({ 
@@ -41,16 +44,27 @@ export function AnalysisDashboard({
   onBackToUpload, 
   onBackToEditor, 
   currentInterviewId,
+  currentInterviewTitle,
   onSaveInterview,
   audioFile,
   notes,
-  waveformData
+  waveformData,
+  hasNewAnalysis,
+  onAnalysisSaved
 }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
-  const [isSaved, setIsSaved] = useState(!!currentInterviewId);
+  
+  // Pre-fill title when loading existing interview
+  useEffect(() => {
+    if (currentInterviewTitle) {
+      setInterviewTitle(currentInterviewTitle);
+      console.log('📝 Pre-filled interview title:', currentInterviewTitle);
+    }
+  }, [currentInterviewTitle]);
+  
   const [expandedSections, setExpandedSections] = useState({
     keyPoints: true,
     coding: true,
@@ -155,6 +169,11 @@ export function AnalysisDashboard({
   // No parsing needed - we get JSON directly from the API!
 
   const handleSaveInterview = async () => {
+    console.log('🔵 handleSaveInterview called!');
+    console.log('🔵 interviewTitle:', interviewTitle);
+    console.log('🔵 currentInterviewId:', currentInterviewId);
+    console.log('🔵 analysisData:', analysisData);
+    
     if (!interviewTitle.trim()) {
       toast.error('Please enter a title for this interview');
       return;
@@ -169,7 +188,8 @@ export function AnalysisDashboard({
 
       if (currentInterviewId) {
         // UPDATE existing interview
-        console.log('Updating interview:', currentInterviewId);
+        console.log('📝 Updating interview:', currentInterviewId);
+        console.log('📊 Analysis data to save:', analysisData);
         const requestBody = {
           interview_id: currentInterviewId,
           title: interviewTitle,
@@ -177,7 +197,7 @@ export function AnalysisDashboard({
           transcript_words: transcriptBlocks,
           analysis_data: analysisData,
         };
-        console.log('PUT request body:', requestBody);
+        console.log('📤 PUT request body:', requestBody);
         
         const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
           method: 'PUT',
@@ -189,7 +209,7 @@ export function AnalysisDashboard({
         if (response.ok) {
           const result = await response.json();
           console.log('Update successful:', result);
-          setIsSaved(true);
+          onAnalysisSaved(); // Clear the hasNewAnalysis flag
           setShowSaveDialog(false);
           toast.success('Interview updated successfully!');
         } else {
@@ -228,7 +248,7 @@ export function AnalysisDashboard({
         if (response.ok) {
           const result = await response.json();
           onSaveInterview(result.id);
-          setIsSaved(true);
+          onAnalysisSaved(); // Clear the hasNewAnalysis flag
           setShowSaveDialog(false);
           toast.success('Interview saved successfully!');
         } else {
@@ -370,9 +390,12 @@ export function AnalysisDashboard({
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Transcript
               </Button>
-              {!isSaved && (
+              {hasNewAnalysis && (
                 <Button
-                  onClick={() => setShowSaveDialog(true)}
+                  onClick={() => {
+                    console.log('🟢 Save Interview button clicked');
+                    setShowSaveDialog(true);
+                  }}
                   disabled={isSaving}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
                 >

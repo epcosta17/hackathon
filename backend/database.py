@@ -184,6 +184,16 @@ def update_interview(
     if transcript_words is not None:
         new_audio_duration = calculate_audio_duration(transcript_words)
     
+    # Determine what to update
+    new_title = title if title is not None else row['title']
+    new_transcript_text = transcript_text if transcript_text is not None else row['transcript_text']
+    new_transcript_words = json.dumps(transcript_words) if transcript_words is not None else row['transcript_words']
+    new_analysis_data = json.dumps(analysis_data) if analysis_data is not None else row['analysis_data']
+    new_audio_url = audio_url if audio_url is not None else current_audio_url
+    
+    print(f"🔄 [DB UPDATE] Interview ID: {interview_id}")
+    print(f"🔄 [DB UPDATE] Updating analysis_data: {analysis_data is not None}")
+    
     cursor.execute('''
         UPDATE interviews 
         SET title = ?,
@@ -195,11 +205,11 @@ def update_interview(
             updated_at = ?
         WHERE id = ?
     ''', (
-        title if title is not None else row['title'],
-        transcript_text if transcript_text is not None else row['transcript_text'],
-        json.dumps(transcript_words) if transcript_words is not None else row['transcript_words'],
-        json.dumps(analysis_data) if analysis_data is not None else row['analysis_data'],
-        audio_url if audio_url is not None else current_audio_url,
+        new_title,
+        new_transcript_text,
+        new_transcript_words,
+        new_analysis_data,
+        new_audio_url,
         new_audio_duration,
         now,
         interview_id

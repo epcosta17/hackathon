@@ -82,6 +82,12 @@ async def create_interview(
 async def update_interview_endpoint(interview_id: int, request: UpdateInterviewRequest):
     """Update an existing interview."""
     try:
+        print(f"📝 [UPDATE] Interview ID: {interview_id}")
+        print(f"📝 [UPDATE] Title: {request.title}")
+        print(f"📝 [UPDATE] Has analysis_data: {request.analysis_data is not None}")
+        if request.analysis_data:
+            print(f"📝 [UPDATE] Analysis data keys: {list(request.analysis_data.keys())}")
+        
         success = update_interview(
             interview_id=interview_id,
             title=request.title,
@@ -91,10 +97,13 @@ async def update_interview_endpoint(interview_id: int, request: UpdateInterviewR
         )
         if not success:
             raise HTTPException(status_code=404, detail="Interview not found")
+        
+        print(f"✅ [UPDATE] Interview {interview_id} updated successfully")
         return {"message": "Interview updated successfully"}
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ [UPDATE] Error updating interview: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update interview: {str(e)}")
 
 

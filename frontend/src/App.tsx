@@ -93,7 +93,9 @@ export default function App() {
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
+  const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
 
   const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File, waveform?: number[]) => {
     setTranscriptBlocks(blocks);
@@ -113,7 +115,15 @@ export default function App() {
   };
 
   const handleAnalysisComplete = (data: AnalysisData) => {
-    setAnalysisData(data);
+    // Add timestamp to force re-render and detection of new analysis
+    const dataWithTimestamp = {
+      ...data,
+      _analysisTimestamp: Date.now()
+    };
+    console.log('📊 New analysis complete with timestamp:', dataWithTimestamp._analysisTimestamp);
+    setAnalysisData(dataWithTimestamp as AnalysisData);
+    setHasNewAnalysis(true); // Mark that analyze button was clicked
+    console.log('✅ hasNewAnalysis set to TRUE');
     setCurrentScreen('analysis');
   };
 
@@ -130,7 +140,10 @@ export default function App() {
     setAudioDuration(null);
     setWaveformData(null);
     setCurrentInterviewId(null);
+    setCurrentInterviewTitle('');
     setNotes([]);
+    setHasNewAnalysis(false); // Clear flag when going home
+    console.log('🏠 Going home - hasNewAnalysis set to FALSE');
   };
 
   const handleLoadInterview = async (interviewId: number) => {
@@ -146,6 +159,7 @@ export default function App() {
       setTranscriptBlocks(interview.transcript_words);
       setAnalysisData(interview.analysis_data);
       setCurrentInterviewId(interviewId);
+      setCurrentInterviewTitle(interview.title || '');
       
       // Use audio URL directly for streaming - no download needed!
       // Browser handles streaming automatically
@@ -233,10 +247,16 @@ export default function App() {
               onBackToUpload={handleBackToUpload}
               onBackToEditor={handleBackToEditor}
               currentInterviewId={currentInterviewId}
+              currentInterviewTitle={currentInterviewTitle}
               onSaveInterview={setCurrentInterviewId}
               audioFile={audioFile}
               notes={notes}
               waveformData={waveformData}
+              hasNewAnalysis={hasNewAnalysis}
+              onAnalysisSaved={() => {
+                setHasNewAnalysis(false);
+                console.log('💾 Saved - hasNewAnalysis set to FALSE');
+              }}
             />
           </motion.div>
         )}
