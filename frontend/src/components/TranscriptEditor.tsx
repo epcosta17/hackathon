@@ -519,6 +519,7 @@ export function TranscriptEditor({
       audioRef.current.play();
     }
     setCurrentTime(timestamp);
+    setIsPlaying(true); // Update play/pause icon state
     
     // Find the block for this timestamp and scroll instantly (no animation)
     const targetBlock = transcriptBlocks.find(
@@ -527,16 +528,18 @@ export function TranscriptEditor({
       .filter(b => b.timestamp <= timestamp)
       .sort((a, b) => b.timestamp - a.timestamp)[0];
     
-    if (targetBlock) {
-      setTimeout(() => {
-        const element = document.querySelector(`[data-block-id="${targetBlock.id}"]`);
-        if (element) {
-          element.scrollIntoView({
+    // Scroll to the target block using Virtuoso
+    if (targetBlock && virtuosoRef.current) {
+      const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
+      if (blockIndex !== -1) {
+        setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({
+            index: blockIndex,
             behavior: 'auto', // Instant scroll
-            block: 'start',
+            align: 'start'
           });
-        }
-      }, 50);
+        }, 50);
+      }
     }
     
     // Keep auto-scroll enabled for future playback
@@ -654,18 +657,18 @@ export function TranscriptEditor({
       }
     }
     
-    // Scroll to the target block by finding it in the DOM
-    if (targetBlock) {
-      setTimeout(() => {
-        // Find the element with this block's key
-        const element = document.querySelector(`[data-block-id="${targetBlock.id}"]`);
-        if (element) {
-          element.scrollIntoView({
+    // Scroll to the target block using Virtuoso
+    if (targetBlock && virtuosoRef.current) {
+      const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
+      if (blockIndex !== -1) {
+        setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({
+            index: blockIndex,
             behavior: 'auto', // Instant jump, no animation
-            block: 'start',
+            align: 'start'
           });
-        }
-      }, 50);
+        }, 50);
+      }
     }
   };
 

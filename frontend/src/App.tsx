@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
+import { AnalysisHeader } from './components/AnalysisHeader'; // Import the new header
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { Save, X } from 'lucide-react';
+
 
 export type Screen = 'upload' | 'editor' | 'analysis';
 
@@ -84,7 +90,7 @@ export interface AnalysisData {
   docx_path?: string;
 }
 
-export default function App() {
+function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -94,8 +100,19 @@ export default function App() {
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [interviewTitle, setInterviewTitle] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
+
+  // Pre-fill title when loading existing interview
+  useEffect(() => {
+    if (currentInterviewTitle) {
+      setInterviewTitle(currentInterviewTitle);
+    }
+  }, [currentInterviewTitle]);
 
   const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File, waveform?: number[]) => {
     setTranscriptBlocks(blocks);
@@ -125,6 +142,77 @@ export default function App() {
     setHasNewAnalysis(true); // Mark that analyze button was clicked
     console.log('✅ hasNewAnalysis set to TRUE');
     setCurrentScreen('analysis');
+  };
+
+  const handleAnalysisSaved = () => {
+    setHasNewAnalysis(false);
+  };
+
+  const handleSaveInterview = async () => {
+    if (!interviewTitle.trim()) {
+      toast.error('Please enter a title for this interview');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
+      if (currentInterviewId) {
+        // UPDATE
+        const requestBody = {
+          interview_id: currentInterviewId,
+          title: interviewTitle,
+          transcript_text: transcriptText,
+          transcript_words: transcriptBlocks,
+          analysis_data: analysisData,
+        };
+        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+        if (response.ok) {
+          handleAnalysisSaved();
+          setShowSaveDialog(false);
+          toast.success('Interview updated successfully!');
+        } else {
+          toast.error('Failed to update interview.');
+        }
+      } else {
+        // CREATE
+        const formData = new FormData();
+        formData.append('title', interviewTitle);
+        // ... (append other form data: transcript, analysis, notes, etc.)
+        const response = await fetch('http://127.0.0.1:8000/api/interviews', {
+          method: 'POST',
+          body: formData,
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setCurrentInterviewId(result.id);
+          handleAnalysisSaved();
+          setShowSaveDialog(false);
+          toast.success('Interview saved successfully!');
+        } else {
+          toast.error('Failed to save interview.');
+        }
+      }
+    } catch (error) {
+      toast.error('An error occurred while saving.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    try {
+      // ... fetch logic for download ...
+    } catch (error) {
+      toast.error('An error occurred while downloading the report.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleBackToEditor = () => {
@@ -201,69 +289,134 @@ export default function App() {
     }
   };
 
+  const handleShowSaveDialog = () => {
+    // This logic now moves to App.tsx
+    // For now, we'll just log it.
+    console.log('Show save dialog triggered');
+  };
+
   const pageTransition = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
     exit: { opacity: 0 },
-    transition: { 
-      duration: 0.4,
-      ease: [0.43, 0.13, 0.23, 0.96]
-    }
+    transition: { duration: 0.3 }
+  };
+
+  const motionProps = {
+    variants: pageTransition,
+    initial: "initial",
+    animate: "animate",
+    exit: "exit"
+  };
+
+  const handleSaveInterview = (id: number) => {
+    setCurrentInterviewId(id);
   };
 
   return (
-    <div className="bg-zinc-950 h-screen overflow-hidden">
+    <div className="bg-zinc-950 text-white">
       <Toaster position="bottom-right" />
-      <AnimatePresence mode="wait">
-        {currentScreen === 'upload' && (
-          <motion.div key="upload" {...pageTransition} className="h-full overflow-hidden">
-            <UploadScreen 
-              onTranscriptionComplete={handleTranscriptionComplete}
-              onLoadInterview={handleLoadInterview}
+      
+      {currentScreen === 'upload' && (
+        <UploadScreen 
+          onTranscriptionComplete={handleTranscriptionComplete}
+          onLoadInterview={handleLoadInterview}
+        />
+      )}
+      {currentScreen === 'editor' && (
+        <TranscriptEditor
+          transcriptBlocks={transcriptBlocks}
+          setTranscriptBlocks={setTranscriptBlocks}
+          onAnalysisComplete={handleAnalysisComplete}
+          onViewAnalysis={() => setCurrentScreen('analysis')}
+          onBackToUpload={handleBackToUpload}
+          audioFile={audioFile}
+          audioUrl={audioUrl}
+          audioDuration={audioDuration}
+          waveformData={waveformData}
+          existingAnalysis={analysisData}
+          currentInterviewId={currentInterviewId}
+          notes={notes}
+          setNotes={setNotes}
+        />
+      )}
+      {currentScreen === 'analysis' && analysisData && (
+        <AnalysisDashboard
+          analysisData={analysisData}
+          transcriptBlocks={transcriptBlocks}
+          onBackToUpload={handleBackToUpload}
+          onBackToEditor={handleBackToEditor}
+          currentInterviewId={currentInterviewId}
+          currentInterviewTitle={currentInterviewTitle}
+          onSaveInterview={handleSaveInterview} // Using the correctly typed handler
+          audioFile={audioFile}
+          notes={notes}
+          waveformData={waveformData}
+          hasNewAnalysis={hasNewAnalysis}
+          onAnalysisSaved={() => {
+            setHasNewAnalysis(false);
+          }}
+        />
+      )}
+      
+      {/* Save Interview Dialog, now managed by App.tsx */}
+      {showSaveDialog && createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+          onClick={() => setShowSaveDialog(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-zinc-700"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">Save Interview</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowSaveDialog(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-zinc-400 mb-4">Please provide a title for this interview session.</p>
+            <Input
+              type="text"
+              placeholder="e.g., Senior Frontend Engineer Interview"
+              value={interviewTitle}
+              onChange={(e) => setInterviewTitle(e.target.value)}
+              className="w-full bg-zinc-900 border-zinc-700 text-white"
             />
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveInterview} 
+                disabled={isSaving}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
           </motion.div>
-        )}
-        {currentScreen === 'editor' && (
-          <motion.div key="editor" {...pageTransition} className="h-full overflow-hidden">
-            <TranscriptEditor
-              transcriptBlocks={transcriptBlocks}
-              setTranscriptBlocks={setTranscriptBlocks}
-              onAnalysisComplete={handleAnalysisComplete}
-              onViewAnalysis={() => setCurrentScreen('analysis')}
-              onBackToUpload={handleBackToUpload}
-              audioFile={audioFile}
-              audioUrl={audioUrl}
-              audioDuration={audioDuration}
-              waveformData={waveformData}
-              existingAnalysis={analysisData}
-              currentInterviewId={currentInterviewId}
-              notes={notes}
-              setNotes={setNotes}
-            />
-          </motion.div>
-        )}
-        {currentScreen === 'analysis' && analysisData && (
-          <motion.div key="analysis" {...pageTransition} className="h-full overflow-hidden">
-            <AnalysisDashboard
-              analysisData={analysisData}
-              transcriptBlocks={transcriptBlocks}
-              onBackToUpload={handleBackToUpload}
-              onBackToEditor={handleBackToEditor}
-              currentInterviewId={currentInterviewId}
-              currentInterviewTitle={currentInterviewTitle}
-              onSaveInterview={setCurrentInterviewId}
-              audioFile={audioFile}
-              notes={notes}
-              waveformData={waveformData}
-              hasNewAnalysis={hasNewAnalysis}
-              onAnalysisSaved={() => {
-                setHasNewAnalysis(false);
-                console.log('💾 Saved - hasNewAnalysis set to FALSE');
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
+
+export default App;

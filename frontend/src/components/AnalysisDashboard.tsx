@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, Check, BarChart3, PlusCircle } from 'lucide-react';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { AnalysisData } from '../App';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { 
   SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql, 
@@ -40,9 +41,9 @@ interface AnalysisDashboardProps {
 
 export function AnalysisDashboard({ 
   analysisData, 
-  transcriptBlocks, 
-  onBackToUpload, 
-  onBackToEditor, 
+  transcriptBlocks,
+  onBackToUpload,
+  onBackToEditor,
   currentInterviewId,
   currentInterviewTitle,
   onSaveInterview,
@@ -57,11 +58,9 @@ export function AnalysisDashboard({
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
   
-  // Pre-fill title when loading existing interview
   useEffect(() => {
     if (currentInterviewTitle) {
       setInterviewTitle(currentInterviewTitle);
-      console.log('📝 Pre-filled interview title:', currentInterviewTitle);
     }
   }, [currentInterviewTitle]);
   
@@ -169,11 +168,6 @@ export function AnalysisDashboard({
   // No parsing needed - we get JSON directly from the API!
 
   const handleSaveInterview = async () => {
-    console.log('🔵 handleSaveInterview called!');
-    console.log('🔵 interviewTitle:', interviewTitle);
-    console.log('🔵 currentInterviewId:', currentInterviewId);
-    console.log('🔵 analysisData:', analysisData);
-    
     if (!interviewTitle.trim()) {
       toast.error('Please enter a title for this interview');
       return;
@@ -183,8 +177,6 @@ export function AnalysisDashboard({
     try {
       // Get full transcript text
       const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
-
-      console.log('handleSaveInterview - currentInterviewId:', currentInterviewId);
 
       if (currentInterviewId) {
         // UPDATE existing interview
@@ -339,9 +331,9 @@ export function AnalysisDashboard({
   // Score tooltips
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const communicationRef = useRef<HTMLDivElement>(null);
-  const technicalRef = useRef<HTMLDivElement>(null);
-  const engagementRef = useRef<HTMLDivElement>(null);
+  const communicationRef = React.useRef<HTMLDivElement>(null);
+  const technicalRef = React.useRef<HTMLDivElement>(null);
+  const engagementRef = React.useRef<HTMLDivElement>(null);
 
   const handleTooltipEnter = (type: string, ref: React.RefObject<HTMLDivElement | null>) => {
     if (ref.current) {
@@ -423,411 +415,412 @@ export function AnalysisDashboard({
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Expert Statistics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ 
-            duration: 0.5,
-            delay: 0.1,
-            ease: [0.43, 0.13, 0.23, 0.96]
-          }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 mb-8"
-        >
-          <motion.div 
-            className="flex items-center gap-3 mb-6"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <Brain className="w-6 h-6 text-cyan-400" />
-            <h2 className="text-xl font-bold text-white">Expert Statistics</h2>
-          </motion.div>
-
-          {/* Score Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Communication Score */}
-            <motion.div 
-              className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-500/10 rounded-lg">
-                  <TrendingUp className="w-8 h-8 text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-zinc-400 text-sm">Communication Score</p>
-                    <div 
-                      ref={communicationRef}
-                      className="relative cursor-help"
-                      onMouseEnter={() => handleTooltipEnter('communication', communicationRef)}
-                      onMouseLeave={() => setHoveredTooltip(null)}
-                    >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-white">{analysisData.statistics.communicationScore}</p>
-                  <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${analysisData.statistics.communicationScore}%` }}
-                      transition={{ duration: 1, delay: 0.3 }}
-                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Technical Depth */}
-            <motion.div 
-              className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: 0.4 }}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-500/10 rounded-lg">
-                  <Code className="w-8 h-8 text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-zinc-400 text-sm">Technical Depth</p>
-                    <div 
-                      ref={technicalRef}
-                      className="relative cursor-help"
-                      onMouseEnter={() => handleTooltipEnter('technical', technicalRef)}
-                      onMouseLeave={() => setHoveredTooltip(null)}
-                    >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-white">{analysisData.statistics.technicalDepthScore}</p>
-                  <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${analysisData.statistics.technicalDepthScore}%` }}
-                      transition={{ duration: 1, delay: 0.4 }}
-                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Engagement Score */}
-            <motion.div 
-              className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: 0.5 }}
-              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-yellow-500/10 rounded-lg">
-                  <MessageSquare className="w-8 h-8 text-yellow-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-zinc-400 text-sm">Engagement Score</p>
-                    <div 
-                      ref={engagementRef}
-                      className="relative cursor-help"
-                      onMouseEnter={() => handleTooltipEnter('engagement', engagementRef)}
-                      onMouseLeave={() => setHoveredTooltip(null)}
-                    >
-                      <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-white">{analysisData.statistics.engagementScore}</p>
-                  <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${analysisData.statistics.engagementScore}%` }}
-                      transition={{ duration: 1, delay: 0.5 }}
-                      className="h-full"
-                      style={{
-                        background: 'linear-gradient(to bottom right, #f59e0b, #eab308)'
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-          <motion.div 
-            className="flex flex-wrap justify-between items-center gap-x-8 gap-y-4"
+      <main>
+        <div className="max-w-7xl mx-auto px-8 py-8">
+          {/* Expert Statistics */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
+            transition={{ 
+              duration: 0.5,
+              delay: 0.1,
+              ease: [0.43, 0.13, 0.23, 0.96]
+            }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 mb-8"
           >
-            <div className="flex flex-col items-center min-w-[80px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Clock className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Duration</p>
-              </div>
-              <p className="text-xl font-bold text-white">{analysisData.statistics.duration}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[100px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Code className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Technical</p>
-              </div>
-              <p className="text-lg font-bold text-blue-400">{analysisData.statistics.technicalTime}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[90px]">
-              <div className="flex items-center gap-1 mb-1">
-                <MessageSquare className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Q&A Time</p>
-              </div>
-              <p className="text-lg font-bold text-yellow-400">{analysisData.statistics.qaTime}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[80px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Users className="w-4 h-4 text-zinc-400" />
-                <p className="text-zinc-500 text-xs">Engagement</p>
-              </div>
-              <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[140px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Zap className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Complexity</p>
-              </div>
-              <p className={`text-xl font-bold ${getComplexityTextColor(analysisData.statistics.complexity)}`}>{analysisData.statistics.complexity}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[80px]">
-              <div className="flex items-center gap-1 mb-1">
-                <TrendingUp className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Pace</p>
-              </div>
-              <p className={`text-xl font-bold ${getPaceTextColor(analysisData.statistics.pace)}`}>{analysisData.statistics.pace}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[70px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Award className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Questions</p>
-              </div>
-              <p className="text-xl font-bold text-cyan-400">{analysisData.statistics.technicalQuestions}</p>
-            </div>
-            <div className="flex flex-col items-center min-w-[70px]">
-              <div className="flex items-center gap-1 mb-1">
-                <Brain className="w-4 h-4 text-zinc-500" />
-                <p className="text-zinc-500 text-xs">Follow-ups</p>
-              </div>
-              <p className="text-xl font-bold text-yellow-400">{analysisData.statistics.followUpQuestions}</p>
-            </div>
-          </motion.div>
-        </motion.div>
+            <motion.div 
+              className="flex items-center gap-3 mb-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <Brain className="w-6 h-6 text-cyan-400" />
+              <h2 className="text-xl font-bold text-white">Expert Statistics</h2>
+            </motion.div>
 
-        {/* General Comments */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3, ease: [0.43, 0.13, 0.23, 0.96] }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
-        >
-          <button
-            onClick={() => toggleSection('general')}
-            className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-          >
-            <h2 className="text-xl font-bold text-white">💬 General Comments</h2>
-            {expandedSections.general ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-          </button>
-          <AnimatePresence>
-            {expandedSections.general && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
+            {/* Score Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {/* Communication Score */}
+              <motion.div 
+                className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               >
-                <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  <div>
-                    <p className="text-cyan-400 font-medium mb-3">Interview Overview</p>
-                    <p className="leading-loose">{analysisData.generalComments.howInterview}</p>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-500/10 rounded-lg">
+                    <TrendingUp className="w-8 h-8 text-green-400" />
                   </div>
-                  <div>
-                    <p className="text-cyan-400 font-medium mb-3">Interviewer's Attitude</p>
-                    <p className="leading-loose">{analysisData.generalComments.attitude}</p>
-                  </div>
-                  <div>
-                    <p className="text-cyan-400 font-medium mb-3">Platform Used</p>
-                    <p className="leading-loose">{analysisData.generalComments.platform}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Key Technical Points */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.35, ease: [0.43, 0.13, 0.23, 0.96] }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
-        >
-          <button
-            onClick={() => toggleSection('keyPoints')}
-            className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-          >
-            <h2 className="text-xl font-bold text-white">💡 Key Technical Emphasis Points</h2>
-            {expandedSections.keyPoints ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-          </button>
-          <AnimatePresence>
-            {expandedSections.keyPoints && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  {analysisData.keyPoints.map((point, idx) => (
-                    <div key={idx}>
-                      <p className="text-yellow-400 font-semibold mb-3">{point.title}</p>
-                      <p className="leading-loose">{point.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Coding Challenge */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
-        >
-          <button
-            onClick={() => toggleSection('coding')}
-            className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-          >
-            <h2 className="text-xl font-bold text-white">💻 Live Coding Challenge Details</h2>
-            {expandedSections.coding ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-          </button>
-          <AnimatePresence>
-            {expandedSections.coding && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  <div>
-                    <p className="font-semibold mb-3" style={{ color: '#60a5fa' }}>Core Exercise</p>
-                    <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold mb-3" style={{ color: '#fb923c' }}>Critical Follow-up</p>
-                    <p className="leading-loose">{analysisData.codingChallenge.followUp}</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold mb-3" style={{ color: '#c084fc' }}>Required Knowledge</p>
-                    <p className="leading-loose">{analysisData.codingChallenge.knowledge}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Technologies */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.45, ease: [0.43, 0.13, 0.23, 0.96] }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
-        >
-          <button
-            onClick={() => toggleSection('technologies')}
-            className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-          >
-            <h2 className="text-xl font-bold text-white">🛠️ Technologies and Tools Used</h2>
-            {expandedSections.technologies ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-          </button>
-          <AnimatePresence>
-            {expandedSections.technologies && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-6">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {analysisData.technologies.map((tech, idx) => (
-                      <div
-                        key={idx}
-                        className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors"
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-zinc-400 text-sm">Communication Score</p>
+                      <div 
+                        ref={communicationRef}
+                        className="relative cursor-help"
+                        onMouseEnter={() => handleTooltipEnter('communication', communicationRef)}
+                        onMouseLeave={() => setHoveredTooltip(null)}
                       >
-                        <div className="flex items-center gap-3 mb-1">
-                          {getTechIcon(tech.name)}
-                          <span className="text-sm font-semibold truncate" style={{ color: '#06b6d4' }}>{tech.name}</span>
-                        </div>
-                        {tech.timestamps && (
-                          <div className="text-xs text-zinc-500 ml-9">
-                            {tech.timestamps}
-                          </div>
-                        )}
+                        <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{analysisData.statistics.communicationScore}</p>
+                    <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${analysisData.statistics.communicationScore}%` }}
+                        transition={{ duration: 1, delay: 0.3 }}
+                        className="h-full bg-gradient-to-r from-green-500 to-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Technical Depth */}
+              <motion.div 
+                className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.4 }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/10 rounded-lg">
+                    <Code className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-zinc-400 text-sm">Technical Depth</p>
+                      <div 
+                        ref={technicalRef}
+                        className="relative cursor-help"
+                        onMouseEnter={() => handleTooltipEnter('technical', technicalRef)}
+                        onMouseLeave={() => setHoveredTooltip(null)}
+                      >
+                        <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{analysisData.statistics.technicalDepthScore}</p>
+                    <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${analysisData.statistics.technicalDepthScore}%` }}
+                        transition={{ duration: 1, delay: 0.4 }}
+                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Engagement Score */}
+              <motion.div 
+                className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
+                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-yellow-500/10 rounded-lg">
+                    <MessageSquare className="w-8 h-8 text-yellow-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-zinc-400 text-sm">Engagement Score</p>
+                      <div 
+                        ref={engagementRef}
+                        className="relative cursor-help"
+                        onMouseEnter={() => handleTooltipEnter('engagement', engagementRef)}
+                        onMouseLeave={() => setHoveredTooltip(null)}
+                      >
+                        <HelpCircle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-white">{analysisData.statistics.engagementScore}</p>
+                    <div className="mt-2 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${analysisData.statistics.engagementScore}%` }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className="h-full"
+                        style={{
+                          background: 'linear-gradient(to bottom right, #f59e0b, #eab308)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+            <motion.div 
+              className="flex flex-wrap justify-between items-center gap-x-8 gap-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              <div className="flex flex-col items-center min-w-[80px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Clock className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Duration</p>
+                </div>
+                <p className="text-xl font-bold text-white">{analysisData.statistics.duration}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[100px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Code className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Technical</p>
+                </div>
+                <p className="text-lg font-bold text-blue-400">{analysisData.statistics.technicalTime}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[90px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <MessageSquare className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Q&A Time</p>
+                </div>
+                <p className="text-lg font-bold text-yellow-400">{analysisData.statistics.qaTime}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[80px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Users className="w-4 h-4 text-zinc-400" />
+                  <p className="text-zinc-500 text-xs">Engagement</p>
+                </div>
+                <p className="text-xl font-bold text-green-400">{analysisData.statistics.engagement}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[140px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Zap className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Complexity</p>
+                </div>
+                <p className={`text-xl font-bold ${getComplexityTextColor(analysisData.statistics.complexity)}`}>{analysisData.statistics.complexity}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[80px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <TrendingUp className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Pace</p>
+                </div>
+                <p className={`text-xl font-bold ${getPaceTextColor(analysisData.statistics.pace)}`}>{analysisData.statistics.pace}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[70px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Award className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Questions</p>
+                </div>
+                <p className="text-xl font-bold text-cyan-400">{analysisData.statistics.technicalQuestions}</p>
+              </div>
+              <div className="flex flex-col items-center min-w-[70px]">
+                <div className="flex items-center gap-1 mb-1">
+                  <Brain className="w-4 h-4 text-zinc-500" />
+                  <p className="text-zinc-500 text-xs">Follow-ups</p>
+                </div>
+                <p className="text-xl font-bold text-yellow-400">{analysisData.statistics.followUpQuestions}</p>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* General Comments */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3, ease: [0.43, 0.13, 0.23, 0.96] }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
+          >
+            <button
+              onClick={() => toggleSection('general')}
+              className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+            >
+              <h2 className="text-xl font-bold text-white">💬 General Comments</h2>
+              {expandedSections.general ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+            </button>
+            <AnimatePresence>
+              {expandedSections.general && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                    <div>
+                      <p className="text-cyan-400 font-medium mb-3">Interview Overview</p>
+                      <p className="leading-loose">{analysisData.generalComments.howInterview}</p>
+                    </div>
+                    <div>
+                      <p className="text-cyan-400 font-medium mb-3">Interviewer's Attitude</p>
+                      <p className="leading-loose">{analysisData.generalComments.attitude}</p>
+                    </div>
+                    <div>
+                      <p className="text-cyan-400 font-medium mb-3">Platform Used</p>
+                      <p className="leading-loose">{analysisData.generalComments.platform}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Key Technical Points */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35, ease: [0.43, 0.13, 0.23, 0.96] }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
+          >
+            <button
+              onClick={() => toggleSection('keyPoints')}
+              className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+            >
+              <h2 className="text-xl font-bold text-white">💡 Key Technical Emphasis Points</h2>
+              {expandedSections.keyPoints ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+            </button>
+            <AnimatePresence>
+              {expandedSections.keyPoints && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                    {analysisData.keyPoints.map((point, idx) => (
+                      <div key={idx}>
+                        <p className="text-yellow-400 font-semibold mb-3">{point.title}</p>
+                        <p className="leading-loose">{point.content}</p>
                       </div>
                     ))}
                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
-        {/* Q&A Topics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5, ease: [0.43, 0.13, 0.23, 0.96] }}
-          className="bg-zinc-900/30 border border-zinc-800 rounded-lg"
-        >
-          <button
-            onClick={() => toggleSection('qa')}
-            className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+          {/* Coding Challenge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
           >
-            <h2 className="text-xl font-bold text-white">🗣️ Non-Technical & Situational Q&A Topics</h2>
-            {expandedSections.qa ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-          </button>
-          <AnimatePresence>
-            {expandedSections.qa && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                  {analysisData.qaTopics.map((topic, idx) => (
-                    <div key={idx}>
-                      <p className="text-green-400 font-semibold mb-3">{topic.title}</p>
-                      <p className="leading-loose">{topic.content}</p>
+            <button
+              onClick={() => toggleSection('coding')}
+              className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+            >
+              <h2 className="text-xl font-bold text-white">💻 Live Coding Challenge Details</h2>
+              {expandedSections.coding ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+            </button>
+            <AnimatePresence>
+              {expandedSections.coding && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                    <div>
+                      <p className="font-semibold mb-3" style={{ color: '#60a5fa' }}>Core Exercise</p>
+                      <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+                    <div>
+                      <p className="font-semibold mb-3" style={{ color: '#fb923c' }}>Critical Follow-up</p>
+                      <p className="leading-loose">{analysisData.codingChallenge.followUp}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-3" style={{ color: '#c084fc' }}>Required Knowledge</p>
+                      <p className="leading-loose">{analysisData.codingChallenge.knowledge}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Technologies */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.45, ease: [0.43, 0.13, 0.23, 0.96] }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
+          >
+            <button
+              onClick={() => toggleSection('technologies')}
+              className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+            >
+              <h2 className="text-xl font-bold text-white">🛠️ Technologies and Tools Used</h2>
+              {expandedSections.technologies ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+            </button>
+            <AnimatePresence>
+              {expandedSections.technologies && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {analysisData.technologies.map((tech, idx) => (
+                        <div
+                          key={idx}
+                          className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 mb-1">
+                            {getTechIcon(tech.name)}
+                            <span className="text-sm font-semibold truncate" style={{ color: '#06b6d4' }}>{tech.name}</span>
+                          </div>
+                          {tech.timestamps && (
+                            <div className="text-xs text-zinc-500 ml-9">
+                              {tech.timestamps}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Q&A Topics */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5, ease: [0.43, 0.13, 0.23, 0.96] }}
+            className="bg-zinc-900/30 border border-zinc-800 rounded-lg"
+          >
+            <button
+              onClick={() => toggleSection('qa')}
+              className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
+            >
+              <h2 className="text-xl font-bold text-white">🗣️ Non-Technical & Situational Q&A Topics</h2>
+              {expandedSections.qa ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+            </button>
+            <AnimatePresence>
+              {expandedSections.qa && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                    {analysisData.qaTopics.map((topic, idx) => (
+                      <div key={idx}>
+                        <p className="text-green-400 font-semibold mb-3">{topic.title}</p>
+                        <p className="leading-loose">{topic.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
       </main>
 
-      {/* Portal Tooltip - completely outside component tree to avoid parent opacity */}
+      {/* Portal Tooltip */}
       {hoveredTooltip && typeof document !== 'undefined' && createPortal(
         <div
           style={{
