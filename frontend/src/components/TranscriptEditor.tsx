@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { Virtuoso } from 'react-virtuoso';
 
 interface Note {
   id: number;
@@ -65,6 +66,7 @@ export function TranscriptEditor({
   const seekBarRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const notesScrollRef = useRef<HTMLDivElement | null>(null);
+  const virtuosoRef = useRef<any>(null);
   
   // Notes and Bookmarks state  
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -599,19 +601,19 @@ export function TranscriptEditor({
 
   // Scroll active segment to top whenever it changes (same logic as clicking player)
   useEffect(() => {
-    if (autoScrollEnabled && currentBlock?.id && isPlaying) {
-      // Use the same scrolling logic as handleScrub
-      setTimeout(() => {
-        const element = document.querySelector(`[data-block-id="${currentBlock.id}"]`);
-        if (element) {
-          element.scrollIntoView({
-            behavior: 'smooth', // Smooth scrolling during playback
-            block: 'start',
+    if (autoScrollEnabled && currentBlock?.id && isPlaying && virtuosoRef.current) {
+      const blockIndex = transcriptBlocks.findIndex(b => b.id === currentBlock.id);
+      if (blockIndex !== -1) {
+        setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({
+            index: blockIndex,
+            behavior: 'smooth',
+            align: 'start'
           });
-        }
-      }, 50);
+        }, 50);
+      }
     }
-  }, [currentBlock?.id, autoScrollEnabled, isPlaying]);
+  }, [currentBlock?.id, autoScrollEnabled, isPlaying, transcriptBlocks]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -1118,114 +1120,120 @@ export function TranscriptEditor({
                   Scroll to view all segments
                 </span>
               </motion.div>
-              <div 
+              <motion.div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto px-8 pt-6 pb-8 scrollbar-hidden" 
-                style={{ maxHeight: 'calc(100vh - 260px)' }}
-                onWheel={() => setAutoScrollEnabled(false)}
-                onTouchMove={() => setAutoScrollEnabled(false)}
+                className="flex-1 px-8 pt-6 pb-8" 
+                style={{ height: 'calc(100vh - 260px)' }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
               >
-                <div className="max-w-3xl space-y-4">
-                {transcriptBlocks.map((block, index) => {
-                  const isActive = currentBlock?.id === block.id;
-                  const isEditing = editingBlockId === block.id;
-                  const isHovered = hoveredBlockId === block.id;
-                  
-                  // Only animate first 10 blocks for saved interviews (only 5 visible at a time)
-                  const isLoadedInterview = currentInterviewId !== null;
-                  const shouldAnimate = !isLoadedInterview || index < 10;
-                  
-                  return (
-                    <motion.div
-                      key={block.id}
-                      data-block-id={block.id}
-                      ref={isActive ? activeBlockRef : null}
-                      initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
-                      animate={{ 
-                        opacity: 1,
-                        y: 0
-                      }}
-                      transition={{ 
-                        duration: shouldAnimate ? 0.6 : 0,
-                        delay: shouldAnimate ? index * 0.08 : 0,
-                        ease: [0.25, 0.46, 0.45, 0.94]
-                      }}
-                      whileHover={{ scale: 1.02 }}
-                      onMouseEnter={() => setHoveredBlockId(block.id)}
-                      onMouseLeave={() => setHoveredBlockId(null)}
-                      className={`
-                        relative p-4 rounded-lg border
-                        ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30'}
-                      `}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => jumpToTimestamp(block.timestamp)}
-                            className="text-xs text-zinc-500 hover:text-blue-400 transition-colors"
-                          >
-                            {formatTime(block.timestamp)}
-                          </button>
-                        </div>
-                        
-                        {isEditing ? (
-                          <Textarea
-                            value={block.text}
-                            onChange={(e) => handleBlockEdit(block.id, e.target.value)}
-                            onBlur={() => setEditingBlockId(null)}
-                            autoFocus
-                            className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
-                          />
-                        ) : (
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                              <p
-                                onClick={() => jumpToTimestamp(block.timestamp)}
-                                className="cursor-pointer leading-relaxed"
-                              >
-                                {block.words && block.words.length > 0 ? (
-                                  // Render words with confidence-based coloring
-                                  block.words.map((word, idx) => (
-                                    <span
-                                      key={idx}
-                                      className={`${getConfidenceColor(word.confidence)} transition-colors`}
-                                      title={`Confidence: ${(word.confidence * 100).toFixed(1)}%`}
-                                    >
-                                      {word.text}{idx < block.words!.length - 1 ? ' ' : ''}
-                                    </span>
-                                  ))
-                                ) : (
-                                  // Fallback to plain text if no word data
-                                  <span className="text-zinc-100">{block.text}</span>
-                                )}
-                              </p>
-                            </div>
-
-                            {isHovered && !isEditing && (
-                              <motion.button
-                                initial={{ opacity: 0, scale: 0.8, x: -10 }}
-                                animate={{ opacity: 1, scale: 1, x: 0 }}
-                                exit={{ opacity: 0, scale: 0.8, x: -10 }}
-                                transition={{ 
-                                  duration: 0.2,
-                                  ease: [0.43, 0.13, 0.23, 0.96]
-                                }}
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setEditingBlockId(block.id)}
-                                className="p-2 hover:bg-zinc-800 rounded flex-shrink-0 transition-colors"
-                              >
-                                <Edit2 className="w-4 h-4 text-zinc-400" />
-                              </motion.button>
-                            )}
-                          </div>
-                        )}
+                <Virtuoso
+                  ref={virtuosoRef}
+                  data={transcriptBlocks}
+                  totalCount={transcriptBlocks.length}
+                  style={{ height: '100%' }}
+                  onWheel={() => setAutoScrollEnabled(false)}
+                  onTouchMove={() => setAutoScrollEnabled(false)}
+                  components={{
+                    List: React.forwardRef<HTMLDivElement, { style?: React.CSSProperties; children?: React.ReactNode }>(({ style, children }, ref) => (
+                      <div 
+                        ref={ref} 
+                        style={{ ...style, maxWidth: '900px', width: '100%' }}
+                      >
+                        {children}
                       </div>
-                    </motion.div>
-                  );
-                })}
-                </div>
-              </div>
+                    ))
+                  }}
+                  itemContent={(index, block) => {
+                      const isActive = currentBlock?.id === block.id;
+                      const isEditing = editingBlockId === block.id;
+                      const isHovered = hoveredBlockId === block.id;
+                      
+                      return (
+                        <div style={{ paddingBottom: '16px', paddingLeft: '4px', paddingRight: '4px' }}>
+                          <motion.div
+                            key={block.id}
+                            data-block-id={block.id}
+                            ref={isActive ? activeBlockRef : null}
+                            whileHover={{ scale: 1.015 }}
+                            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                            onMouseEnter={() => setHoveredBlockId(block.id)}
+                            onMouseLeave={() => setHoveredBlockId(null)}
+                            className={`
+                              relative p-4 rounded-lg border transition-colors
+                              ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30'}
+                            `}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <button
+                                  onClick={() => jumpToTimestamp(block.timestamp)}
+                                  className="text-xs text-zinc-500 hover:text-blue-400 transition-colors"
+                                >
+                                  {formatTime(block.timestamp)}
+                                </button>
+                              </div>
+                              
+                              {isEditing ? (
+                                <Textarea
+                                  value={block.text}
+                                  onChange={(e) => handleBlockEdit(block.id, e.target.value)}
+                                  onBlur={() => setEditingBlockId(null)}
+                                  autoFocus
+                                  className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
+                                />
+                              ) : (
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-1">
+                                    <p
+                                      onClick={() => jumpToTimestamp(block.timestamp)}
+                                      className="cursor-pointer leading-relaxed"
+                                    >
+                                      {block.words && block.words.length > 0 ? (
+                                        // Render words with confidence-based coloring
+                                        block.words.map((word, idx) => (
+                                          <span
+                                            key={idx}
+                                            className={`${getConfidenceColor(word.confidence)} transition-colors`}
+                                            title={`Confidence: ${(word.confidence * 100).toFixed(1)}%`}
+                                          >
+                                            {word.text}{idx < block.words!.length - 1 ? ' ' : ''}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        // Fallback to plain text if no word data
+                                        <span className="text-zinc-100">{block.text}</span>
+                                      )}
+                                    </p>
+                                  </div>
+
+                                  {isHovered && !isEditing && (
+                                    <motion.button
+                                      initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                                      exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                                      transition={{ 
+                                        duration: 0.2,
+                                        ease: [0.43, 0.13, 0.23, 0.96]
+                                      }}
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={() => setEditingBlockId(block.id)}
+                                      className="p-2 hover:bg-zinc-800 rounded flex-shrink-0 transition-colors"
+                                    >
+                                      <Edit2 className="w-4 h-4 text-zinc-400" />
+                                    </motion.button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        </div>
+                      );
+                    }}
+                  />
+              </motion.div>
             </div>
 
             {/* Right Side - Info Panel (35%) */}
