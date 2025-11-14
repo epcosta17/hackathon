@@ -87,21 +87,32 @@ export function TranscriptEditor({
       
       // 2. Download in parallel chunks for 2-5x faster speed
       let blobUrl: string | null = null;
+      const abortController = new AbortController();
+      let isDownloading = true;
       
       const downloadWithParallelChunks = async () => {
         try {
           console.log('🚀 Starting optimized parallel chunk download...');
           
           // First, get file size by fetching headers only
-          const headResponse = await fetch(audioUrl, { method: 'HEAD' });
+          const headResponse = await fetch(audioUrl, { 
+            method: 'HEAD',
+            signal: abortController.signal 
+          });
           const fileSize = parseInt(headResponse.headers.get('content-length') || '0');
           const supportsRange = headResponse.headers.get('accept-ranges') === 'bytes';
           
           if (!supportsRange || fileSize === 0) {
             // Fallback to regular download if Range not supported
             console.log('⚠️ Range requests not supported, falling back to standard download');
-            const response = await fetch(audioUrl);
+            const response = await fetch(audioUrl, { signal: abortController.signal });
             const blob = await response.blob();
+            
+            if (abortController.signal.aborted) {
+              console.log('🛑 Download cancelled before blob creation');
+              return;
+            }
+            
             blobUrl = URL.createObjectURL(blob);
             
             // Save state and switch to blob
@@ -152,10 +163,16 @@ export function TranscriptEditor({
           const chunkBlobs: Blob[] = new Array(actualChunks);
           
           for (let i = 0; i < chunks.length; i += batchSize) {
+            if (abortController.signal.aborted) {
+              console.log('🛑 Download cancelled during chunk processing');
+              return;
+            }
+            
             const batch = chunks.slice(i, i + batchSize);
             const batchPromises = batch.map(async (chunk) => {
               const response = await fetch(audioUrl, {
-                headers: { 'Range': `bytes=${chunk.start}-${chunk.end}` }
+                headers: { 'Range': `bytes=${chunk.start}-${chunk.end}` },
+                signal: abortController.signal
               });
               if (response.status !== 206) {
                 throw new Error('Range request failed');
@@ -168,6 +185,11 @@ export function TranscriptEditor({
           }
           
           // Combine all chunks into single blob
+          if (abortController.signal.aborted) {
+            console.log('🛑 Download cancelled before reassembly');
+            return;
+          }
+          
           console.log('🔧 Reassembling chunks...');
           const fullBlob = new Blob(chunkBlobs, { type: 'audio/mpeg' });
           blobUrl = URL.createObjectURL(fullBlob);
@@ -211,16 +233,26 @@ export function TranscriptEditor({
               }
             }
           }, 100);
-        } catch (error) {
-          console.error('Failed to download audio chunks, continuing with streaming:', error);
-          // Keep using streaming URL if download fails
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.log('🛑 Audio download aborted by user navigation');
+          } else {
+            console.error('Failed to download audio chunks, continuing with streaming:', error);
+          }
+          // Keep using streaming URL if download fails or is cancelled
+        } finally {
+          isDownloading = false;
         }
       };
       
       downloadWithParallelChunks();
       
-      // Cleanup blob URL when component unmounts or audioUrl changes
+      // Cleanup: Cancel download and revoke blob URL when navigating away
       return () => {
+        if (isDownloading) {
+          console.log('🛑 Cancelling audio download...');
+          abortController.abort();
+        }
         if (blobUrl) {
           console.log('🧹 Cleaning up blob URL');
           URL.revokeObjectURL(blobUrl);
@@ -791,24 +823,52 @@ export function TranscriptEditor({
       </header>
 
       {/* Audio Player */}
-      <div className="border-b border-zinc-800 bg-zinc-900/30 flex-shrink-0">
+      <motion.div 
+        className="border-b border-zinc-800 bg-zinc-900/30 flex-shrink-0"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ 
+          duration: 0.5,
+          delay: 0.1,
+          ease: [0.43, 0.13, 0.23, 0.96]
+        }}
+      >
         <div className="max-w-[1800px] mx-auto px-8 py-6">
           <div className="flex items-center gap-6">
-            <Button
-              onClick={togglePlayPause}
-              variant="outline"
-              className="w-12 h-12 rounded-full bg-zinc-800 border-zinc-700 hover:bg-zinc-700 p-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!localAudioUrl}
-              title={!localAudioUrl ? 'No audio available' : ''}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ 
+                duration: 0.4,
+                delay: 0.2
+              }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
             >
-              {isPlaying ? (
-                <Pause className="w-5 h-5 text-white" />
-              ) : (
-                <Play className="w-5 h-5 text-white ml-0.5" />
-              )}
-            </Button>
+              <Button
+                onClick={togglePlayPause}
+                variant="outline"
+                className="w-12 h-12 rounded-full bg-zinc-800 border-zinc-700 hover:bg-zinc-700 p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!localAudioUrl}
+                title={!localAudioUrl ? 'No audio available' : ''}
+              >
+                {isPlaying ? (
+                  <Pause className="w-5 h-5 text-white" />
+                ) : (
+                  <Play className="w-5 h-5 text-white ml-0.5" />
+                )}
+              </Button>
+            </motion.div>
             
-            <div className="flex-1 flex items-center gap-4">
+            <motion.div 
+              className="flex-1 flex items-center gap-4"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                duration: 0.5,
+                delay: 0.2,
+                ease: [0.43, 0.13, 0.23, 0.96]
+              }}
+            >
               <span className="text-zinc-400 text-sm min-w-[3rem]">
                 {formatTime(currentTime)}
               </span>
@@ -895,10 +955,10 @@ export function TranscriptEditor({
               <span className="text-zinc-400 text-sm min-w-[3rem]">
                 {formatTime(duration)}
               </span>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden min-h-0 flex">
@@ -906,7 +966,15 @@ export function TranscriptEditor({
           <div className="flex w-full h-full">
             {/* Left Side - Notes & Bookmarks (20%) */}
             <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden bg-zinc-900/10 flex-shrink-0" style={{ width: '20%' }}>
-              <div className="p-6 pb-4 flex items-center justify-between flex-shrink-0">
+              <motion.div 
+                className="p-6 pb-4 flex items-center justify-between flex-shrink-0"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  duration: 0.4,
+                  ease: [0.43, 0.13, 0.23, 0.96]
+                }}
+              >
                 <h2 className="text-zinc-400 text-sm font-medium">Notes & Bookmarks</h2>
                 <div className="flex gap-2">
                   <button
@@ -924,10 +992,19 @@ export function TranscriptEditor({
                     <Plus className="w-4 h-4 text-blue-400 hover:text-blue-300 transition-colors" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
               
               {isAddingNote && (
-                <div className="px-6 pb-6 flex-shrink-0">
+                <motion.div 
+                  className="px-6 pb-6 flex-shrink-0"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ 
+                    duration: 0.3,
+                    ease: [0.43, 0.13, 0.23, 0.96]
+                  }}
+                >
                   <div className="bg-zinc-900 p-3 rounded-lg border border-zinc-700">
                     <Textarea
                       value={newNoteContent}
@@ -970,7 +1047,7 @@ export function TranscriptEditor({
                       </Button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               )}
               
               <div
@@ -1024,14 +1101,23 @@ export function TranscriptEditor({
             
             {/* Middle - Transcript (45%) */}
             <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden flex-shrink-0" style={{ width: '45%' }}>
-              <div className="p-8 pb-4 flex items-center justify-between flex-shrink-0">
+              <motion.div 
+                className="p-8 pb-4 flex items-center justify-between flex-shrink-0"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  duration: 0.4,
+                  delay: 0.05,
+                  ease: [0.43, 0.13, 0.23, 0.96]
+                }}
+              >
                 <h2 className="text-zinc-400 text-sm font-medium">
                   Transcript Segments ({transcriptBlocks.length})
                 </h2>
                 <span className="text-xs text-zinc-500">
                   Scroll to view all segments
                 </span>
-              </div>
+              </motion.div>
               <div 
                 ref={scrollContainerRef}
                 className="flex-1 overflow-y-auto px-8 pt-6 pb-8 scrollbar-hidden" 
@@ -1045,27 +1131,30 @@ export function TranscriptEditor({
                   const isEditing = editingBlockId === block.id;
                   const isHovered = hoveredBlockId === block.id;
                   
+                  // Only animate first 10 blocks for saved interviews (only 5 visible at a time)
+                  const isLoadedInterview = currentInterviewId !== null;
+                  const shouldAnimate = !isLoadedInterview || index < 10;
+                  
                   return (
                     <motion.div
                       key={block.id}
                       data-block-id={block.id}
                       ref={isActive ? activeBlockRef : null}
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={shouldAnimate ? { opacity: 0, y: 20 } : { opacity: 1, y: 0 }}
                       animate={{ 
-                        opacity: 1, 
-                        x: 0,
-                        scale: isActive ? 1.02 : 1
+                        opacity: 1,
+                        y: 0
                       }}
                       transition={{ 
-                        duration: 0.3,
-                        delay: Math.min(index * 0.03, 1),
-                        ease: [0.43, 0.13, 0.23, 0.96]
+                        duration: shouldAnimate ? 0.6 : 0,
+                        delay: shouldAnimate ? index * 0.08 : 0,
+                        ease: [0.25, 0.46, 0.45, 0.94]
                       }}
-                      whileHover={{ scale: 1.01 }}
+                      whileHover={{ scale: 1.02 }}
                       onMouseEnter={() => setHoveredBlockId(block.id)}
                       onMouseLeave={() => setHoveredBlockId(null)}
                       className={`
-                        relative p-4 rounded-lg border transition-all duration-200
+                        relative p-4 rounded-lg border
                         ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30'}
                       `}
                     >
@@ -1112,12 +1201,15 @@ export function TranscriptEditor({
                               </p>
                             </div>
 
-                            {isHovered && (
+                            {isHovered && !isEditing && (
                               <motion.button
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                transition={{ duration: 0.15 }}
+                                initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                                animate={{ opacity: 1, scale: 1, x: 0 }}
+                                exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                                transition={{ 
+                                  duration: 0.2,
+                                  ease: [0.43, 0.13, 0.23, 0.96]
+                                }}
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setEditingBlockId(block.id)}
@@ -1140,7 +1232,16 @@ export function TranscriptEditor({
             <div className="bg-zinc-900/20 p-8 overflow-y-auto h-full flex-shrink-0" style={{ width: '35%' }}>
               <div className="space-y-6">
                 {/* How to Use - Top */}
-                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <motion.div 
+                  className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.4,
+                    delay: 0.1
+                  }}
+                  whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+                >
                   <h4 className="text-blue-400 mb-3 font-semibold">How to Use</h4>
                   <div className="space-y-4">
                     <div>
@@ -1166,10 +1267,19 @@ export function TranscriptEditor({
                       </ul>
                     </div>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Confidence Colors - Middle */}
-                <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <motion.div 
+                  className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.4,
+                    delay: 0.2
+                  }}
+                  whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+                >
                   <h4 className="text-zinc-300 font-medium mb-3">Confidence Colors</h4>
                   <div className="space-y-2.5 text-sm">
                     <div className="flex items-center gap-2">
@@ -1196,10 +1306,19 @@ export function TranscriptEditor({
                   <p className="text-xs text-zinc-500 mt-3 italic">
                     Hover over any word to see exact confidence percentage
                   </p>
-                </div>
+                </motion.div>
 
                 {/* Statistics - Bottom */}
-                <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <motion.div 
+                  className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    duration: 0.4,
+                    delay: 0.3
+                  }}
+                  whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+                >
                   <h4 className="text-zinc-300 font-medium mb-3">Transcript Statistics</h4>
                   <div className="space-y-2.5 text-sm">
                     <div className="flex items-center justify-between">
@@ -1217,7 +1336,7 @@ export function TranscriptEditor({
                       </span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </div>
           </div>

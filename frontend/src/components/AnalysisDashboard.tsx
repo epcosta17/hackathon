@@ -631,7 +631,7 @@ export function AnalysisDashboard({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7, ease: [0.43, 0.13, 0.23, 0.96] }}
+          transition={{ duration: 0.5, delay: 0.3, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
         >
           <button
@@ -672,7 +672,7 @@ export function AnalysisDashboard({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ duration: 0.5, delay: 0.35, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
         >
           <button
@@ -707,7 +707,7 @@ export function AnalysisDashboard({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ duration: 0.5, delay: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
         >
           <button
@@ -748,7 +748,7 @@ export function AnalysisDashboard({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ duration: 0.5, delay: 0.45, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
         >
           <button
@@ -795,7 +795,7 @@ export function AnalysisDashboard({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
+          transition={{ duration: 0.5, delay: 0.5, ease: [0.43, 0.13, 0.23, 0.96] }}
           className="bg-zinc-900/30 border border-zinc-800 rounded-lg"
         >
           <button

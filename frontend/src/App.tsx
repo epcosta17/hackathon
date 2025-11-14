@@ -187,6 +187,9 @@ export default function App() {
       
       console.timeEnd('Set State');
       
+      // Small delay to let state settle before transition
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Show the screen immediately - audio will stream when played
       console.log('Setting screen to editor');
       setCurrentScreen('editor');
@@ -199,12 +202,12 @@ export default function App() {
   };
 
   const pageTransition = {
-    initial: { opacity: 0, x: 20 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -20 },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
     transition: { 
-      duration: 0.4, 
-      ease: [0.43, 0.13, 0.23, 0.96]  // Custom easing for smooth feel
+      duration: 0.4,
+      ease: [0.43, 0.13, 0.23, 0.96]
     }
   };
 
