@@ -353,9 +353,9 @@ export function AnalysisDashboard({
   };
 
   return (
-    <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
+    <div className="h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden" style={{ height: '100vh', maxHeight: '100vh' }}>
       {/* Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="w-full px-8 py-4">
           <div className="flex items-center justify-between gap-8">
             <div className="flex items-center gap-3 flex-1">
@@ -415,7 +415,7 @@ export function AnalysisDashboard({
         </div>
       </header>
 
-      <main>
+      <main className="flex-1 overflow-y-auto scrollbar-hidden">
         <div className="max-w-7xl mx-auto px-8 py-8">
           {/* Expert Statistics */}
           <motion.div
