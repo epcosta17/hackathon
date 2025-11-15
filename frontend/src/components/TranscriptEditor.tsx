@@ -1,12 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Pause, Edit2, Sparkles, Eye, FileText, Home, StickyNote, Bookmark, Plus, Trash2, Download, ChevronDown } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye, File, FileText, Home, StickyNote, Bookmark, FilePlus2, Trash2, Download, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Virtuoso } from 'react-virtuoso';
+import { TranscriptSegment } from './TranscriptSegment';
 
 interface Note {
   id: number;
@@ -602,16 +603,17 @@ export function TranscriptEditor({
 
   const currentBlock = getCurrentBlock();
 
-  // Scroll active segment to top whenever it changes (same logic as clicking player)
+  // Scroll active segment into view whenever it changes
   useEffect(() => {
     if (autoScrollEnabled && currentBlock?.id && isPlaying && virtuosoRef.current) {
       const blockIndex = transcriptBlocks.findIndex(b => b.id === currentBlock.id);
       if (blockIndex !== -1) {
+        // Use a timeout to allow the UI to update before scrolling
         setTimeout(() => {
           virtuosoRef.current?.scrollToIndex({
             index: blockIndex,
-            behavior: 'smooth',
-            align: 'start'
+            align: 'center', // Keep the active block centered
+            behavior: 'smooth'
           });
         }, 50);
       }
@@ -634,42 +636,9 @@ export function TranscriptEditor({
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
-    setCurrentTime(newTime);
-    
-    // Disable auto-scroll when scrubbing - it will be re-enabled when play is pressed
-    setAutoScrollEnabled(false);
-    
-    // Find the block for this time IMMEDIATELY (don't wait for state update)
-    let targetBlock = transcriptBlocks.find(
-      (block) => newTime >= block.timestamp && newTime < block.timestamp + block.duration
-    );
-    
-    if (!targetBlock && transcriptBlocks.length > 0) {
-      targetBlock = transcriptBlocks
-        .filter(b => b.timestamp <= newTime)
-        .sort((a, b) => b.timestamp - a.timestamp)[0];
-      
-      if (!targetBlock) {
-        targetBlock = transcriptBlocks[0];
-      }
-    }
-    
-    // Scroll to the target block using Virtuoso
-    if (targetBlock && virtuosoRef.current) {
-      const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
-      if (blockIndex !== -1) {
-        setTimeout(() => {
-          virtuosoRef.current?.scrollToIndex({
-            index: blockIndex,
-            behavior: 'auto', // Instant jump, no animation
-            align: 'start'
-          });
-        }, 50);
-      }
-    }
+    // This now calls the function that you confirmed works perfectly for notes/bookmarks.
+    // It will handle playing, scrolling, and enabling the teleprompter correctly.
+    jumpToNote(newTime);
   };
 
   const handleSeekBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -687,43 +656,6 @@ export function TranscriptEditor({
   const handleSeekBarLeave = () => {
     setHoverTime(null);
     setHoverPosition(null);
-  };
-
-  const jumpToTimestamp = (timestamp: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = timestamp;
-      audioRef.current.play();
-    }
-    setCurrentTime(timestamp);
-    setIsPlaying(true);
-    // Keep auto-scroll enabled when clicking a segment
-    setAutoScrollEnabled(true);
-  };
-
-  const handleBlockEdit = (id: string, newText: string) => {
-    setTranscriptBlocks(
-      transcriptBlocks.map((block) =>
-        block.id === id ? { ...block, text: newText, words: [] } : block
-      )
-    );
-  };
-
-  const formatTime = (seconds: number) => {
-    // Handle invalid values (NaN, Infinity, negative, etc.)
-    if (!isFinite(seconds) || seconds < 0) {
-      return '0:00';
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getConfidenceColor = (confidence: number): string => {
-    // Color words based on confidence: high confidence = white, low = yellow/red
-    if (confidence >= 0.95) return 'text-zinc-100';  // High confidence - white
-    if (confidence >= 0.85) return 'text-zinc-300';  // Good confidence - light gray
-    if (confidence >= 0.75) return 'text-yellow-400'; // Medium confidence - yellow
-    return 'text-red-400'; // Low confidence - red
   };
 
   const handleRunAnalysis = async () => {
@@ -756,6 +688,86 @@ export function TranscriptEditor({
       setIsAnalyzing(false);
     }
   };
+
+  const [wasPlayingBeforeEdit, setWasPlayingBeforeEdit] = useState(false);
+
+  const handleSegmentClick = useCallback((blockId: string) => {
+    if (isPlaying) {
+      setWasPlayingBeforeEdit(true);
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      setWasPlayingBeforeEdit(false);
+    }
+    setEditingBlockId(blockId);
+  }, [isPlaying]);
+
+  const handleEditBlur = useCallback(() => {
+    if (wasPlayingBeforeEdit) {
+      audioRef.current?.play();
+      setIsPlaying(true);
+    }
+    setEditingBlockId(null);
+    setWasPlayingBeforeEdit(false);
+  }, [wasPlayingBeforeEdit]);
+
+  const jumpToTimestamp = useCallback((timestamp: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = timestamp;
+    }
+    setCurrentTime(timestamp);
+
+    const audio = audioRef.current;
+    if (audio && audio.paused) {
+      audio.play();
+      setIsPlaying(true);
+    }
+    
+    setAutoScrollEnabled(true);
+    
+    const targetBlock = transcriptBlocks.find(
+      (block) => timestamp >= block.timestamp && timestamp < block.timestamp + block.duration
+    ) || transcriptBlocks
+      .filter(b => b.timestamp <= timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    
+    if (targetBlock) {
+      const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
+      if (blockIndex !== -1 && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({
+          index: blockIndex,
+          align: 'center',
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [transcriptBlocks]);
+
+  const handleBlockEdit = useCallback((id: string, newText: string) => {
+    setTranscriptBlocks(
+      transcriptBlocks.map((block) =>
+        block.id === id ? { ...block, text: newText, words: [] } : block
+      )
+    );
+  }, [transcriptBlocks]);
+
+  const formatTime = useCallback((seconds: number) => {
+    // Handle invalid values (NaN, Infinity, negative, etc.)
+    if (!isFinite(seconds) || seconds < 0) {
+      return '0:00';
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  const getConfidenceColor = useCallback((confidence: number): string => {
+    // Color words based on confidence: high confidence = white, low = yellow/red
+    if (confidence >= 0.95) return 'text-zinc-100';  // High confidence - white
+    if (confidence >= 0.85) return 'text-zinc-300';  // Good confidence - light gray
+    if (confidence >= 0.75) return 'text-yellow-400'; // Medium confidence - yellow
+    return 'text-red-400'; // Low confidence - red
+  }, []);
 
   return (
     <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
@@ -994,7 +1006,7 @@ export function TranscriptEditor({
                     className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
                     title="Add Note"
                   > 
-                    <Plus className="w-4 h-4 text-blue-400 hover:text-blue-300 transition-colors" />
+                    <FilePlus2 className="w-4 h-4 text-blue-400 hover:text-blue-300 transition-colors" />
                   </button>
                 </div>
               </motion.div>
@@ -1063,7 +1075,7 @@ export function TranscriptEditor({
                 <div className="space-y-3">
                   {notes.length === 0 ? (
                     <div className="text-center py-12 px-4">
-                      <FileText className="w-8 h-8 text-zinc-600 mx-auto mb-4" />
+                      <File className="w-8 h-8 text-zinc-600 mx-auto mb-4" />
                       <div className="text-zinc-400 text-sm font-medium mb-1">No notes or bookmarks yet</div>
                       <div className="text-zinc-500 text-xs">Use the buttons above to add notes or bookmarks</div>
                     </div>
@@ -1086,7 +1098,7 @@ export function TranscriptEditor({
                             onClick={() => jumpToNote(note.timestamp)}
                             className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
                           >
-                            {note.is_bookmark ? <Bookmark className="w-3 h-3 fill-zinc-400 text-zinc-400" /> : <StickyNote className="w-3 h-3 text-zinc-400" />}
+                            {note.is_bookmark ? <Bookmark className="w-3 h-3 fill-zinc-400 text-zinc-400" /> : <File className="w-3 h-3 text-zinc-400" />}
                             {formatTime(note.timestamp)}
                           </button>
                           <button
@@ -1125,7 +1137,7 @@ export function TranscriptEditor({
               </motion.div>
               <motion.div 
                 ref={scrollContainerRef}
-                className="flex-1 px-8 pt-6 pb-8" 
+                className="flex-1 px-8 pt-6 pb-8 pr-12" // Increased right padding
                 style={{ height: 'calc(100vh - 260px)' }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1142,99 +1154,28 @@ export function TranscriptEditor({
                     List: React.forwardRef<HTMLDivElement, { style?: React.CSSProperties; children?: React.ReactNode }>(({ style, children }, ref) => (
                       <div 
                         ref={ref} 
-                        style={{ ...style, maxWidth: '900px', width: '100%' }}
+                        style={{ ...style, maxWidth: '900px', width: '100%', paddingRight: '16px' }} // Added paddingRight
                       >
                         {children}
                       </div>
                     ))
                   }}
                   itemContent={(index, block) => {
-                      const isActive = currentBlock?.id === block.id;
-                      const isEditing = editingBlockId === block.id;
-                      const isHovered = hoveredBlockId === block.id;
-                      
-                      return (
-                        <div style={{ paddingBottom: '16px', paddingLeft: '4px', paddingRight: '4px' }}>
-                          <motion.div
-                            key={block.id}
-                            data-block-id={block.id}
-                            ref={isActive ? activeBlockRef : null}
-                            whileHover={{ scale: 1.015 }}
-                            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-                            onMouseEnter={() => setHoveredBlockId(block.id)}
-                            onMouseLeave={() => setHoveredBlockId(null)}
-                            className={`
-                              relative p-4 rounded-lg border transition-colors
-                              ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30'}
-                            `}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <button
-                                  onClick={() => jumpToTimestamp(block.timestamp)}
-                                  className="text-xs text-zinc-500 hover:text-blue-400 transition-colors"
-                                >
-                                  {formatTime(block.timestamp)}
-                                </button>
-                              </div>
-                              
-                              {isEditing ? (
-                                <Textarea
-                                  value={block.text}
-                                  onChange={(e) => handleBlockEdit(block.id, e.target.value)}
-                                  onBlur={() => setEditingBlockId(null)}
-                                  autoFocus
-                                  className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
-                                />
-                              ) : (
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-1">
-                                    <p
-                                      onClick={() => jumpToTimestamp(block.timestamp)}
-                                      className="cursor-pointer leading-relaxed"
-                                    >
-                                      {block.words && block.words.length > 0 ? (
-                                        // Render words with confidence-based coloring
-                                        block.words.map((word, idx) => (
-                                          <span
-                                            key={idx}
-                                            className={`${getConfidenceColor(word.confidence)} transition-colors`}
-                                            title={`Confidence: ${(word.confidence * 100).toFixed(1)}%`}
-                                          >
-                                            {word.text}{idx < block.words!.length - 1 ? ' ' : ''}
-                                          </span>
-                                        ))
-                                      ) : (
-                                        // Fallback to plain text if no word data
-                                        <span className="text-zinc-100">{block.text}</span>
-                                      )}
-                                    </p>
-                                  </div>
-
-                                  {isHovered && !isEditing && (
-                                    <motion.button
-                                      initial={{ opacity: 0, scale: 0.8, x: -10 }}
-                                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                                      exit={{ opacity: 0, scale: 0.8, x: -10 }}
-                                      transition={{ 
-                                        duration: 0.2,
-                                        ease: [0.43, 0.13, 0.23, 0.96]
-                                      }}
-                                      whileHover={{ scale: 1.1 }}
-                                      whileTap={{ scale: 0.95 }}
-                                      onClick={() => setEditingBlockId(block.id)}
-                                      className="p-2 hover:bg-zinc-800 rounded flex-shrink-0 transition-colors"
-                                    >
-                                      <Edit2 className="w-4 h-4 text-zinc-400" />
-                                    </motion.button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        </div>
-                      );
-                    }}
+                    return (
+                      <TranscriptSegment
+                        block={block}
+                        isActive={currentBlock?.id === block.id}
+                        isEditing={editingBlockId === block.id}
+                        formatTime={formatTime}
+                        getConfidenceColor={getConfidenceColor}
+                        jumpToTimestamp={jumpToTimestamp}
+                        handleBlockEdit={handleBlockEdit}
+                        setEditingBlockId={handleSegmentClick}
+                        onBlur={handleEditBlur}
+                        activeBlockRef={activeBlockRef}
+                      />
+                    );
+                  }}
                   />
               </motion.div>
             </div>
@@ -1266,7 +1207,7 @@ export function TranscriptEditor({
                     <div>
                       <h5 className="text-white text-sm font-medium mb-2">Notes & Bookmarks</h5>
                       <ul className="text-zinc-300 text-sm space-y-1.5">
-                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <Plus className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
+                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <FilePlus2 className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
                         <li>• Click any note/bookmark to jump & play</li>
                         <li>• Hover to delete notes</li>
                       </ul>

@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
-import { AnalysisHeader } from './components/AnalysisHeader'; // Import the new header
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
@@ -307,10 +306,6 @@ function App() {
     initial: "initial",
     animate: "animate",
     exit: "exit"
-  };
-
-  const handleSaveInterview = (id: number) => {
-    setCurrentInterviewId(id);
   };
 
   return (
