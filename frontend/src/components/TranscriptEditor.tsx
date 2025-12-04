@@ -744,12 +744,12 @@ export function TranscriptEditor({
   }, [transcriptBlocks]);
 
   const handleBlockEdit = useCallback((id: string, newText: string) => {
-    setTranscriptBlocks(
-      transcriptBlocks.map((block) =>
+    setTranscriptBlocks((prevBlocks) =>
+      prevBlocks.map((block) =>
         block.id === id ? { ...block, text: newText, words: [] } : block
       )
     );
-  }, [transcriptBlocks]);
+  }, []);
 
   const formatTime = useCallback((seconds: number) => {
     // Handle invalid values (NaN, Infinity, negative, etc.)
@@ -781,7 +781,7 @@ export function TranscriptEditor({
         <div className="max-w-[1800px] mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -809,7 +809,7 @@ export function TranscriptEditor({
               <Button
                 onClick={handleRunAnalysis}
                 disabled={isAnalyzing}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
               >
                 <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
                 {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
@@ -919,7 +919,7 @@ export function TranscriptEditor({
                               style={{
                                 height: `${height}%`,
                                 backgroundColor: isPlayed 
-                                  ? 'rgb(59, 130, 246)' // Blue for played
+                                  ? 'rgb(99, 102, 241)' // Indigo for played
                                   : 'rgb(63, 63, 70)', // Zinc-700 for unplayed
                               }}
                             />
@@ -932,7 +932,7 @@ export function TranscriptEditor({
                     <div className="absolute inset-0 flex items-center px-2">
                       <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                         <div 
-                          className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 transition-all duration-150"
+                          className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-150"
                           style={{ width: `${(currentTime / duration) * 100}%` }}
                         />
                       </div>
@@ -1006,7 +1006,7 @@ export function TranscriptEditor({
                     className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
                     title="Add Note"
                   > 
-                    <FilePlus2 className="w-4 h-4 text-blue-400 hover:text-blue-300 transition-colors" />
+                    <FilePlus2 className="w-4 h-4 text-indigo-400 hover:text-indigo-300 transition-colors" />
                   </button>
                 </div>
               </motion.div>
@@ -1037,7 +1037,7 @@ export function TranscriptEditor({
                       className="text-sm text-white mb-3"
                       rows={3}
                       onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.borderColor = '#6366f1';
                         e.currentTarget.style.boxShadow = 'none';
                       }}
                       onBlur={(e) => e.currentTarget.style.borderColor = '#52525b'}
@@ -1057,7 +1057,7 @@ export function TranscriptEditor({
                       <Button
                         onClick={() => addNote(false)}
                         size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white"
+                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
                       >
                         <StickyNote className="w-3.5 h-3.5 mr-1.5" />
                         Save
@@ -1096,7 +1096,7 @@ export function TranscriptEditor({
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <button
                             onClick={() => jumpToNote(note.timestamp)}
-                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
                           >
                             {note.is_bookmark ? <Bookmark className="w-3 h-3 fill-zinc-400 text-zinc-400" /> : <File className="w-3 h-3 text-zinc-400" />}
                             {formatTime(note.timestamp)}
@@ -1185,7 +1185,7 @@ export function TranscriptEditor({
               <div className="space-y-6">
                 {/* How to Use - Top */}
                 <motion.div 
-                  className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+                  className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ 
@@ -1194,7 +1194,7 @@ export function TranscriptEditor({
                   }}
                   whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
                 >
-                  <h4 className="text-blue-400 mb-3 font-semibold">How to Use</h4>
+                  <h4 className="text-indigo-400 mb-3 font-semibold">How to Use</h4>
                   <div className="space-y-4">
                     <div>
                       <h5 className="text-white text-sm font-medium mb-2">Transcript</h5>
@@ -1207,7 +1207,7 @@ export function TranscriptEditor({
                     <div>
                       <h5 className="text-white text-sm font-medium mb-2">Notes & Bookmarks</h5>
                       <ul className="text-zinc-300 text-sm space-y-1.5">
-                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <FilePlus2 className="w-3 h-3 text-blue-400 inline" /> to add bookmark or notes at current time</li>
+                        <li className="flex items-center gap-1">• Click <Bookmark className="w-3 h-3 text-yellow-400 inline" /> or <FilePlus2 className="w-3 h-3 text-indigo-400 inline" /> to add bookmark or notes at current time</li>
                         <li>• Click any note/bookmark to jump & play</li>
                         <li>• Hover to delete notes</li>
                       </ul>

@@ -6,8 +6,130 @@ import re
 import asyncio
 from typing import List
 from fastapi import HTTPException
+from httpx import request
 
 from models.schemas import TranscriptBlock, Word
+
+
+async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock]:
+    """
+    Transcribe audio using Deepgram API with diarization.
+    """
+    print(f"🎙️  [BACKEND] transcribe_with_deepgram called for: {audio_file_path}")
+    
+    try:
+        from deepgram import DeepgramClient
+    except ImportError:
+        print("❌ [BACKEND] deepgram-sdk not installed")
+        raise HTTPException(status_code=500, detail="deepgram-sdk not installed")
+
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    if not api_key:
+        print("❌ [BACKEND] DEEPGRAM_API_KEY not found")
+        raise HTTPException(
+            status_code=500, 
+            detail="DEEPGRAM_API_KEY not found. Set it in environment or .env file"
+        )
+
+    try:
+        # Initialize the Deepgram SDK
+        deepgram = DeepgramClient(api_key=api_key)
+
+        with open(audio_file_path, "rb") as file:
+            buffer_data = file.read()
+
+        payload=buffer_data
+
+        # Configure Deepgram options for audio analysis
+        options = dict(
+            model="nova-3-medical",
+            smart_format=True,
+            diarize=True,
+            punctuate=True,
+            paragraphs=True,
+            utterances=True,
+            request=payload
+        )
+
+        print("🚀 [BACKEND] Sending audio to Deepgram...")
+        response = await asyncio.to_thread(
+            deepgram.listen.v1.media.transcribe_file,
+            **options
+        )
+        print("✅ [BACKEND] Received response from Deepgram")
+
+        # Parse the response
+        transcript_blocks = []
+        
+        # We can use paragraphs or utterances. Paragraphs usually give better structure.
+        # Check if we have results
+        if not response.results or not response.results.channels:
+            raise ValueError("No results from Deepgram")
+            
+        channel = response.results.channels[0]
+        alternatives = channel.alternatives[0]
+        
+        # Use paragraphs if available, otherwise fallback to utterances or words
+        segments = []
+        if alternatives.paragraphs:
+            segments = alternatives.paragraphs.paragraphs
+        elif alternatives.sentences:
+            # Fallback to sentences if paragraphs not enabled/available
+            segments = alternatives.sentences
+            
+        print(f"📄 [BACKEND] Parsing {len(segments)} segments from Deepgram")
+
+        for segment in segments:
+            # Extract sentences within the paragraph
+            sentences = getattr(segment, 'sentences', [segment])
+            
+            for sentence in sentences:
+                start_time = sentence.start
+                end_time = sentence.end
+                text = sentence.text
+                
+                # Extract words if available
+                words = []
+                # In Deepgram SDK v3, words might be flattened in the alternative or attached to the sentence
+                # If we used paragraphs, the sentences inside paragraphs typically contain words in the raw JSON,
+                # but the SDK object might structure it differently. 
+                # Let's try to look for words in the sentence object first.
+                
+                # If words are not directly on sentence, we might need to filter from the main words list
+                # This is a bit complex with SDK objects, so let's check if 'words' attribute exists on sentence
+                sentence_words = getattr(sentence, 'words', [])
+                
+                if not sentence_words:
+                    # Fallback: Filter words from the main alternative that fall within this timeframe
+                    all_words = alternatives.words
+                    sentence_words = [
+                        w for w in all_words 
+                        if w.start >= start_time - 0.01 and w.end <= end_time + 0.01
+                    ]
+
+                for w in sentence_words:
+                    words.append(Word(
+                        text=w.word,
+                        confidence=w.confidence
+                    ))
+
+                block = TranscriptBlock(
+                    id=str(uuid.uuid4()),
+                    timestamp=start_time,
+                    duration=end_time - start_time,
+                    text=text,
+                    words=words
+                )
+                transcript_blocks.append(block)
+
+        print(f"✅ [BACKEND] Created {len(transcript_blocks)} transcript blocks from Deepgram")
+        return transcript_blocks
+
+    except Exception as e:
+        print(f"❌ [BACKEND] Deepgram transcription failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Deepgram transcription failed: {str(e)}")
 
 
 async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None) -> List[TranscriptBlock]:
@@ -343,4 +465,3 @@ def generate_mock_transcript() -> List[TranscriptBlock]:
     ]
     
     return [TranscriptBlock(**block, words=create_words(block['text'])) for block in data]
-

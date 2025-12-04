@@ -10,7 +10,7 @@ from pathlib import Path
 router = APIRouter(prefix="/api", tags=["transcription"])
 
 # Import transcription functions from service
-from services.transcription_service import transcribe_with_whisper_cpp, generate_mock_transcript
+from services.transcription_service import transcribe_with_whisper_cpp, transcribe_with_deepgram, generate_mock_transcript
 
 
 @router.post("/transcribe-stream")
@@ -34,8 +34,26 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
             temp_file.write(file_content)
             temp_file.close()
             
-            # Priority: whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
-            if os.path.exists("/opt/homebrew/bin/whisper-cli"):
+            # Priority: Deepgram API > whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
+            deepgram_key = os.getenv("DEEPGRAM_API_KEY")
+            
+            if deepgram_key:
+                print(f"🚀 [BACKEND] Starting Deepgram transcription for: {temp_file.name}")
+                yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with Deepgram AI...'})}\n\n"
+                await asyncio.sleep(0.1)
+                
+                # Deepgram is fast, so we don't have granular progress updates like whisper.cpp
+                # But we can simulate some progress while waiting
+                yield f"data: {json.dumps({'progress': 30, 'message': 'Analyzing audio with Nova-2...'})}\n\n"
+                
+                print("⚙️  [BACKEND] Creating Deepgram task...")
+                # Deepgram is usually very fast (seconds)
+                transcript_blocks = await transcribe_with_deepgram(temp_file.name)
+                
+                yield f"data: {json.dumps({'progress': 90, 'message': 'Processing results...'})}\n\n"
+                print(f"🎉 [BACKEND] Deepgram complete! Created {len(transcript_blocks)} blocks")
+
+            elif os.path.exists("/opt/homebrew/bin/whisper-cli"):
                 print(f"🚀 [BACKEND] Starting whisper-cli transcription for: {temp_file.name}")
                 yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with whisper.cpp (FREE!)...'})}\n\n"
                 await asyncio.sleep(0.1)
@@ -179,4 +197,3 @@ async def get_audio_file(audio_filename: str, request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to serve audio file: {str(e)}")
-

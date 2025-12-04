@@ -130,7 +130,7 @@ export function AnalysisDashboard({
   // Get technology icon based on name
   const getTechIcon = (techName: string) => {
     const name = techName.toLowerCase();
-    const iconProps = { className: "w-6 h-6", style: { color: '#06b6d4' } };
+    const iconProps = { className: "w-6 h-6", style: { color: '#a855f7' } };
     
     if (name.includes('react')) return <SiReact {...iconProps} />;
     if (name.includes('next')) return <SiNextdotjs {...iconProps} />;
@@ -317,14 +317,14 @@ export function AnalysisDashboard({
   const getPaceColor = (pace: string) => {
     if (pace.includes('Intensive')) return 'text-red-400 bg-red-500/10 border-red-500/20';
     if (pace.includes('Fast')) return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-    if (pace.includes('Moderate')) return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+    if (pace.includes('Moderate')) return 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
     return 'text-green-400 bg-green-500/10 border-green-500/20';
   };
 
   const getPaceTextColor = (pace: string) => {
     if (pace.includes('Intensive')) return 'text-red-400';
     if (pace.includes('Fast')) return 'text-orange-400';
-    if (pace.includes('Moderate')) return 'text-blue-400';
+    if (pace.includes('Moderate')) return 'text-indigo-400';
     return 'text-green-400';
   };
 
@@ -359,7 +359,7 @@ export function AnalysisDashboard({
         <div className="w-full px-8 py-4">
           <div className="flex items-center justify-between gap-8">
             <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div className="min-w-0">
@@ -405,7 +405,7 @@ export function AnalysisDashboard({
               <Button
                 onClick={handleDownloadReport}
                 disabled={isDownloading}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Download className="w-4 h-4 mr-2" />
                 {isDownloading ? 'Generating...' : 'Download Report'}
@@ -434,7 +434,7 @@ export function AnalysisDashboard({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <Brain className="w-6 h-6 text-cyan-400" />
+              <Brain className="w-6 h-6 text-purple-400" />
               <h2 className="text-xl font-bold text-white">Expert Statistics</h2>
             </motion.div>
 
@@ -479,15 +479,15 @@ export function AnalysisDashboard({
 
               {/* Technical Depth */}
               <motion.div 
-                className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30 rounded-lg p-6 relative"
+                className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-indigo-800/30 rounded-lg p-6 relative"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.4 }}
                 whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/10 rounded-lg">
-                    <Code className="w-8 h-8 text-blue-400" />
+                  <div className="p-3 bg-indigo-500/10 rounded-lg">
+                    <Code className="w-8 h-8 text-indigo-400" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -507,7 +507,7 @@ export function AnalysisDashboard({
                         initial={{ width: 0 }}
                         animate={{ width: `${analysisData.statistics.technicalDepthScore}%` }}
                         transition={{ duration: 1, delay: 0.4 }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-cyan-500"
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
                       />
                     </div>
                   </div>
@@ -572,7 +572,7 @@ export function AnalysisDashboard({
                   <Code className="w-4 h-4 text-zinc-500" />
                   <p className="text-zinc-500 text-xs">Technical</p>
                 </div>
-                <p className="text-lg font-bold text-blue-400">{analysisData.statistics.technicalTime}</p>
+                <p className="text-lg font-bold text-indigo-400">{analysisData.statistics.technicalTime}</p>
               </div>
               <div className="flex flex-col items-center min-w-[90px]">
                 <div className="flex items-center gap-1 mb-1">
@@ -607,7 +607,7 @@ export function AnalysisDashboard({
                   <Award className="w-4 h-4 text-zinc-500" />
                   <p className="text-zinc-500 text-xs">Questions</p>
                 </div>
-                <p className="text-xl font-bold text-cyan-400">{analysisData.statistics.technicalQuestions}</p>
+                <p className="text-xl font-bold text-purple-400">{analysisData.statistics.technicalQuestions}</p>
               </div>
               <div className="flex flex-col items-center min-w-[70px]">
                 <div className="flex items-center gap-1 mb-1">
@@ -643,15 +643,15 @@ export function AnalysisDashboard({
                 >
                   <div className="px-6 pb-6 space-y-6 text-zinc-300">
                     <div>
-                      <p className="text-cyan-400 font-medium mb-3">Interview Overview</p>
+                      <p className="text-purple-400 font-medium mb-3">Interview Overview</p>
                       <p className="leading-loose">{analysisData.generalComments.howInterview}</p>
                     </div>
                     <div>
-                      <p className="text-cyan-400 font-medium mb-3">Interviewer's Attitude</p>
+                      <p className="text-purple-400 font-medium mb-3">Interviewer's Attitude</p>
                       <p className="leading-loose">{analysisData.generalComments.attitude}</p>
                     </div>
                     <div>
-                      <p className="text-cyan-400 font-medium mb-3">Platform Used</p>
+                      <p className="text-purple-400 font-medium mb-3">Platform Used</p>
                       <p className="leading-loose">{analysisData.generalComments.platform}</p>
                     </div>
                   </div>
@@ -719,7 +719,7 @@ export function AnalysisDashboard({
                 >
                   <div className="px-6 pb-6 space-y-6 text-zinc-300">
                     <div>
-                      <p className="font-semibold mb-3" style={{ color: '#60a5fa' }}>Core Exercise</p>
+                      <p className="font-semibold mb-3" style={{ color: '#818cf8' }}>Core Exercise</p>
                       <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
                     </div>
                     <div>
@@ -763,11 +763,11 @@ export function AnalysisDashboard({
                       {analysisData.technologies.map((tech, idx) => (
                         <div
                           key={idx}
-                          className="px-4 py-2.5 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 rounded-lg hover:from-cyan-500/30 hover:to-blue-500/30 transition-colors"
+                          className="px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-400/30 rounded-lg hover:from-purple-500/30 hover:to-indigo-500/30 transition-colors"
                         >
                           <div className="flex items-center gap-3 mb-1">
                             {getTechIcon(tech.name)}
-                            <span className="text-sm font-semibold truncate" style={{ color: '#06b6d4' }}>{tech.name}</span>
+                            <span className="text-sm font-semibold truncate" style={{ color: '#a855f7' }}>{tech.name}</span>
                           </div>
                           {tech.timestamps && (
                             <div className="text-xs text-zinc-500 ml-9">
@@ -908,7 +908,7 @@ export function AnalysisDashboard({
                 marginBottom: '24px'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
+                e.target.style.borderColor = '#6366f1';
                 e.target.style.boxShadow = 'none';
               }}
               onBlur={(e) => e.target.style.borderColor = '#52525b'}
@@ -931,7 +931,7 @@ export function AnalysisDashboard({
               <Button
                 onClick={handleSaveInterview}
                 disabled={isSaving || !interviewTitle.trim()}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4 mr-1.5" />
                 {isSaving ? (currentInterviewId ? 'Updating...' : 'Saving...') : (currentInterviewId ? 'Update' : 'Save')}

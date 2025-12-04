@@ -29,18 +29,56 @@ export const TranscriptSegment = React.memo(({
   onBlur,
   activeBlockRef
 }: TranscriptSegmentProps) => {
+  // Local state for editing to prevent cursor jumping
+  const [localText, setLocalText] = React.useState(block.text);
+
+  // Update local state when block text changes externally
+  React.useEffect(() => {
+    if (!isEditing) {
+      setLocalText(block.text);
+    }
+  }, [block.text, isEditing]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setLocalText(e.target.value);
+  };
+
+  const handleTextBlur = () => {
+    handleBlockEdit(block.id, localText);
+    onBlur();
+  };
 
   return (
     <div style={{ paddingBottom: '16px', paddingLeft: '4px', paddingRight: '4px' }}>
-      <div
+      <motion.div
         ref={isActive ? activeBlockRef : null}
-        className={`group relative p-4 rounded-lg border ${isActive ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800/30'}`}
+        initial={false}
+        animate={isActive ? { scale: 1.01 } : { scale: 1 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`group relative p-4 rounded-lg border transition-all duration-300 ${
+          isActive 
+            ? 'border-indigo-500/50 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-500/30 ring-offset-2 ring-offset-zinc-950' 
+            : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800/50 hover:border-zinc-700 hover:shadow-lg hover:shadow-zinc-800/50'
+        }`}
       >
+        {/* Accent bar on the left when active */}
+        {isActive && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-r-full"
+          />
+        )}
+        
         <div className="relative z-10 space-y-2">
           <div className="flex items-center justify-between">
             <button
               onClick={() => jumpToTimestamp(block.timestamp)}
-              className="text-xs font-medium text-blue-400 hover:text-blue-300 cursor-pointer p-2 -m-2"
+              className={`text-xs font-medium cursor-pointer p-2 -m-2 rounded-md transition-all duration-200 ${
+                isActive 
+                  ? 'text-indigo-300 bg-indigo-500/20 hover:bg-indigo-500/30 hover:text-indigo-200' 
+                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
+              }`}
             >
               {formatTime(block.timestamp)}
             </button>
@@ -48,12 +86,12 @@ export const TranscriptSegment = React.memo(({
           
           {isEditing ? (
             <Textarea
-              value={block.text}
-              onChange={(e) => handleBlockEdit(block.id, e.target.value)}
-              onBlur={onBlur}
+              value={localText}
+              onChange={handleTextChange}
+              onBlur={handleTextBlur}
               autoFocus
               onClick={(e) => e.stopPropagation()}
-              className="min-h-[80px] bg-zinc-800 border-zinc-700 text-zinc-100 resize-none"
+              className="min-h-[80px] bg-zinc-900/50 border border-indigo-500/30 text-zinc-100 resize-none focus-visible:border-indigo-500/50 focus-visible:ring-1 focus-visible:ring-indigo-500/30 focus-visible:shadow-lg focus-visible:shadow-indigo-500/10"
             />
           ) : (
             <div className="flex items-start gap-3">
@@ -85,7 +123,7 @@ export const TranscriptSegment = React.memo(({
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 });

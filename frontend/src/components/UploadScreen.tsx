@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
@@ -31,11 +31,40 @@ import { toast } from 'sonner';
     const [isLoadingInterviews, setIsLoadingInterviews] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+    const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
 
     // Fetch interviews on mount
     useEffect(() => {
       fetchInterviews();
     }, []);
+
+    const fetchFunFact = async () => {
+      try {
+        const response = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/random?language=en');
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentFact(data.text);
+        }
+      } catch (error) {
+        // Fallback if API fails
+        console.error("Failed to fetch fact", error);
+      }
+    };
+
+    // Rotate fun facts from API
+    useEffect(() => {
+      let interval: NodeJS.Timeout;
+      
+      if (isTranscribing && !isComplete) {
+        // Fetch initial fact immediately
+        fetchFunFact();
+        
+        interval = setInterval(() => {
+          fetchFunFact();
+        }, 6000); // Change fact every 6 seconds (giving more time to read random facts)
+      }
+      return () => clearInterval(interval);
+    }, [isTranscribing, isComplete]);
 
     // Debounced search effect
     useEffect(() => {
@@ -202,7 +231,7 @@ import { toast } from 'sonner';
         <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
           <div className="px-4 py-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
                   <FileAudio className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -262,7 +291,7 @@ import { toast } from 'sonner';
               onChange={(e) => handleSearch(e.target.value)}
               style={{ boxShadow: 'none', outline: 'none' }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
+                e.target.style.borderColor = '#6366f1';
                 e.target.style.boxShadow = 'none';
               }}
               onBlur={(e) => e.target.style.borderColor = '#27272a'}
@@ -336,7 +365,7 @@ import { toast } from 'sonner';
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <h3 className="text-white text-sm font-medium truncate group-hover:text-cyan-400 transition-colors">
+                              <h3 className="text-white text-sm font-medium truncate group-hover:text-purple-400 transition-colors">
                                 {interview.title}
                               </h3>
                               <p className="text-zinc-500 text-xs mt-0.5 line-clamp-1">
@@ -404,7 +433,7 @@ import { toast } from 'sonner';
               onDrop={handleDrop}
               className={`
                 relative border-2 border-dashed rounded-xl p-16 transition-all duration-300
-                ${isDragging ? 'border-blue-500 bg-blue-500/10 scale-105' : 'border-zinc-700 bg-zinc-900/50'}
+                ${isDragging ? 'border-indigo-500 bg-indigo-500/10 scale-105' : 'border-zinc-700 bg-zinc-900/50'}
                 ${file ? 'border-green-500 bg-green-500/5' : ''}
               `}
             >
@@ -462,39 +491,55 @@ import { toast } from 'sonner';
             {/* Progress Section */}
             {(isTranscribing || isComplete) && (
               <motion.div 
-                className={`space-y-3 rounded-xl p-6 border transition-colors ${
+                className={`space-y-4 rounded-xl p-6 border transition-colors ${
                   isComplete 
                     ? 'bg-green-500/10 border-green-500/30' 
                     : 'bg-zinc-900/50 border-zinc-800'
                 }`}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className={`${isComplete ? 'text-green-400' : 'text-zinc-300'}`}>
-                    {isComplete ? 'Transcription complete!' : 'Transcribing audio...'}
+                  <span className={`${isComplete ? 'text-green-400' : 'text-zinc-300'} font-medium`}>
+                    {isComplete ? 'Transcription complete!' : 'Processing Audio...'}
                   </span>
-                  <motion.span 
-                    className={`${isComplete ? 'text-green-400' : 'text-zinc-400'}`}
-                    key={progress}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    {progress}%
-                  </motion.span>
-                </div>
-                <div className="relative">
-                  <Progress value={progress} className="h-2" />
-                  {isComplete && (
-                    <div 
-                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-600 to-emerald-600 rounded-full transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
+                  {!isComplete && (
+                    <span className="text-xs text-indigo-400 font-mono animate-pulse">
+                      Processing
+                    </span>
                   )}
                 </div>
+
+                <div className="relative">
+                  <Progress 
+                    value={isComplete ? 100 : null} 
+                    variant={isComplete ? "success" : "default"}
+                    className="h-2" 
+                  />
+                </div>
+                
+                {/* Fun Facts Section */}
+                {!isComplete && (
+                  <div className="pt-2 flex items-start gap-3">
+                    <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div className="h-12 overflow-hidden relative w-full">
+                      <AnimatePresence mode="wait">
+                        <motion.p
+                          key={currentFact}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.5 }}
+                          className="text-sm text-zinc-400 leading-relaxed absolute w-full"
+                        >
+                          <span className="text-purple-300 font-medium">Did you know?</span> {currentFact}
+                        </motion.p>
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -518,7 +563,7 @@ import { toast } from 'sonner';
                 className={`w-full h-14 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
                   isComplete 
                     ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
-                    : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
                 }`}
               >
                 {isComplete ? (
