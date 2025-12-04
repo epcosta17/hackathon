@@ -17,20 +17,22 @@ function Progress({
     <ProgressPrimitive.Root
       data-slot="progress"
       className={cn(
-        "bg-zinc-800 relative h-2 w-full overflow-hidden rounded-full",
+        "relative h-2 w-full overflow-hidden rounded-full",
+        isIndeterminate ? "bg-gradient-to-r from-indigo-600 to-purple-600" : "bg-zinc-800",
         className,
       )}
       {...props}
     >
       {isIndeterminate ? (
-        <div 
-          className="absolute top-0 h-full rounded-full animate-progress-indeterminate"
-          style={{
-            width: '35%',
-            background: 'linear-gradient(90deg, #a855f7 0%, #818cf8 50%, #a855f7 100%)',
-            boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)'
-          }}
-        />
+        <div className="absolute inset-0 overflow-hidden rounded-full">
+          <div 
+            className="absolute inset-0 rounded-full animate-progress-shimmer"
+            style={{
+              background: 'linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.8), transparent)',
+              width: '50%'
+            }}
+          />
+        </div>
       ) : (
         <ProgressPrimitive.Indicator
           data-slot="progress-indicator"

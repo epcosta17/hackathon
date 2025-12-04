@@ -2142,16 +2142,16 @@ html {
 }
 
 @layer utilities {
-  @keyframes progress-indeterminate {
+  @keyframes progress-shimmer {
     0% {
-      left: -35%;
+      transform: translateX(-100%);
     }
     100% {
-      left: 100%;
+      transform: translateX(200%);
     }
   }
   
-  .animate-progress-indeterminate {
-    animation: progress-indeterminate 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  .animate-progress-shimmer {
+    animation: progress-shimmer 2s ease-in-out infinite;
   }
 }
