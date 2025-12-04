@@ -23,7 +23,14 @@ function Progress({
       {...props}
     >
       {isIndeterminate ? (
-        <div className="absolute top-0 left-0 h-full w-1/3 bg-gradient-to-r from-purple-600 via-purple-400 to-purple-600 rounded-full animate-progress-indeterminate" />
+        <div 
+          className="absolute top-0 h-full rounded-full animate-progress-indeterminate"
+          style={{
+            width: '35%',
+            background: 'linear-gradient(90deg, #a855f7 0%, #818cf8 50%, #a855f7 100%)',
+            boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)'
+          }}
+        />
       ) : (
         <ProgressPrimitive.Indicator
           data-slot="progress-indicator"
