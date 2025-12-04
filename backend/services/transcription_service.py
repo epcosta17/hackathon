@@ -69,77 +69,68 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
         channel = response.results.channels[0]
         alternatives = channel.alternatives[0]
         
-        # Use paragraphs if available, otherwise fallback to utterances or words
-        segments = []
-        if alternatives.paragraphs:
-            segments = alternatives.paragraphs.paragraphs
-        elif alternatives.sentences:
-            # Fallback to sentences if paragraphs not enabled/available
-            segments = alternatives.sentences
+        # Use utterances for speaker-based segmentation (utterances are at results level)
+        utterances = response.results.utterances if response.results.utterances else []
             
-        print(f"📄 [BACKEND] Parsing {len(segments)} segments from Deepgram")
+        print(f"📄 [BACKEND] Parsing {len(utterances)} utterances from Deepgram")
 
-        for segment in segments:
-            # Extract sentences within the paragraph
-            sentences = getattr(segment, 'sentences', [segment])
+        for utterance in utterances:
+            start_time = utterance.start
+            end_time = utterance.end
             
-            for sentence in sentences:
-                start_time = sentence.start
-                end_time = sentence.end
-                text = sentence.text
+            # Use transcript field (has proper formatting) instead of text
+            text = utterance.transcript
+            
+            # Capitalize first letter of the text
+            if text:
+                text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+            
+            # Get speaker directly from utterance (utterances have speaker already assigned)
+            utterance_speaker = getattr(utterance, 'speaker', None)
+            speaker_label = f"Speaker {int(utterance_speaker)+1}" if utterance_speaker is not None else None
+            
+            # Get words for this utterance - filter from all words by time range
+            all_words = alternatives.words
+            utterance_words = [
+                w for w in all_words 
+                if w.start >= start_time - 0.01 and w.end <= end_time + 0.01
+            ]
+            
+            # Build a map of lowercased words to their confidence values
+            word_confidence_map = {}
+            for w in utterance_words:
+                # Use punctuated_word if available, otherwise fall back to word
+                word_text = getattr(w, 'punctuated_word', w.word)
+                # Strip punctuation for matching and lowercase
+                clean_word = ''.join(c for c in word_text if c.isalnum() or c == "'").lower()
+                if clean_word:
+                    word_confidence_map[clean_word] = w.confidence
+            
+            # Split transcript text into words and match with confidence values
+            words = []
+            # Split on whitespace while preserving punctuation attached to words
+            transcript_words = text.split()
+            
+            for transcript_word in transcript_words:
+                # Clean the word for matching (remove punctuation, lowercase)
+                clean_word = ''.join(c for c in transcript_word if c.isalnum() or c == "'").lower()
+                # Get confidence from map, default to 1.0 if not found
+                confidence = word_confidence_map.get(clean_word, 1.0)
                 
-                # Capitalize first letter of the text
-                if text:
-                    text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
-                
-                # Extract words if available
-                words = []
-                speaker_label = None
-                
-                # In Deepgram SDK v3, words might be flattened in the alternative or attached to the sentence
-                # If we used paragraphs, the sentences inside paragraphs typically contain words in the raw JSON,
-                # but the SDK object might structure it differently. 
-                # Let's try to look for words in the sentence object first.
-                
-                # If words are not directly on sentence, we might need to filter from the main words list
-                # This is a bit complex with SDK objects, so let's check if 'words' attribute exists on sentence
-                sentence_words = getattr(sentence, 'words', [])
-                
-                if not sentence_words:
-                    # Fallback: Filter words from the main alternative that fall within this timeframe
-                    all_words = alternatives.words
-                    sentence_words = [
-                        w for w in all_words 
-                        if w.start >= start_time - 0.01 and w.end <= end_time + 0.01
-                    ]
+                words.append(Word(
+                    text=transcript_word,
+                    confidence=confidence
+                ))
 
-                # Determine speaker by majority vote from words in this segment
-                speaker_counts = {}
-                for w in sentence_words:
-                    # Get speaker from word (Deepgram adds speaker field when diarization is enabled)
-                    word_speaker = getattr(w, 'speaker', None)
-                    if word_speaker is not None:
-                        speaker_counts[word_speaker] = speaker_counts.get(word_speaker, 0) + 1
-                    
-                    words.append(Word(
-                        text=w.word,
-                        confidence=w.confidence
-                    ))
-                
-                # Select the most common speaker
-                if speaker_counts:
-                    speaker_id = max(speaker_counts, key=speaker_counts.get)
-                    speaker_label = f"Speaker {speaker_id}"
-
-                block = TranscriptBlock(
-                    id=str(uuid.uuid4()),
-                    timestamp=start_time,
-                    duration=end_time - start_time,
-                    text=text,
-                    words=words,
-                    speaker=speaker_label
-                )
-                transcript_blocks.append(block)
+            block = TranscriptBlock(
+                id=str(uuid.uuid4()),
+                timestamp=start_time,
+                duration=end_time - start_time,
+                text=text,
+                words=words,
+                speaker=speaker_label
+            )
+            transcript_blocks.append(block)
 
         print(f"✅ [BACKEND] Created {len(transcript_blocks)} transcript blocks from Deepgram")
         return transcript_blocks

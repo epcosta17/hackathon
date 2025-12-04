@@ -97,7 +97,7 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
             await asyncio.sleep(0.1)
             
             from services.waveform_service import generate_waveform_universal
-            waveform_data = generate_waveform_universal(temp_file.name, samples=250)
+            waveform_data = generate_waveform_universal(temp_file.name, samples=275)
             print(f"✅ [BACKEND] Waveform generated with {len(waveform_data)} bars")
             
             print(f"📦 [BACKEND] Preparing final response with {len(transcript_blocks)} blocks...")
