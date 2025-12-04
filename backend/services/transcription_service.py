@@ -88,8 +88,14 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
                 end_time = sentence.end
                 text = sentence.text
                 
+                # Capitalize first letter of the text
+                if text:
+                    text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+                
                 # Extract words if available
                 words = []
+                speaker_label = None
+                
                 # In Deepgram SDK v3, words might be flattened in the alternative or attached to the sentence
                 # If we used paragraphs, the sentences inside paragraphs typically contain words in the raw JSON,
                 # but the SDK object might structure it differently. 
@@ -107,18 +113,31 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
                         if w.start >= start_time - 0.01 and w.end <= end_time + 0.01
                     ]
 
+                # Determine speaker by majority vote from words in this segment
+                speaker_counts = {}
                 for w in sentence_words:
+                    # Get speaker from word (Deepgram adds speaker field when diarization is enabled)
+                    word_speaker = getattr(w, 'speaker', None)
+                    if word_speaker is not None:
+                        speaker_counts[word_speaker] = speaker_counts.get(word_speaker, 0) + 1
+                    
                     words.append(Word(
                         text=w.word,
                         confidence=w.confidence
                     ))
+                
+                # Select the most common speaker
+                if speaker_counts:
+                    speaker_id = max(speaker_counts, key=speaker_counts.get)
+                    speaker_label = f"Speaker {speaker_id}"
 
                 block = TranscriptBlock(
                     id=str(uuid.uuid4()),
                     timestamp=start_time,
                     duration=end_time - start_time,
                     text=text,
-                    words=words
+                    words=words,
+                    speaker=speaker_label
                 )
                 transcript_blocks.append(block)
 
@@ -311,6 +330,10 @@ async def transcribe_with_whisper_cpp(audio_file_path: str, progress_queue=None)
                         start_seconds = time_to_seconds(start_time_str)
                         end_seconds = time_to_seconds(end_time_str)
                         
+                        # Capitalize first letter of the text
+                        if text:
+                            text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+                        
                         # Create words array from text with varied confidence
                         words = []
                         import random
@@ -408,11 +431,16 @@ async def transcribe_with_openai(audio_file_path: str) -> List[TranscriptBlock]:
                 current_block_words.append(word_data.word)
                 
                 if len(current_block_words) >= 10 or word_data.word.rstrip().endswith(('.', '!', '?', ',')):
+                    text = ' '.join(current_block_words).strip()
+                    # Capitalize first letter
+                    if text:
+                        text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+                    
                     block = TranscriptBlock(
                         id=str(uuid.uuid4()),
                         timestamp=float(current_start),
                         duration=float(word_data.end - current_start),
-                        text=' '.join(current_block_words).strip()
+                        text=text
                     )
                     transcript_blocks.append(block)
                     current_block_words = []
@@ -420,19 +448,29 @@ async def transcribe_with_openai(audio_file_path: str) -> List[TranscriptBlock]:
             
             if current_block_words and current_start is not None:
                 last_word = transcript.words[-1]
+                text = ' '.join(current_block_words).strip()
+                # Capitalize first letter
+                if text:
+                    text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+                
                 block = TranscriptBlock(
                     id=str(uuid.uuid4()),
                     timestamp=float(current_start),
                     duration=float(last_word.end - current_start),
-                    text=' '.join(current_block_words).strip()
+                    text=text
                 )
                 transcript_blocks.append(block)
         else:
+            text = transcript.text
+            # Capitalize first letter
+            if text:
+                text = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
+            
             block = TranscriptBlock(
                 id=str(uuid.uuid4()),
                 timestamp=0.0,
                 duration=float(getattr(transcript, 'duration', 0)),
-                text=transcript.text
+                text=text
             )
             transcript_blocks.append(block)
         

@@ -24,6 +24,7 @@ export interface TranscriptBlock {
   duration: number;
   text: string;
   words?: Word[];
+  speaker?: string;
 }
 
 export interface Note {

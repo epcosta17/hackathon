@@ -72,16 +72,27 @@ export const TranscriptSegment = React.memo(({
         
         <div className="relative z-10 space-y-2">
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => jumpToTimestamp(block.timestamp)}
-              className={`text-xs font-medium cursor-pointer p-2 -m-2 rounded-md transition-all duration-200 ${
-                isActive 
-                  ? 'text-indigo-300 bg-indigo-500/20 hover:bg-indigo-500/30 hover:text-indigo-200' 
-                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
-              }`}
-            >
-              {formatTime(block.timestamp)}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => jumpToTimestamp(block.timestamp)}
+                className={`text-xs font-medium cursor-pointer p-2 -m-2 rounded-md transition-all duration-200 ${
+                  isActive 
+                    ? 'text-indigo-300 bg-indigo-500/20 hover:bg-indigo-500/30 hover:text-indigo-200' 
+                    : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
+                }`}
+              >
+                {formatTime(block.timestamp)}
+              </button>
+              {block.speaker && (
+                <span className={`text-xs font-semibold px-2 py-1 rounded-md ${
+                  isActive 
+                    ? 'bg-purple-500/20 text-purple-300' 
+                    : 'bg-zinc-800 text-zinc-400'
+                }`}>
+                  {block.speaker}
+                </span>
+              )}
+            </div>
           </div>
           
           {isEditing ? (

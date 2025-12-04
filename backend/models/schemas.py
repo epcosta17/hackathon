@@ -18,6 +18,7 @@ class TranscriptBlock(BaseModel):
     duration: float
     text: str
     words: List[Word] = Field(default_factory=list, description="Words with confidence scores")
+    speaker: Optional[str] = Field(default=None, description="Speaker label from diarization")
 
 
 class Technology(BaseModel):
