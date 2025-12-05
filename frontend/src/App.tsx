@@ -12,7 +12,7 @@ import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { auth } from './config/firebase';
-import { getJSON, postJSON, postFormData } from './utils/api';
+import { getJSON, postJSON, postFormData, authenticatedFetch } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 
@@ -161,6 +161,48 @@ function MainApp() {
     setHasNewAnalysis(true); // Mark that analyze button was clicked
     console.log('✅ hasNewAnalysis set to TRUE');
     setCurrentScreen('analysis');
+
+    // Auto-update if interview already exists
+    if (currentInterviewId) {
+      console.log('🔄 Auto-updating existing interview with new analysis...');
+      // We need to use the latest state, but state updates are async.
+      // So we'll construct the update payload directly here.
+      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
+
+      const updateInterview = async () => {
+        try {
+          const requestBody = {
+            interview_id: currentInterviewId,
+            title: currentInterviewTitle, // Keep existing title
+            transcript_text: transcriptText,
+            transcript_words: transcriptBlocks,
+            analysis_data: dataWithTimestamp,
+          };
+
+          const response = await authenticatedFetch(`/api/interviews/${currentInterviewId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
+          if (response.ok) {
+            console.log('✅ Auto-update successful');
+            toast.success('Interview updated with new analysis');
+            setHasNewAnalysis(false); // It's already saved
+          } else {
+            console.error('❌ Auto-update failed');
+          }
+        } catch (err) {
+          console.error('❌ Auto-update error:', err);
+        }
+      };
+
+      updateInterview();
+    } else {
+      // New interview (not saved yet) - just show analysis complete
+      toast.success('Analysis completed successfully!');
+    }
   };
 
   const handleAnalysisSaved = () => {
@@ -185,10 +227,17 @@ function MainApp() {
           transcript_words: transcriptBlocks,
           analysis_data: analysisData,
         };
-        const response = await postJSON(`/api/interviews/${currentInterviewId}`, requestBody, { method: 'PUT' });
+        const response = await authenticatedFetch(`/api/interviews/${currentInterviewId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
         if (response.ok) {
           handleAnalysisSaved();
           setShowSaveDialog(false);
+          setCurrentInterviewTitle(interviewTitle);
           toast.success('Interview updated successfully!');
         } else {
           toast.error('Failed to update interview.');
@@ -197,11 +246,46 @@ function MainApp() {
         // CREATE
         const formData = new FormData();
         formData.append('title', interviewTitle);
-        // ... (append other form data: transcript, analysis, notes, etc.)
+        formData.append('transcript_text', transcriptText);
+        formData.append('transcript_words', JSON.stringify(transcriptBlocks));
+        if (analysisData) {
+          formData.append('analysis_data', JSON.stringify(analysisData));
+        } else {
+          // Provide empty analysis structure if saving before analysis
+          formData.append('analysis_data', JSON.stringify({
+            generalComments: { howInterview: '', attitude: '', structure: '', platform: '' },
+            keyPoints: [],
+            codingChallenge: { coreExercise: '', followUp: '', knowledge: '' },
+            technologies: [],
+            qaTopics: [],
+            statistics: {
+              duration: '0:00', technicalTime: '0:00', qaTime: '0:00',
+              technicalQuestions: 0, followUpQuestions: 0, technologiesCount: 0,
+              complexity: 'Intermediate', pace: 'Moderate', engagement: 0,
+              communicationScore: 0, technicalDepthScore: 0, engagementScore: 0
+            }
+          }));
+        }
+
+        // Add notes if available
+        if (notes.length > 0) {
+          formData.append('notes', JSON.stringify(notes));
+        }
+
+        // Add waveform data if available
+        if (waveformData && waveformData.length > 0) {
+          formData.append('waveform_data', JSON.stringify(waveformData));
+        }
+
+        // Add audio file if available
+        if (audioFile) {
+          formData.append('audio_file', audioFile);
+        }
         const response = await postFormData('/api/interviews', formData);
         if (response.ok) {
           const result = await response.json();
           setCurrentInterviewId(result.id);
+          setCurrentInterviewTitle(interviewTitle);
           handleAnalysisSaved();
           setShowSaveDialog(false);
           toast.success('Interview saved successfully!');
@@ -331,10 +415,15 @@ function MainApp() {
     exit: "exit"
   };
 
-  return (
-    <div className="bg-zinc-950 text-white">
-      <Toaster position="bottom-right" />
+  const handleInterviewSaved = (id: number) => {
+    setCurrentInterviewId(id);
+    setHasNewAnalysis(false);
+    console.log('✅ Interview saved/updated, ID:', id);
+  };
 
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
+      <Toaster position="bottom-right" theme="dark" />
       {currentScreen === 'upload' && (
         <UploadScreen
           onTranscriptionComplete={handleTranscriptionComplete}
@@ -357,6 +446,7 @@ function MainApp() {
             currentInterviewId={currentInterviewId}
             notes={notes}
             setNotes={setNotes}
+            onSave={() => setShowSaveDialog(true)}
           />
         </ErrorBoundary>
       )}
@@ -369,7 +459,7 @@ function MainApp() {
             onBackToEditor={handleBackToEditor}
             currentInterviewId={currentInterviewId}
             currentInterviewTitle={currentInterviewTitle}
-            onSaveInterview={handleSaveInterview} // Using the correctly typed handler
+            onSaveInterview={handleInterviewSaved} // Use the state updater, not the API caller
             audioFile={audioFile}
             notes={notes}
             waveformData={waveformData}
@@ -422,7 +512,7 @@ function MainApp() {
                 className="w-full bg-zinc-900 border-zinc-700 text-white"
               />
               <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700">
+                <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700 text-zinc-300">
                   Cancel
                 </Button>
                 <Button

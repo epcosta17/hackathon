@@ -19,8 +19,8 @@ from routes import transcription, analysis, interviews, notes, auth
 # --- FastAPI Setup ---
 
 app = FastAPI(
-    title="Talent X-Ray API",
-    description="Backend for AI-Powered Talent Analysis Hackathon Project",
+    title="InterviewLens API",
+    description="Backend for AI-Powered Interview Analysis",
     docs_url="/",
 )
 

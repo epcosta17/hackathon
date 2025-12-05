@@ -50,21 +50,16 @@ export const TranscriptSegment = React.memo(({
 
   return (
     <div style={{ paddingBottom: '16px', paddingLeft: '4px', paddingRight: '4px' }}>
-      <motion.div
+      <div
         ref={isActive ? activeBlockRef : null}
-        initial={false}
-        animate={isActive ? { backgroundColor: 'rgba(99, 102, 241, 0.1)' } : { backgroundColor: 'rgba(24, 24, 27, 0.3)' }}
-        transition={{ duration: 0.2 }}
-        className={`group relative p-4 rounded-lg border transition-all duration-300 ${isActive
-          ? 'border-indigo-500'
-          : 'border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700'
+        className={`group relative p-4 rounded-lg border transition-colors duration-200 ${isActive
+          ? 'border-indigo-500 bg-indigo-500/10'
+          : 'border-zinc-800 bg-zinc-900/30'
           }`}
       >
         {/* Accent bar on the left when active */}
         {isActive && (
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
+          <div
             className="absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-r-full"
           />
         )}
@@ -131,7 +126,7 @@ export const TranscriptSegment = React.memo(({
             </div>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 });

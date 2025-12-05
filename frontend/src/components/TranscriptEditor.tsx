@@ -35,6 +35,7 @@ interface TranscriptEditorProps {
   currentInterviewId: number | null;
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+  onSave: () => void;
 }
 
 export function TranscriptEditor({
@@ -51,6 +52,7 @@ export function TranscriptEditor({
   currentInterviewId,
   notes = [],
   setNotes,
+  onSave,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -688,7 +690,6 @@ export function TranscriptEditor({
 
       const data: AnalysisData = await response.json();
       onAnalysisComplete(data);
-      toast.success('Analysis completed successfully!');
     } catch (error) {
       console.error('Error during analysis:', error);
       toast.error('An error occurred during analysis. Please try again.');
@@ -816,6 +817,15 @@ export function TranscriptEditor({
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   View Analysis
+                </Button>
+              )}
+              {!currentInterviewId && (
+                <Button
+                  onClick={onSave}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                >
+                  <StickyNote className="w-4 h-4 mr-2" />
+                  Save Interview
                 </Button>
               )}
               <Button
@@ -1172,19 +1182,30 @@ export function TranscriptEditor({
                       </div>
                     ))
                   }}
-                  itemContent={(index, block) => {
+                  context={{
+                    currentBlockId: currentBlock?.id,
+                    editingBlockId,
+                    formatTime,
+                    getConfidenceColor,
+                    jumpToTimestamp,
+                    handleBlockEdit,
+                    handleSegmentClick,
+                    handleEditBlur,
+                    activeBlockRef
+                  }}
+                  itemContent={(index, block, context) => {
                     return (
                       <TranscriptSegment
                         block={block}
-                        isActive={currentBlock?.id === block.id}
-                        isEditing={editingBlockId === block.id}
-                        formatTime={formatTime}
-                        getConfidenceColor={getConfidenceColor}
-                        jumpToTimestamp={jumpToTimestamp}
-                        handleBlockEdit={handleBlockEdit}
-                        setEditingBlockId={handleSegmentClick}
-                        onBlur={handleEditBlur}
-                        activeBlockRef={activeBlockRef}
+                        isActive={context.currentBlockId === block.id}
+                        isEditing={context.editingBlockId === block.id}
+                        formatTime={context.formatTime}
+                        getConfidenceColor={context.getConfidenceColor}
+                        jumpToTimestamp={context.jumpToTimestamp}
+                        handleBlockEdit={context.handleBlockEdit}
+                        setEditingBlockId={context.handleSegmentClick}
+                        onBlur={context.handleEditBlur}
+                        activeBlockRef={context.activeBlockRef}
                       />
                     );
                   }}
