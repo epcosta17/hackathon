@@ -2,18 +2,17 @@
 import os
 import json
 from dotenv import load_dotenv
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel, GenerationConfig, SafetySetting
 
 from models.schemas import AnalysisData
 
 # Load environment variables
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'ai', '.env'))
-
 
 def generate_analysis_report(transcript_text: str) -> AnalysisData:
-    """Generate comprehensive interview analysis report using Google Gemini API."""
+    """Generate comprehensive interview analysis report using Google Vertex AI (Enterprise)."""
     
     # Load the JSON prompt template
     prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ai", "PROMPT_JSON.md")
@@ -23,49 +22,50 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
     except:
         prompt_template = "Analyze the interview transcript and provide structured insights in JSON format."
     
-    # Try to use Google Gemini API for actual analysis
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    project_id = os.getenv("GCS_PROJECT_ID")
     
-    if gemini_api_key:
+    if project_id:
         try:
-            print("🤖 Using Google Gemini API for analysis...")
+            print(f"🤖 Using Google Vertex AI (Enterprise) for analysis [Project: {project_id}]...")
             
-            # Configure Gemini API
-            genai.configure(api_key=gemini_api_key)
+            # Initialize Vertex AI with the same project as your storage
+            vertexai.init(project=project_id, location="us-central1")
             
-            # Create the model with JSON response
-            model = genai.GenerativeModel(
-                model_name='gemini-2.0-flash-exp',
-                generation_config={
-                    'temperature': 0.3,
-                    'top_p': 0.95,
-                    'top_k': 40,
-                    'max_output_tokens': 8192,
-                    'response_mime_type': 'application/json',
-                }
+            # Use Gemini 2.5 Flash Lite (User Preference)
+            model = GenerativeModel("gemini-2.5-flash-lite")
+            
+            generation_config = GenerationConfig(
+                temperature=0.3,
+                top_p=0.95,
+                top_k=40,
+                max_output_tokens=8192,
+                response_mime_type="application/json",
             )
             
             # Prepare the full prompt
             full_prompt = prompt_template.replace('{transcript}', transcript_text)
             
             # Generate content
-            response = model.generate_content(full_prompt)
+            response = model.generate_content(
+                full_prompt,
+                generation_config=generation_config,
+            )
             
             if response and response.text:
                 # Parse JSON response
                 json_response = json.loads(response.text)
                 analysis_data = AnalysisData(**json_response)
-                print("✅ Gemini analysis complete!")
+                print("✅ Vertex AI analysis complete!")
                 return analysis_data
             else:
-                print(f"⚠️ Empty response from Gemini API")
+                print(f"⚠️ Empty response from Vertex AI")
                 print("📋 Falling back to mock data...")
             
         except Exception as e:
-            print(f"⚠️ Gemini API error: {str(e)}")
+            print(f"⚠️ Vertex AI error: {str(e)}")
             print("📋 Falling back to mock data...")
     else:
-        print("⚠️ GEMINI_API_KEY not found in environment variables")
+        print("⚠️ GCS_PROJECT_ID not found. Cannot initialize Vertex AI.")
         print("📋 Using mock analysis data...")
     
     # Fallback to mock data if API is not available
