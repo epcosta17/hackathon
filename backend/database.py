@@ -55,7 +55,7 @@ def save_interview(
     
     # 2. Save Transcript
     transcript_data = {
-        'text': transcript_text,
+        'text': transcript_text[:200],
         'words': transcript_words
     }
     storage_service.upload_json(f"{base_path}/transcript.json", transcript_data)
@@ -74,7 +74,7 @@ def save_interview(
     summary = {
         'id': interview_id,
         'title': title,
-        'transcript_preview': transcript_text[:200] + '...' if len(transcript_text) > 200 else transcript_text,
+        'transcript_preview': transcript_text,
         'audio_url': audio_url,
         'created_at': now,
         'updated_at': now
@@ -110,10 +110,8 @@ def update_interview(
         metadata['audio_url'] = audio_url
         
     # Update Transcript if needed
-    if transcript_text is not None or transcript_words is not None:
+    if transcript_words is not None:
         current_transcript = storage_service.download_json(f"{base_path}/transcript.json") or {}
-        if transcript_text is not None:
-            current_transcript['text'] = transcript_text
         if transcript_words is not None:
             current_transcript['words'] = transcript_words
             # Recalculate duration
@@ -129,15 +127,15 @@ def update_interview(
     storage_service.upload_json(f"{base_path}/metadata.json", metadata)
     
     # Update Index
-    # Get transcript text for preview if not provided
-    if transcript_text is None:
-        current_transcript = storage_service.download_json(f"{base_path}/transcript.json") or {}
-        transcript_text = current_transcript.get('text', '')
-
+    transcript_text = ""
+    while len(transcript_text) < 200:
+        transcript_text += " " + transcript_words.pop(0)['text']
+    transcript_text = transcript_text.strip()
+    
     summary = {
         'id': interview_id,
         'title': metadata['title'],
-        'transcript_preview': transcript_text[:200] + '...' if len(transcript_text) > 200 else transcript_text,
+        'transcript_preview': transcript_text,
         'audio_url': metadata.get('audio_url'),
         'created_at': metadata['created_at'],
         'updated_at': now

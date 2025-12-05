@@ -676,11 +676,8 @@ export function TranscriptEditor({
     setIsAnalyzing(true);
 
     try {
-      // Send full transcript with timestamps and speakers
-      const fullText = transcriptBlocks.map(b => b.text).join(' ');
 
       const response = await postJSON('/api/analyze', {
-        transcript_text: fullText,
         transcript_blocks: transcriptBlocks
       });
 
