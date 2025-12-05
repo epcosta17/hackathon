@@ -546,12 +546,12 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between min-h-[24px]">
                     <span className={`${isComplete ? 'text-green-400' : 'text-zinc-300'} font-medium`}>
-                      {isComplete ? 'Transcription complete!' : 'Processing Audio...'}
+                      {isComplete ? 'Transcription complete!' : ''}
                     </span>
                     {!isComplete && (
-                      <span className="text-xs text-indigo-400 font-mono animate-pulse">
+                      <span className="text-xs text-indigo-400 font-medium animate-pulse">
                         Processing
                       </span>
                     )}
@@ -618,7 +618,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
                   ) : (
                     <>
                       <FileAudio className={`w-5 h-5 mr-2 ${isTranscribing ? 'animate-pulse' : ''}`} />
-                      {isTranscribing ? 'Processing...' : 'Start Transcription & Analysis'}
+                      {isTranscribing ? 'Processing Audio...' : 'Start Transcription & Analysis'}
                     </>
                   )}
                 </Button>
