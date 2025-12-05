@@ -82,6 +82,26 @@ class StorageService:
         blob = self.bucket.blob(path)
         return blob.download_as_bytes(start=start, end=end)
 
+    def download_file(self, gcs_path: str, local_path: str):
+        """Downloads a file from GCS to a local path."""
+        self._check_client()
+        blob = self.bucket.blob(gcs_path)
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        blob.download_to_filename(local_path)
+
+    def open_file_stream(self, gcs_path: str):
+        """Opens a file from GCS as a stream (file-like object)."""
+        self._check_client()
+        blob = self.bucket.blob(gcs_path)
+        return blob.open("rb")
+
+    def generate_signed_url(self, gcs_path: str, expiration: int = 3600) -> str:
+        """Generates a signed URL for a GCS object."""
+        self._check_client()
+        blob = self.bucket.blob(gcs_path)
+        return blob.generate_signed_url(expiration=expiration, method='GET')
+
     # --- Interview Specific Methods ---
 
     def get_index(self, user_id: str) -> List[Dict[str, Any]]:

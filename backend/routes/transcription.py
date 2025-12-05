@@ -132,7 +132,10 @@ async def get_audio_file(
     request: Request,
     token: str = None
 ):
-    """Serve an audio file with HTTP Range request support for parallel chunk downloading."""
+    """
+    Serve an audio file using GCS Signed URLs.
+    Redirects the browser directly to GCS for optimal performance and native seeking.
+    """
     # Manual authentication check to support both Header and Query Param
     user_id = None
     try:
@@ -154,78 +157,30 @@ async def get_audio_file(
 
     try:
         from services.storage_service import storage_service
+        
         # Use user-scoped path
         gcs_path = f"{user_id}/audio/{audio_filename}"
-        
-        metadata = storage_service.get_file_metadata(gcs_path)
-        if not metadata:
-            raise HTTPException(status_code=404, detail="Audio file not found")
-        
-        file_size = metadata['size']
-        content_type = metadata['content_type'] or ("audio/mpeg" if audio_filename.endswith(".mp3") else "audio/wav")
-        
-        # Parse Range header
-        range_header = request.headers.get("range")
-        
-        if range_header:
-            # Parse range header (format: "bytes=start-end")
-            range_match = range_header.replace("bytes=", "").split("-")
-            start = int(range_match[0]) if range_match[0] else 0
-            end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
+
+        # Generate Signed URL and Redirect
+        # This allows the browser to stream directly from GCS with native performance
+        # and support for Range requests, seeking, etc.
+        try:
+            signed_url = storage_service.generate_signed_url(gcs_path)
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=signed_url)
+        except Exception as e:
+            print(f"❌ [GCS] Failed to generate signed URL: {e}")
+            # Fallback to streaming through backend if signing fails
+            def iterfile_gcs():
+                with storage_service.open_file_stream(gcs_path) as stream:
+                    chunk_size = 8192 * 4
+                    while True:
+                        data = stream.read(chunk_size)
+                        if not data: break
+                        yield data
             
-            # Ensure valid range
-            start = max(0, start)
-            end = min(end, file_size - 1)
-            content_length = end - start + 1
-            
-            # Read the requested chunk from GCS
-            def iter_chunk():
-                # GCS download_as_bytes is blocking, so we might want to chunk it if it's large
-                # But for typical audio chunks (browser requests), it's fine.
-                # Ideally we use a stream, but GCS python client doesn't expose a simple seekable stream easily.
-                # We can just fetch the range.
-                data = storage_service.get_file_range(gcs_path, start, end)
-                yield data
-            
-            # Return 206 Partial Content
-            headers = {
-                "Content-Range": f"bytes {start}-{end}/{file_size}",
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(content_length),
-            }
-            return StreamingResponse(
-                iter_chunk(),
-                status_code=206,
-                media_type=content_type,
-                headers=headers
-            )
-        else:
-            # No range request - serve full file
-            def iterfile():
-                # Stream the whole file
-                # We can use blob.download_to_file() with a pipe, or just chunks.
-                # For simplicity with our service abstraction, let's just fetch it.
-                # Warning: Loading full file into memory is bad.
-                # Let's assume browsers usually use Range.
-                # If not, we should implement chunked streaming from GCS.
-                # storage_service.bucket.blob(gcs_path).download_to_file(file_obj)
-                # Let's use the underlying client for efficient streaming if possible.
-                blob = storage_service.bucket.blob(gcs_path)
-                with tempfile.NamedTemporaryFile() as tmp:
-                    blob.download_to_filename(tmp.name)
-                    with open(tmp.name, "rb") as f:
-                        yield from f
-            
-            headers = {
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(file_size),
-            }
-            return StreamingResponse(
-                iterfile(),
-                media_type=content_type,
-                headers=headers
-            )
-            
+            return StreamingResponse(iterfile_gcs(), media_type="audio/mpeg")
+
     except HTTPException:
         raise
     except Exception as e:
