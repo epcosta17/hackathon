@@ -196,8 +196,22 @@ def delete_interview(user_id: str, interview_id: int) -> bool:
     base_path = _get_interview_path(user_id, interview_id)
     
     # Check if exists
-    if not storage_service.download_json(f"{base_path}/metadata.json"):
+    metadata = storage_service.download_json(f"{base_path}/metadata.json")
+    if not metadata:
         return False
+
+    # Delete audio file if exists
+    audio_url = metadata.get('audio_url')
+    if audio_url:
+        # url format: /api/audio/{filename}
+        try:
+            filename = audio_url.split('/')[-1]
+            if filename:
+                audio_path = f"{user_id}/audio/{filename}"
+                storage_service.delete_file(audio_path)
+                print(f"🗑️ Deleted audio file: {audio_path}")
+        except Exception as e:
+            print(f"⚠️ Failed to delete audio file: {e}")
         
     # Delete all files
     files = [
