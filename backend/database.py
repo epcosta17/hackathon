@@ -245,11 +245,23 @@ def delete_interview(user_id: str, interview_id: int) -> bool:
     audio_url = metadata.get('audio_url')
     if audio_url:
         try:
-            filename = audio_url.split('/')[-1]
+            # Handle query parameters (e.g. ?token=...)
+            clean_url = audio_url.split('?')[0]
+            
+            # Extract filename
+            # Handles both /api/audio/filename.mp3 and full GCS URLs
+            filename = clean_url.split('/')[-1]
+            
             if filename:
+                # Reconstruct path based on our known structure: {user_id}/audio/{filename}
+                # NOTE: This assumes the file resides in the user's audio folder.
+                # If we support other paths, we might need a more sophisticated parse 
+                # or store storage_path in metadata.
                 audio_path = f"{user_id}/audio/{filename}"
+                
+                print(f"🗑️ Attempting to delete audio blob: {audio_path} (derived from {audio_url})")
                 storage_service.delete_file(audio_path)
-                print(f"🗑️ Deleted audio file: {audio_path}")
+                print(f"✅ Deleted audio file: {audio_path}")
         except Exception as e:
             print(f"⚠️ Failed to delete audio file: {e}")
             
