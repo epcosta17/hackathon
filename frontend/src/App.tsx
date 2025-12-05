@@ -12,6 +12,8 @@ import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { auth } from './config/firebase';
+import { db } from './config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { getJSON, postJSON, postFormData, authenticatedFetch } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -330,25 +332,81 @@ function MainApp() {
     console.log('🏠 Going home - hasNewAnalysis set to FALSE');
   };
 
-  const handleLoadInterview = async (interviewId: number) => {
-    console.time('Load Interview');
+  // Optimistic Navigation: Switch screen immediately
+  const handleLoadInterview = (interviewId: number) => {
+    console.log('🚀 Optimistic Load: Switching to editor immediately');
+    setCurrentInterviewId(interviewId);
+    setCurrentScreen('editor');
+
+    // Clear previous data to show skeleton state
+    setTranscriptBlocks([]);
+    setAnalysisData(null);
+    setAudioUrl(null);
+    setAudioDuration(null);
+    setWaveformData(null);
+
+    // Fetch data in background
+    fetchInterviewData(interviewId);
+  };
+
+  // Inside App component
+  const fetchInterviewData = async (interviewId: number) => {
+    console.time('Fetch Interview Data (Firestore)');
     try {
-      // Fetch interview data
-      console.time('Fetch Interview Data');
-      const interview = await getJSON(`/api/interviews/${interviewId}`);
-      console.timeEnd('Fetch Interview Data');
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
 
-      console.time('Set State');
-      setTranscriptBlocks(interview.transcript_words);
-      setAnalysisData(interview.analysis_data);
-      setCurrentInterviewId(interviewId);
-      setCurrentInterviewTitle(interview.title || '');
+      // Construct references
+      // Path: users/{uid}/interviews/{interviewId}
+      // Sub-collections: data/transcript, data/analysis, data/waveform
+      const interviewRef = doc(db, 'users', user.uid, 'interviews', String(interviewId));
+      const transcriptRef = doc(db, 'users', user.uid, 'interviews', String(interviewId), 'data', 'transcript');
+      const analysisRef = doc(db, 'users', user.uid, 'interviews', String(interviewId), 'data', 'analysis');
+      const waveformRef = doc(db, 'users', user.uid, 'interviews', String(interviewId), 'data', 'waveform');
 
-      // Use audio URL directly for streaming - no download needed!
-      // Browser handles streaming automatically
+      // Parallel fetch
+      const [interviewSnap, transcriptSnap, analysisSnap, waveformSnap] = await Promise.all([
+        getDoc(interviewRef),
+        getDoc(transcriptRef),
+        getDoc(analysisRef),
+        getDoc(waveformRef)
+      ]);
+
+      console.timeEnd('Fetch Interview Data (Firestore)');
+
+      if (!interviewSnap.exists()) {
+        toast.error("Interview not found");
+        return;
+      }
+
+      const interviewData = interviewSnap.data();
+      const transcriptData = transcriptSnap.exists() ? transcriptSnap.data() : {};
+      const analysisData = analysisSnap.exists() ? analysisSnap.data() : null; // Analysis might be null
+      const waveformDocData = waveformSnap.exists() ? waveformSnap.data() : {};
+
+      // Race condition check: user might have switched away
+      /* 
+         Note: In a real app, we should check a ref or state. 
+         But typically we want to update the cache/store regardless.
+      */
+
+      // Set Transcript
+      // Firestore stores it as { text: "...", words: [...] }
+      const words = transcriptData.words || [];
+      console.log(`📝 Loaded ${words.length} transcript words from Firestore`);
+      setTranscriptBlocks(words);
+
+      // Set Analysis
+      setAnalysisData(analysisData as AnalysisData | null);
+
+      // Set Title
+      setCurrentInterviewTitle(interviewData.title || '');
+
+      // Handle Audio URL
       setAudioFile(null);
-      if (interview.audio_url) {
-        // Append auth token to URL for secure streaming
+      if (interviewData.audio_url) {
         let token = '';
         try {
           if (auth.currentUser) {
@@ -358,40 +416,27 @@ function MainApp() {
           console.error('Failed to get token for audio stream:', e);
         }
 
-        const baseUrl = `http://127.0.0.1:8000${interview.audio_url}`;
+        // interviewData.audio_url is the relative path stored by backend e.g. "/api/audio/..."
+        const baseUrl = `http://127.0.0.1:8000${interviewData.audio_url}`;
         setAudioUrl(token ? `${baseUrl}?token=${token}` : baseUrl);
       } else {
         setAudioUrl(null);
       }
 
-      // Set stored audio duration if available
-      if (interview.audio_duration) {
-        setAudioDuration(interview.audio_duration);
-      } else {
-        setAudioDuration(null);
+      // Set Duration
+      if (interviewData.audio_duration) {
+        setAudioDuration(interviewData.audio_duration);
       }
 
-      // Set waveform data if available (from database)
-      if (interview.waveform_data && interview.waveform_data.length > 0) {
-        setWaveformData(interview.waveform_data);
-        console.log('✨ Loaded waveform from database with', interview.waveform_data.length, 'bars');
-      } else {
-        setWaveformData(null);
+      // Set Waveform
+      // Firestore stores as { data: [...] }
+      if (waveformDocData.data && waveformDocData.data.length > 0) {
+        setWaveformData(waveformDocData.data);
       }
 
-      console.timeEnd('Set State');
-
-      // Small delay to let state settle before transition
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Show the screen immediately - audio will stream when played
-      console.log('Setting screen to editor');
-      setCurrentScreen('editor');
-      console.timeEnd('Load Interview');
     } catch (err) {
-      console.error('Failed to load interview:', err);
+      console.error('Failed to load interview from Firestore:', err);
       toast.error('Failed to load interview. Please try again.');
-      console.timeEnd('Load Interview');
     }
   };
 

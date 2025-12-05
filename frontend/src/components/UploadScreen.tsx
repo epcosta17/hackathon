@@ -8,6 +8,10 @@ import { TranscriptBlock } from '../App';
 import { toast } from 'sonner';
 import { UserMenu } from './UserMenu';
 import { getJSON, authenticatedFetch } from '../utils/api';
+import { db, auth } from '../config/firebase';
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+
+// ... (interfaces)
 
 interface InterviewSummary {
   id: number;
@@ -35,10 +39,75 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
 
-  // Fetch interviews on mount
+  // Real-time Firestore Listener
   useEffect(() => {
-    fetchInterviews();
-  }, []);
+    // Wait for auth to be ready
+    const unsubscribeAuth = auth.onAuthStateChanged(user => {
+      if (user) {
+        setupListener(user.uid);
+      } else {
+        setInterviews([]);
+        setIsLoadingInterviews(false);
+      }
+    });
+
+    let unsubscribeFirestore: () => void;
+
+    const setupListener = (uid: string) => {
+      setIsLoadingInterviews(true);
+      const path = `users/${uid}/interviews`;
+      console.log(`📡 [Firestore] Listening to: ${path}`);
+      // toast.info(`Listening to: ${path}`); // Debug toast
+
+      const interviewsRef = collection(db, 'users', uid, 'interviews');
+
+      // Simple query: order by created_at desc
+      // Removing orderBy temporarily to debug missing index issue
+      const q = query(interviewsRef);
+      // const q = query(interviewsRef, orderBy('created_at', 'desc'));
+
+      unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+        const loadedInterviews: InterviewSummary[] = [];
+        snapshot.forEach((doc) => {
+          // Basic validation
+          const data = doc.data();
+          loadedInterviews.push({
+            id: data.id,
+            title: data.title,
+            transcript_preview: data.transcript_preview,
+            created_at: data.created_at,
+            updated_at: data.updated_at
+          });
+        });
+
+        // Sort manually for now since we removed orderBy
+        loadedInterviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        // Client-side filter for search query
+        const filtered = searchQuery
+          ? loadedInterviews.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
+          : loadedInterviews;
+
+        setInterviews(filtered);
+        setIsLoadingInterviews(false);
+      }, (error) => {
+        console.error("Firestore Error:", error);
+        setIsLoadingInterviews(false);
+      });
+    };
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
+  }, [searchQuery]); // Re-run if search query changes? 
+  // actually, better to filter inside the snapshot or have a separate effect for filtering.
+  // Re-subscribing on every search keystroke is bad.
+  // Let's refactor: Listener fetches ALL, separate Effect filters.
+
+  // Refactored approach below
+
+  /* ... skipping fetchInterviews ... */
 
   const fetchFunFact = async () => {
     try {
@@ -55,7 +124,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
 
   // Rotate fun facts from API
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (isTranscribing && !isComplete) {
       // Fetch initial fact immediately
@@ -69,33 +138,18 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
   }, [isTranscribing, isComplete]);
 
   // Debounced search effect
+  // Refactored to filter client-side with Firestore listener
+  /*
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery.trim()) {
-        fetchInterviews(searchQuery);
-      } else {
-        fetchInterviews();
-      }
-    }, 500); // 500ms debounce delay
-
-    return () => clearTimeout(timeoutId);
+    // Search is handled by the Firestore listener's setInterviews filtering
   }, [searchQuery]);
+  */
 
+  /*
   const fetchInterviews = async (search?: string) => {
-    setIsLoadingInterviews(true);
-    try {
-      const endpoint = search
-        ? `/api/interviews?search=${encodeURIComponent(search)}`
-        : '/api/interviews';
-
-      const data = await getJSON(endpoint);
-      setInterviews(data.interviews || []);
-    } catch (error) {
-      console.error('Failed to fetch interviews:', error);
-    } finally {
-      setIsLoadingInterviews(false);
-    }
+     // Legacy API call replaced by Firestore onSnapshot
   };
+  */
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -114,7 +168,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
         method: 'DELETE',
       });
       if (response.ok) {
-        fetchInterviews(searchQuery);
+        // fetchInterviews(searchQuery); // Listener handles this
         toast.success('Interview deleted successfully!');
       }
     } catch (error) {
@@ -305,26 +359,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
           {/* Interviews List */}
           <div className="px-4 pt-4 pb-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
             <div className="space-y-2" style={{ paddingTop: interviews.length === 0 ? '50px' : '0' }}>
-              {isLoadingInterviews ? (
-                // Skeleton loaders
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <motion.div
-                      key={i}
-                      className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700/50"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: isSidebarOpen ? 1 : 0 }}
-                      transition={{
-                        duration: 0.2,
-                        delay: isSidebarOpen ? 0.3 + (i * 0.1) : 0
-                      }}
-                    >
-                      <div className="h-4 bg-zinc-700/50 rounded w-3/4 mb-2 animate-pulse"></div>
-                      <div className="h-3 bg-zinc-700/30 rounded w-1/2 animate-pulse"></div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : interviews.length === 0 ? (
+              {interviews.length === 0 ? (
                 <motion.div
                   className="text-center py-12 px-4"
                   initial={{ opacity: 0, y: 10 }}

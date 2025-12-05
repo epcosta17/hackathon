@@ -14,6 +14,8 @@ import {
   SiTailwindcss, SiBootstrap, SiAmazon, SiGooglecloud
 } from 'react-icons/si';
 import { UserMenu } from './UserMenu';
+import { db, auth } from '../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { getJSON, postJSON, postFormData, authenticatedFetch } from '../utils/api';
 
 interface Note {
@@ -102,18 +104,21 @@ export function AnalysisDashboard({
     generateReport();
   }, []); // Run once on mount
 
-  // Load interview title for existing interviews
+  // Load interview title for existing interviews (Firestore)
   useEffect(() => {
     const loadInterviewTitle = async () => {
-      if (currentInterviewId) {
-        try {
-          const interview = await getJSON(`/api/interviews/${currentInterviewId}`);
-          if (interview) {
-            setInterviewTitle(interview.title || '');
-          }
-        } catch (error) {
-          console.error('Failed to load interview title:', error);
+      if (!currentInterviewId || !auth.currentUser) return;
+
+      try {
+        const docRef = doc(db, 'users', auth.currentUser.uid, 'interviews', String(currentInterviewId));
+        const snap = await getDoc(docRef);
+
+        if (snap.exists()) {
+          const data = snap.data();
+          setInterviewTitle(data.title || '');
         }
+      } catch (error) {
+        console.error('Failed to load interview title:', error);
       }
     };
     loadInterviewTitle();

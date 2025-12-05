@@ -62,6 +62,7 @@ def save_interview(
     waveform_data: Optional[List[float]] = None
 ) -> int:
     """Save a new interview to Firestore"""
+    print(f"💾 [SAVE] Saving interview with {len(transcript_words)} blocks...", flush=True)
     interview_id = int(time.time() * 1000)
     now = datetime.utcnow().isoformat()
     
@@ -174,20 +175,42 @@ def get_interview(user_id: str, interview_id: int) -> Optional[Dict[str, Any]]:
     # Use transactional/batch get if possible, or parallel awaits. 
     # For now, simple sequential gets are fine for this scale and ensure simplicity.
     
-    transcript_doc = doc_ref.collection('data').document('transcript').get()
-    analysis_doc = doc_ref.collection('data').document('analysis').get()
-    waveform_doc = doc_ref.collection('data').document('waveform').get()
+    # Create references for sub-documents
+    data_col = doc_ref.collection('data')
+    transcript_ref = data_col.document('transcript')
+    analysis_ref = data_col.document('analysis')
+    waveform_ref = data_col.document('waveform')
+    
+    # Fetch all sub-documents in parallel using get_all
+    # This reduces round-trips from 3 to 1
+    # get_all returns a generator, so we must consume it into a list
+    # sub_docs = list(get_firestore_db().get_all([transcript_ref, analysis_ref, waveform_ref]))
+    
+    # transcript_doc = sub_docs[0]
+    # analysis_doc = sub_docs[1]
+    # waveform_doc = sub_docs[2]
+    
+    # Reverting to sequential for debugging
+    transcript_doc = transcript_ref.get()
+    analysis_doc = analysis_ref.get()
+    waveform_doc = waveform_ref.get()
     
     transcript_data = transcript_doc.to_dict() if transcript_doc.exists else {}
+    print(f"🔍 [DEBUG] Transcript doc exists: {transcript_doc.exists}", flush=True)
+    print(f"🔍 [DEBUG] Transcript keys: {list(transcript_data.keys())}", flush=True)
+    
     analysis_data = analysis_doc.to_dict() if analysis_doc.exists else {}
     waveform_data = waveform_doc.to_dict() if waveform_doc.exists else {}
     
+    words = transcript_data.get('words', [])
+    print(f"🔍 [DEBUG] Transcript words count: {len(words)}", flush=True)
+
     # Combine into the legacy format expected by Frontend
     return {
         'id': data.get('id'),
         'title': data.get('title'),
         'transcript_text': transcript_data.get('text', ''),
-        'transcript_words': transcript_data.get('words', []),
+        'transcript_words': words,
         'analysis_data': analysis_data,
         'audio_url': data.get('audio_url'),
         'audio_duration': data.get('audio_duration'),

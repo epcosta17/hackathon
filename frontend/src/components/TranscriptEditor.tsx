@@ -9,6 +9,8 @@ import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Virtuoso } from 'react-virtuoso';
+import { db, auth } from '../config/firebase';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { TranscriptSegment } from './TranscriptSegment';
 
 interface Note {
@@ -359,35 +361,49 @@ export function TranscriptEditor({
     generateWaveform();
   }, [localAudioUrl, currentInterviewId, waveformData.length]);
 
-  // Fetch notes when interview is loaded
+  // Firestore Listener for Notes
   useEffect(() => {
-    if (currentInterviewId) {
-      console.time('Fetch Notes');
-      fetchNotes();
-    }
-  }, [currentInterviewId]);
+    if (!currentInterviewId) return;
 
-  const fetchNotes = async () => {
-    if (!currentInterviewId) {
-      // If no interview ID, keep local notes
-      return;
-    }
-    try {
-      const notesData = await getJSON(`/api/interviews/${currentInterviewId}/notes`);
-      if (notesData && Array.isArray(notesData.notes)) {
-        setNotes(notesData.notes);
-      } else if (Array.isArray(notesData)) {
-        setNotes(notesData);
+    // We need the user UID to construct the path
+    const unsubscribeAuth = auth.onAuthStateChanged(user => {
+      if (user) {
+        const notesRef = collection(db, 'users', user.uid, 'interviews', String(currentInterviewId), 'notes');
+        const q = query(notesRef, orderBy('timestamp', 'asc')); // Order by timestamp
+
+        const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+          console.log(`📝 [Firestore] Notes update: ${snapshot.size} docs`);
+          const loadedNotes: Note[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            loadedNotes.push({
+              id: parseInt(doc.id), // Doc ID matches the Note ID (timestamp-based int)
+              interview_id: currentInterviewId,
+              timestamp: data.timestamp,
+              content: data.content,
+              is_bookmark: data.is_bookmark,
+              created_at: data.created_at,
+              updated_at: data.updated_at
+            });
+          });
+          setNotes(loadedNotes);
+        }, (error) => {
+          console.error("Firestore Notes Error:", error);
+        });
+
+        return () => unsubscribeSnapshot();
       } else {
-        console.error('Unexpected notes data format:', notesData);
         setNotes([]);
       }
-      console.timeEnd('Fetch Notes');
-    } catch (error) {
-      console.error('Failed to load notes:', error);
-      console.timeEnd('Fetch Notes');
-    }
-  };
+    });
+
+    return () => unsubscribeAuth();
+  }, [currentInterviewId]);
+
+  /* 
+  // Legacy Fetch (Removed)
+  const fetchNotes = async () => { ... }
+  */
 
   const addNote = async (isBookmark: boolean = false) => {
     if (!newNoteContent.trim() && !isBookmark) return;

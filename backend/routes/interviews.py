@@ -36,6 +36,7 @@ async def create_interview(
         
         # Parse JSON strings
         transcript_words_data = json.loads(transcript_words)
+        print(f"📥 [CREATE] Received {len(transcript_words_data)} transcript blocks", flush=True)
         analysis_data_dict = json.loads(analysis_data)
         notes_data = json.loads(notes) if notes else []
         waveform_data_list = json.loads(waveform_data) if waveform_data else None

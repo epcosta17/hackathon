@@ -127,6 +127,7 @@ async def transcribe_stream_endpoint(
 
 
 @router.get("/audio/{audio_filename}")
+@router.head("/audio/{audio_filename}")
 async def get_audio_file(
     audio_filename: str,
     request: Request,
@@ -169,7 +170,8 @@ async def get_audio_file(
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url=signed_url)
         except Exception as e:
-            print(f"❌ [GCS] Failed to generate signed URL: {e}")
+            # Expected in local dev without service account key
+            print(f"⚠️ [GCS] Signed URL generation failed (using fallback): {e}")
             # Fallback to streaming through backend if signing fails
             def iterfile_gcs():
                 with storage_service.open_file_stream(gcs_path) as stream:
