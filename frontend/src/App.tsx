@@ -82,8 +82,11 @@ export interface Statistics {
   pace: string;
   engagement: number;
   communicationScore: number;
+  communicationScoreExplanation?: string;
   technicalDepthScore: number;
+  technicalDepthScoreExplanation?: string;
   engagementScore: number;
+  engagementScoreExplanation?: string;
 }
 
 export interface AnalysisData {

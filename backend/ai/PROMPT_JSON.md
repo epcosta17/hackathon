@@ -63,8 +63,11 @@ You are a professional Interview Analyst AI. Your task is to analyze the provide
     "pace": "Moderate",
     "engagement": 8,
     "communicationScore": 85,
+    "communicationScoreExplanation": "Candidate was articulate but occasionally rambled.",
     "technicalDepthScore": 78,
-    "engagementScore": 80
+    "technicalDepthScoreExplanation": "Strong knowledge of React internals but struggled with complex SQL queries.",
+    "engagementScore": 80,
+    "engagementScoreExplanation": "Active listener, asked insightful questions about the team structure."
   }
 }
 ```
@@ -79,6 +82,12 @@ You are a professional Interview Analyst AI. Your task is to analyze the provide
 4. Extract 3-5 key technical points that the interviewer emphasized
 5. Dynamically generate Q&A topic titles based on actual discussion
 6. Calculate all time values from the transcript timestamps
+
+7. **CRITICAL: Statistics must be extracted dynamically:**
+   - `"technicalQuestions"`: Count the actual number of distinct technical questions asked.
+   - `"followUpQuestions"`: Count the actual probing/follow-up questions.
+   - `"technologiesCount"`: Count the unique technologies listed in the `technologies` array.
+   - `"engagement"`, `"communicationScore"`, `"technicalDepthScore"`, `"engagementScore"`: Evaluate based on the candidate's actual performance in the transcript (0-100 scale). DO NOT use the example values.
 
 **RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT**
 

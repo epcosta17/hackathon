@@ -312,9 +312,9 @@ export function AnalysisDashboard({
   };
 
   const scoreExplanations = {
-    communication: "Measures clarity of explanations, response quality, and overall dialogue flow throughout the interview.",
-    technical: "Evaluates the complexity of challenges, depth of technical discussion, and coverage of advanced concepts.",
-    engagement: "Assesses the candidate's active participation, quality of questions asked, and overall interaction level."
+    communication: analysisData.statistics.communicationScoreExplanation || "Measures clarity of explanations, response quality, and overall dialogue flow throughout the interview.",
+    technical: analysisData.statistics.technicalDepthScoreExplanation || "Evaluates the complexity of challenges, depth of technical discussion, and coverage of advanced concepts.",
+    engagement: analysisData.statistics.engagementScoreExplanation || "Assesses the candidate's active participation, quality of questions asked, and overall interaction level."
   };
 
   return (

@@ -32,7 +32,7 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
             vertexai.init(project=project_id, location="us-central1")
             
             # Use Gemini 2.5 Flash Lite (User Preference)
-            model = GenerativeModel("gemini-2.5-flash-lite")
+            model = GenerativeModel("gemini-2.5-flash")
             
             generation_config = GenerationConfig(
                 temperature=0.3,
@@ -134,8 +134,11 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
             "pace": "Moderate",
             "engagement": 8,
             "communicationScore": 85,
+            "communicationScoreExplanation": "Candidate was articulate and explained complex concepts clearly, though occasionally needed redirection.",
             "technicalDepthScore": 75,
-            "engagementScore": 80
+            "technicalDepthScoreExplanation": "Demonstrated solid understanding of React hooks and state management, but struggled with database indexing concepts.",
+            "engagementScore": 80,
+            "engagementScoreExplanation": "Maintained good eye contact and asked relevant questions about the engineering culture."
         }
     }
     

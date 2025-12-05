@@ -66,8 +66,11 @@ class Statistics(BaseModel):
     pace: str
     engagement: int
     communicationScore: int
+    communicationScoreExplanation: str = Field(..., description="Brief explanation of the communication score")
     technicalDepthScore: int
+    technicalDepthScoreExplanation: str = Field(..., description="Brief explanation of the technical depth score")
     engagementScore: int
+    engagementScoreExplanation: str = Field(..., description="Brief explanation of the engagement score")
 
 
 class AnalysisData(BaseModel):
