@@ -964,14 +964,18 @@ export function TranscriptEditor({
                       })}
                     </div>
                   ) : (
-                    // Fallback to simple progress bar while waveform loads
-                    <div className="absolute inset-0 flex items-center px-2">
-                      <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    // Skeleton Waveform Loading State
+                    <div className="absolute inset-0 flex items-center justify-between px-2 gap-[2px] opacity-50">
+                      {Array.from({ length: 60 }).map((_, index) => (
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-150"
-                          style={{ width: `${(currentTime / duration) * 100}%` }}
+                          key={`skeleton-${index}`}
+                          className="w-[3px] bg-zinc-700/50 rounded-full animate-pulse"
+                          style={{
+                            height: `${30 + Math.random() * 40}%`,
+                            animationDelay: `${index * 0.01}s`
+                          }}
                         />
-                      </div>
+                      ))}
                     </div>
                   )}
 
@@ -1176,7 +1180,7 @@ export function TranscriptEditor({
                 className="flex-1 px-8 pt-6 pb-8 pr-12" // Increased right padding
                 style={{ height: 'calc(100vh - 260px)' }}
                 initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                animate={transcriptBlocks.length > 0 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
               >
                 <Virtuoso
