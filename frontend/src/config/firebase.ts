@@ -25,4 +25,8 @@ export const auth = getAuth(app);
 import { getFirestore } from "firebase/firestore";
 export const db = getFirestore(app, "interviewlens");
 
+// Initialize Storage
+import { getStorage } from "firebase/storage";
+export const storage = getStorage(app);
+
 export default app;

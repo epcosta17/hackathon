@@ -191,3 +191,50 @@ async def save_waveform(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save waveform: {str(e)}")
 
+
+@router.post("/interviews/{interview_id}/audio")
+async def upload_interview_audio(
+    interview_id: int,
+    audio_file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Upload audio file for an existing interview and update its audio_url.
+    This supports the "Hybrid Save" strategy where Frontend creates the interview 
+    and Backend handles the heavy audio upload.
+    """
+    try:
+        user_id = current_user['uid']
+        print(f"🎙️ [UPLOAD] Receiving audio for interview {interview_id}", flush=True)
+
+        # 1. Upload to GCS
+        # Generate unique filename
+        file_extension = os.path.splitext(audio_file.filename)[1]
+        audio_filename = f"{uuid.uuid4()}{file_extension}"
+        
+        from services.storage_service import storage_service
+        import io
+        
+        content = await audio_file.read()
+        f = io.BytesIO(content)
+        # Use user-scoped path
+        gcs_path = f"{user_id}/audio/{audio_filename}"
+        storage_service.upload_file(gcs_path, f, content_type=audio_file.content_type)
+        
+        audio_url = f"/api/audio/{audio_filename}"
+        print(f"✅ [UPLOAD] Audio uploaded to {gcs_path}", flush=True)
+
+        # 2. Update Firestore Document
+        # We perform a partial update just for the audio_url
+        update_interview(
+            user_id=user_id,
+            interview_id=interview_id,
+            data={'audio_url': audio_url}
+        )
+        
+        return {"message": "Audio uploaded successfully", "audio_url": audio_url}
+
+    except Exception as e:
+        print(f"❌ [UPLOAD] Failed: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload audio: {str(e)}")
+

@@ -11,9 +11,8 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { auth } from './config/firebase';
-import { db } from './config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from './config/firebase';
+import { collection, query, where, getDocs, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { getJSON, postJSON, postFormData, authenticatedFetch } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -217,89 +216,104 @@ function MainApp() {
       return;
     }
 
-    setIsSaving(true);
-    try {
-      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
-      if (currentInterviewId) {
-        // UPDATE
-        const requestBody = {
-          interview_id: currentInterviewId,
-          title: interviewTitle,
-          transcript_text: transcriptText,
-          transcript_words: transcriptBlocks,
-          analysis_data: analysisData,
-        };
-        const response = await authenticatedFetch(`/api/interviews/${currentInterviewId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-        if (response.ok) {
-          handleAnalysisSaved();
-          setShowSaveDialog(false);
-          setCurrentInterviewTitle(interviewTitle);
-          toast.success('Interview updated successfully!');
-        } else {
-          toast.error('Failed to update interview.');
-        }
-      } else {
-        // CREATE
-        const formData = new FormData();
-        formData.append('title', interviewTitle);
-        formData.append('transcript_text', transcriptText);
-        formData.append('transcript_words', JSON.stringify(transcriptBlocks));
-        if (analysisData) {
-          formData.append('analysis_data', JSON.stringify(analysisData));
-        } else {
-          // Provide empty analysis structure if saving before analysis
-          formData.append('analysis_data', JSON.stringify({
-            generalComments: { howInterview: '', attitude: '', structure: '', platform: '' },
-            keyPoints: [],
-            codingChallenge: { coreExercise: '', followUp: '', knowledge: '' },
-            technologies: [],
-            qaTopics: [],
-            statistics: {
-              duration: '0:00', technicalTime: '0:00', qaTime: '0:00',
-              technicalQuestions: 0, followUpQuestions: 0, technologiesCount: 0,
-              complexity: 'Intermediate', pace: 'Moderate', engagement: 0,
-              communicationScore: 0, technicalDepthScore: 0, engagementScore: 0
-            }
-          }));
-        }
-
-        // Add notes if available
-        if (notes.length > 0) {
-          formData.append('notes', JSON.stringify(notes));
-        }
-
-        // Add waveform data if available
-        if (waveformData && waveformData.length > 0) {
-          formData.append('waveform_data', JSON.stringify(waveformData));
-        }
-
-        // Add audio file if available
-        if (audioFile) {
-          formData.append('audio_file', audioFile);
-        }
-        const response = await postFormData('/api/interviews', formData);
-        if (response.ok) {
-          const result = await response.json();
-          setCurrentInterviewId(result.id);
-          setCurrentInterviewTitle(interviewTitle);
-          handleAnalysisSaved();
-          setShowSaveDialog(false);
-          toast.success('Interview saved successfully!');
-        } else {
-          toast.error('Failed to save interview.');
-        }
-      }
-    } catch (error) {
-      toast.error('An error occurred while saving.');
-    } finally {
-      setIsSaving(false);
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error("You must be logged in to save.");
+      return;
     }
+
+    // 1. Optimistic UI: Close immediately
+    setShowSaveDialog(false);
+
+    // 2. Start Background Process
+    const savePromise = async () => {
+      const uid = user.uid;
+      // If creating new, generate ID. If updating, use existing.
+      const interviewId = currentInterviewId || Date.now();
+      const now = new Date().toISOString();
+      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
+      const preview = transcriptText.slice(0, 200) + (transcriptText.length > 200 ? '...' : '');
+
+      const batch = writeBatch(db);
+
+      // --- 1. Main Document (Metadata) ---
+      // Note: We do NOT set audio_url here anymore, the backend handles it.
+      const interviewRef = doc(db, 'users', uid, 'interviews', String(interviewId));
+      const interviewData: any = {
+        id: interviewId,
+        title: interviewTitle,
+        transcript_preview: preview,
+        updated_at: now,
+      };
+
+      if (!currentInterviewId) {
+        interviewData.created_at = now;
+      }
+
+      // Calculate Duration
+      if (transcriptBlocks.length > 0) {
+        const last = transcriptBlocks[transcriptBlocks.length - 1];
+        interviewData.audio_duration = last.timestamp + last.duration;
+      }
+
+      batch.set(interviewRef, interviewData, { merge: true });
+
+      // --- 2. Sub-collections ---
+      // Transcript
+      const transcriptRef = doc(db, 'users', uid, 'interviews', String(interviewId), 'data', 'transcript');
+      batch.set(transcriptRef, {
+        text: transcriptText,
+        words: transcriptBlocks
+      });
+
+      // Analysis
+      if (analysisData) {
+        const analysisRef = doc(db, 'users', uid, 'interviews', String(interviewId), 'data', 'analysis');
+        batch.set(analysisRef, analysisData);
+      }
+
+      // Waveform
+      if (waveformData && waveformData.length > 0) {
+        const waveformRef = doc(db, 'users', uid, 'interviews', String(interviewId), 'data', 'waveform');
+        batch.set(waveformRef, { data: waveformData });
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        notes.forEach(note => {
+          const noteId = note.id;
+          const noteRef = doc(db, 'users', uid, 'interviews', String(interviewId), 'notes', String(noteId));
+          batch.set(noteRef, { ...note, interview_id: interviewId });
+        });
+      }
+
+      // --- 3. Commit Firestore Data ---
+      await batch.commit();
+
+      // --- 4. Upload Audio to Backend (Hybrid) ---
+      if (audioFile) {
+        const formData = new FormData();
+        formData.append('audio_file', audioFile);
+
+        // This call goes to Backend -> Uploads to GCS -> Updates Firestore Doc
+        await postFormData(`/api/interviews/${interviewId}/audio`, formData);
+      }
+
+      return interviewId;
+    };
+
+    toast.promise(savePromise(), {
+      loading: 'Saving interview...',
+      success: (id) => {
+        // Update state after success
+        setCurrentInterviewId(id);
+        setCurrentInterviewTitle(interviewTitle);
+        handleAnalysisSaved();
+        setAudioFile(null); // Clear file as it's saved
+        return 'Interview saved successfully!';
+      },
+      error: 'Failed to save interview'
+    });
   };
 
   const handleDownloadReport = async () => {
