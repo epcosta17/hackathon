@@ -255,9 +255,33 @@ function MainApp() {
         interviewData.created_at = now;
       }
 
-      // If we have a pre-uploaded audio URL (from concurrent upload), save it directly!
+      // If we have a pre-uploaded audio URL, finalize it (move from temp to perm)
       if (preUploadedAudioUrl) {
-        interviewData.audio_url = preUploadedAudioUrl;
+        let finalAudioUrl = preUploadedAudioUrl;
+
+        // Only call finalize if it looks like a temp URL
+        if (preUploadedAudioUrl.includes('/temp/')) {
+          try {
+            console.log('📦 Finalizing audio file...');
+            const finalizeRes = await authenticatedFetch('/api/audio/finalize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ audio_url: preUploadedAudioUrl })
+            });
+
+            if (finalizeRes.ok) {
+              const data = await finalizeRes.json();
+              finalAudioUrl = data.audio_url;
+              console.log('✅ Audio finalized:', finalAudioUrl);
+            } else {
+              console.warn('⚠️ Audio finalization failed. Using temp URL.', await finalizeRes.text());
+            }
+          } catch (e) {
+            console.error('Finalize error:', e);
+          }
+        }
+
+        interviewData.audio_url = finalAudioUrl;
       }
 
       // Calculate Duration

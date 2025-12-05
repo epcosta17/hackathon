@@ -253,15 +253,17 @@ def delete_interview(user_id: str, interview_id: int) -> bool:
             filename = clean_url.split('/')[-1]
             
             if filename:
-                # Reconstruct path based on our known structure: {user_id}/audio/{filename}
-                # NOTE: This assumes the file resides in the user's audio folder.
-                # If we support other paths, we might need a more sophisticated parse 
-                # or store storage_path in metadata.
-                audio_path = f"{user_id}/audio/{filename}"
+                # Reconstruct path based on URL structure
+                if "/temp/" in clean_url:
+                     audio_path = f"{user_id}/temp_audio/{filename}"
+                else:
+                     audio_path = f"{user_id}/audio/{filename}"
                 
                 print(f"🗑️ Attempting to delete audio blob: {audio_path} (derived from {audio_url})")
-                storage_service.delete_file(audio_path)
-                print(f"✅ Deleted audio file: {audio_path}")
+                if storage_service.delete_file(audio_path):
+                    print(f"✅ Deleted audio file: {audio_path}")
+                else:
+                    print(f"⚠️ Audio file not found at: {audio_path}. It may have already been deleted or the path is incorrect.")
         except Exception as e:
             print(f"⚠️ Failed to delete audio file: {e}")
             

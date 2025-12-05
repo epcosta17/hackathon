@@ -49,8 +49,8 @@ async def transcribe_stream_endpoint(
             
             # Setup GCS Path
             remote_filename = f"{uuid.uuid4()}{ext}"
-            gcs_path = f"{user_id}/audio/{remote_filename}"
-            audio_url = f"/api/audio/{remote_filename}"
+            gcs_path = f"{user_id}/temp_audio/{remote_filename}"  # Store in temp first
+            audio_url = f"/api/audio/temp/{remote_filename}"      # New temp URL format
             # Priority: Deepgram API > whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
             deepgram_key = os.getenv("DEEPGRAM_API_KEY")
             
@@ -163,6 +163,53 @@ async def transcribe_stream_endpoint(
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+
+
+@router.get("/audio/temp/{audio_filename}")
+@router.head("/audio/temp/{audio_filename}")
+async def get_temp_audio_file(
+    audio_filename: str,
+    request: Request,
+    token: str = None
+):
+    """Serve a TEMPORARY audio file from temp_audio/ folder."""
+    # Logic mirrors get_audio_file but points to temp_audio
+    user_id = None
+    try:
+        # 1. Check Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            id_token = auth_header.split("Bearer ")[1]
+            decoded = await verify_firebase_token(id_token)
+            user_id = decoded['uid']
+        # 2. Check Query Parameter
+        elif token:
+            decoded = await verify_firebase_token(token)
+            user_id = decoded['uid']
+        else:
+            raise HTTPException(status_code=403, detail="Not authenticated")
+            
+        from services.storage_service import storage_service
+        gcs_path = f"{user_id}/temp_audio/{audio_filename}"
+
+        try:
+            signed_url = storage_service.generate_signed_url(gcs_path)
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=signed_url)
+        except Exception as e:
+            # Fallback
+            def iterfile_gcs():
+                with storage_service.open_file_stream(gcs_path) as stream:
+                    chunk_size = 8192 * 4
+                    while True:
+                        data = stream.read(chunk_size)
+                        if not data: break
+                        yield data
+            return StreamingResponse(iterfile_gcs(), media_type="audio/mpeg")
+
+    except Exception as e:
+        print(f"Failed to serve temp audio: {e}")
+        raise HTTPException(status_code=404, detail="Temp audio not found")
 
 @router.get("/audio/{audio_filename}")
 @router.head("/audio/{audio_filename}")

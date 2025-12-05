@@ -44,6 +44,8 @@ app.include_router(transcription.router)
 app.include_router(analysis.router)
 app.include_router(interviews.router)
 app.include_router(notes.router)
+from routes import audio
+app.include_router(audio.router)
 
 
 # Initialize database and Firebase on startup

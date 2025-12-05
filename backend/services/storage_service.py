@@ -59,6 +59,16 @@ class StorageService:
         if blob.exists():
             blob.delete()
 
+    def rename_file(self, old_path: str, new_path: str) -> Optional[str]:
+        """Renames (moves) a file within GCS. Returns new public URL or None."""
+        self._check_client()
+        blob = self.bucket.blob(old_path)
+        if not blob.exists():
+            return None
+            
+        new_blob = self.bucket.rename_blob(blob, new_path)
+        return new_blob.public_url
+
     def list_files(self, prefix: str) -> List[str]:
         """Lists files with a given prefix."""
         self._check_client()
