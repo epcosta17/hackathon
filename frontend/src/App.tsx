@@ -4,11 +4,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
+import { LoginPage } from './components/LoginPage';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { auth } from './config/firebase';
+import { getJSON, postJSON, postFormData } from './utils/api';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 
 export type Screen = 'upload' | 'editor' | 'analysis';
@@ -90,7 +95,21 @@ export interface AnalysisData {
   docx_path?: string;
 }
 
-function App() {
+// Inner component that uses authentication
+function AuthenticatedApp() {
+  const { currentUser } = useAuth();
+
+  // Show login page if not authenticated
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
+  // User is authenticated, show the main app
+  return <MainApp />;
+}
+
+// Main app logic (extracted from original App component)
+function MainApp() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -119,7 +138,7 @@ function App() {
     setAudioFile(file);
     setAudioUrl(null); // Clear URL when using new file
     setAudioDuration(null); // Clear stored duration for new file
-    
+
     // Store waveform data if provided (from backend generation)
     if (waveform && waveform.length > 0) {
       setWaveformData(waveform);
@@ -127,7 +146,7 @@ function App() {
     } else {
       setWaveformData(null);
     }
-    
+
     setCurrentScreen('editor');
   };
 
@@ -166,11 +185,7 @@ function App() {
           transcript_words: transcriptBlocks,
           analysis_data: analysisData,
         };
-        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
+        const response = await postJSON(`/api/interviews/${currentInterviewId}`, requestBody, { method: 'PUT' });
         if (response.ok) {
           handleAnalysisSaved();
           setShowSaveDialog(false);
@@ -183,10 +198,7 @@ function App() {
         const formData = new FormData();
         formData.append('title', interviewTitle);
         // ... (append other form data: transcript, analysis, notes, etc.)
-        const response = await fetch('http://127.0.0.1:8000/api/interviews', {
-          method: 'POST',
-          body: formData,
-        });
+        const response = await postFormData('/api/interviews', formData);
         if (response.ok) {
           const result = await response.json();
           setCurrentInterviewId(result.id);
@@ -203,7 +215,7 @@ function App() {
       setIsSaving(false);
     }
   };
-  
+
   const handleDownloadReport = async () => {
     setIsDownloading(true);
     try {
@@ -239,32 +251,42 @@ function App() {
     try {
       // Fetch interview data
       console.time('Fetch Interview Data');
-      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}`);
-      const interview = await response.json();
+      const interview = await getJSON(`/api/interviews/${interviewId}`);
       console.timeEnd('Fetch Interview Data');
-      
+
       console.time('Set State');
       setTranscriptBlocks(interview.transcript_words);
       setAnalysisData(interview.analysis_data);
       setCurrentInterviewId(interviewId);
       setCurrentInterviewTitle(interview.title || '');
-      
+
       // Use audio URL directly for streaming - no download needed!
       // Browser handles streaming automatically
       setAudioFile(null);
       if (interview.audio_url) {
-        setAudioUrl(`http://127.0.0.1:8000${interview.audio_url}`);
+        // Append auth token to URL for secure streaming
+        let token = '';
+        try {
+          if (auth.currentUser) {
+            token = await auth.currentUser.getIdToken();
+          }
+        } catch (e) {
+          console.error('Failed to get token for audio stream:', e);
+        }
+
+        const baseUrl = `http://127.0.0.1:8000${interview.audio_url}`;
+        setAudioUrl(token ? `${baseUrl}?token=${token}` : baseUrl);
       } else {
         setAudioUrl(null);
       }
-      
+
       // Set stored audio duration if available
       if (interview.audio_duration) {
         setAudioDuration(interview.audio_duration);
       } else {
         setAudioDuration(null);
       }
-      
+
       // Set waveform data if available (from database)
       if (interview.waveform_data && interview.waveform_data.length > 0) {
         setWaveformData(interview.waveform_data);
@@ -272,12 +294,12 @@ function App() {
       } else {
         setWaveformData(null);
       }
-      
+
       console.timeEnd('Set State');
-      
+
       // Small delay to let state settle before transition
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Show the screen immediately - audio will stream when played
       console.log('Setting screen to editor');
       setCurrentScreen('editor');
@@ -312,106 +334,121 @@ function App() {
   return (
     <div className="bg-zinc-950 text-white">
       <Toaster position="bottom-right" />
-      
+
       {currentScreen === 'upload' && (
-        <UploadScreen 
+        <UploadScreen
           onTranscriptionComplete={handleTranscriptionComplete}
           onLoadInterview={handleLoadInterview}
         />
       )}
       {currentScreen === 'editor' && (
-        <TranscriptEditor
-          transcriptBlocks={transcriptBlocks}
-          setTranscriptBlocks={setTranscriptBlocks}
-          onAnalysisComplete={handleAnalysisComplete}
-          onViewAnalysis={() => setCurrentScreen('analysis')}
-          onBackToUpload={handleBackToUpload}
-          audioFile={audioFile}
-          audioUrl={audioUrl}
-          audioDuration={audioDuration}
-          waveformData={waveformData}
-          existingAnalysis={analysisData}
-          currentInterviewId={currentInterviewId}
-          notes={notes}
-          setNotes={setNotes}
-        />
+        <ErrorBoundary>
+          <TranscriptEditor
+            transcriptBlocks={transcriptBlocks}
+            setTranscriptBlocks={setTranscriptBlocks}
+            onAnalysisComplete={handleAnalysisComplete}
+            onViewAnalysis={() => setCurrentScreen('analysis')}
+            onBackToUpload={handleBackToUpload}
+            audioFile={audioFile}
+            audioUrl={audioUrl}
+            audioDuration={audioDuration}
+            waveformData={waveformData}
+            existingAnalysis={analysisData}
+            currentInterviewId={currentInterviewId}
+            notes={notes}
+            setNotes={setNotes}
+          />
+        </ErrorBoundary>
       )}
-      {currentScreen === 'analysis' && analysisData && (
-        <AnalysisDashboard
-          analysisData={analysisData}
-          transcriptBlocks={transcriptBlocks}
-          onBackToUpload={handleBackToUpload}
-          onBackToEditor={handleBackToEditor}
-          currentInterviewId={currentInterviewId}
-          currentInterviewTitle={currentInterviewTitle}
-          onSaveInterview={handleSaveInterview} // Using the correctly typed handler
-          audioFile={audioFile}
-          notes={notes}
-          waveformData={waveformData}
-          hasNewAnalysis={hasNewAnalysis}
-          onAnalysisSaved={() => {
-            setHasNewAnalysis(false);
-          }}
-        />
-      )}
-      
+      {
+        currentScreen === 'analysis' && analysisData && (
+          <AnalysisDashboard
+            analysisData={analysisData}
+            transcriptBlocks={transcriptBlocks}
+            onBackToUpload={handleBackToUpload}
+            onBackToEditor={handleBackToEditor}
+            currentInterviewId={currentInterviewId}
+            currentInterviewTitle={currentInterviewTitle}
+            onSaveInterview={handleSaveInterview} // Using the correctly typed handler
+            audioFile={audioFile}
+            notes={notes}
+            waveformData={waveformData}
+            hasNewAnalysis={hasNewAnalysis}
+            onAnalysisSaved={() => {
+              setHasNewAnalysis(false);
+            }}
+          />
+        )
+      }
+
       {/* Save Interview Dialog, now managed by App.tsx */}
-      {showSaveDialog && createPortal(
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-          }}
-          onClick={() => setShowSaveDialog(false)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-zinc-700"
+      {
+        showSaveDialog && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+            }}
+            onClick={() => setShowSaveDialog(false)}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-white">Save Interview</h2>
-              <Button variant="ghost" size="icon" onClick={() => setShowSaveDialog(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-zinc-400 mb-4">Please provide a title for this interview session.</p>
-            <Input
-              type="text"
-              placeholder="e.g., Senior Frontend Engineer Interview"
-              value={interviewTitle}
-              onChange={(e) => setInterviewTitle(e.target.value)}
-              className="w-full bg-zinc-900 border-zinc-700 text-white"
-            />
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700">
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveInterview} 
-                disabled={isSaving}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </motion.div>
-        </div>,
-        document.body
-      )}
-    </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-zinc-700"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">Save Interview</h2>
+                <Button variant="ghost" size="icon" onClick={() => setShowSaveDialog(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-zinc-400 mb-4">Please provide a title for this interview session.</p>
+              <Input
+                type="text"
+                placeholder="e.g., Senior Frontend Engineer Interview"
+                value={interviewTitle}
+                onChange={(e) => setInterviewTitle(e.target.value)}
+                className="w-full bg-zinc-900 border-zinc-700 text-white"
+              />
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveInterview}
+                  disabled={isSaving}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>,
+          document.body
+        )
+      }
+    </div >
+  );
+}
+
+// Main App component with AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
   );
 }
 

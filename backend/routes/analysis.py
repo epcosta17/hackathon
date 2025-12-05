@@ -2,19 +2,23 @@
 import time
 import asyncio
 import io
-from typing import Dict
-from fastapi import APIRouter, HTTPException
+from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
 from models.schemas import AnalysisData, AnalyzeRequest, GenerateReportRequest, DownloadRequest
 from services.docx_service import generate_docx_async, get_cached_docx
 from services.analysis_service import generate_analysis_report
+from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
 
 @router.post("/analyze", response_model=AnalysisData)
-async def analyze_endpoint(request: AnalyzeRequest):
+async def analyze_endpoint(
+    request: AnalyzeRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Takes the final, edited transcript with timestamps and speakers, returns AI analysis.
     Also generates DOCX in background for instant download later.
@@ -44,7 +48,10 @@ async def analyze_endpoint(request: AnalyzeRequest):
 
 
 @router.post("/generate-report")
-async def generate_report_endpoint(request: GenerateReportRequest):
+async def generate_report_endpoint(
+    request: GenerateReportRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Generate DOCX report from existing analysis data without re-analyzing."""
     try:
         # Convert dict to AnalysisData model
@@ -65,7 +72,10 @@ async def generate_report_endpoint(request: GenerateReportRequest):
 
 
 @router.post("/download-report")
-async def download_report_endpoint(request: DownloadRequest):
+async def download_report_endpoint(
+    request: DownloadRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Download cached DOCX file. If not in cache, return error message.
     Frontend should regenerate analysis to get a new report.

@@ -53,13 +53,12 @@ export const TranscriptSegment = React.memo(({
       <motion.div
         ref={isActive ? activeBlockRef : null}
         initial={false}
-        animate={isActive ? { scale: 1.01 } : { scale: 1 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className={`group relative p-4 rounded-lg border transition-all duration-300 ${
-          isActive 
-            ? 'border-indigo-500/50 bg-gradient-to-br from-indigo-500/10 to-purple-500/5 shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-500/30 ring-offset-2 ring-offset-zinc-950' 
-            : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800/50 hover:border-zinc-700 hover:shadow-lg hover:shadow-zinc-800/50'
-        }`}
+        animate={isActive ? { backgroundColor: 'rgba(99, 102, 241, 0.1)' } : { backgroundColor: 'rgba(24, 24, 27, 0.3)' }}
+        transition={{ duration: 0.2 }}
+        className={`group relative p-4 rounded-lg border transition-all duration-300 ${isActive
+          ? 'border-indigo-500'
+          : 'border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700'
+          }`}
       >
         {/* Accent bar on the left when active */}
         {isActive && (
@@ -69,32 +68,30 @@ export const TranscriptSegment = React.memo(({
             className="absolute left-0 top-2 bottom-2 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-r-full"
           />
         )}
-        
+
         <div className="relative z-10 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => jumpToTimestamp(block.timestamp)}
-                className={`text-xs font-medium cursor-pointer p-2 -m-2 rounded-md transition-all duration-200 ${
-                  isActive 
-                    ? 'text-indigo-300 bg-indigo-500/20 hover:bg-indigo-500/30 hover:text-indigo-200' 
-                    : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
-                }`}
+                className={`text-xs font-medium cursor-pointer p-2 -m-2 rounded-md transition-all duration-200 ${isActive
+                  ? 'text-indigo-300 bg-indigo-500/20 hover:bg-indigo-500/30 hover:text-indigo-200'
+                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
+                  }`}
               >
                 {formatTime(block.timestamp)}
               </button>
               {block.speaker && (
-                <span className={`text-xs font-semibold px-2 py-1 rounded-md ${
-                  isActive 
-                    ? 'bg-purple-500/20 text-purple-300' 
-                    : 'bg-zinc-800 text-zinc-400'
-                }`}>
+                <span className={`text-xs font-semibold px-2 py-1 rounded-md ${isActive
+                  ? 'bg-purple-500/20 text-purple-300'
+                  : 'bg-zinc-800 text-zinc-400'
+                  }`}>
                   {block.speaker}
                 </span>
               )}
             </div>
           </div>
-          
+
           {isEditing ? (
             <Textarea
               value={localText}
@@ -106,24 +103,24 @@ export const TranscriptSegment = React.memo(({
             />
           ) : (
             <div className="flex items-start gap-3">
-              <div 
-                className="flex-1" 
+              <div
+                className="flex-1"
                 onClick={(e) => {
                   e.stopPropagation();
                   setEditingBlockId(block.id);
                 }}
               >
-                <p 
+                <p
                   className="leading-relaxed cursor-text"
                 >
                   {block.words && block.words.length > 0 ? (
-                    block.words.map((word, idx) => (
+                    block.words?.map((word, idx) => (
                       <span
                         key={idx}
                         className={`${getConfidenceColor(word.confidence)} transition-colors`}
                         title={`Confidence: ${(word.confidence * 100).toFixed(1)}%`}
                       >
-                        {word.text}{idx < block.words.length - 1 ? ' ' : ''}
+                        {word.text}{idx < (block.words?.length || 0) - 1 ? ' ' : ''}
                       </span>
                     ))
                   ) : (

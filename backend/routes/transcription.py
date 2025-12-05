@@ -3,18 +3,23 @@ import os
 import json
 import asyncio
 import tempfile
-from fastapi import APIRouter, File, UploadFile, HTTPException, Request
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse, Response
 from pathlib import Path
+from typing import Dict, Any
 
 router = APIRouter(prefix="/api", tags=["transcription"])
 
 # Import transcription functions from service
 from services.transcription_service import transcribe_with_whisper_cpp, transcribe_with_deepgram, generate_mock_transcript
+from middleware.auth_middleware import get_current_user, verify_firebase_token
 
 
 @router.post("/transcribe-stream")
-async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
+async def transcribe_stream_endpoint(
+    audio_file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Handles audio file upload and streams progress updates via Server-Sent Events.
     """
@@ -122,8 +127,28 @@ async def transcribe_stream_endpoint(audio_file: UploadFile = File(...)):
 
 
 @router.get("/audio/{audio_filename}")
-async def get_audio_file(audio_filename: str, request: Request):
+async def get_audio_file(
+    audio_filename: str,
+    request: Request,
+    token: str = None
+):
     """Serve an audio file with HTTP Range request support for parallel chunk downloading."""
+    # Manual authentication check to support both Header and Query Param
+    try:
+        # 1. Check Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            id_token = auth_header.split("Bearer ")[1]
+            verify_firebase_token(id_token)
+        # 2. Check Query Parameter
+        elif token:
+            verify_firebase_token(token)
+        else:
+            raise HTTPException(status_code=403, detail="Not authenticated")
+    except Exception as e:
+        print(f"Auth failed for audio stream: {str(e)}")
+        raise HTTPException(status_code=403, detail="Authentication failed")
+
     try:
         audio_dir = Path(__file__).parent.parent / "audio_files"
         audio_path = audio_dir / audio_filename

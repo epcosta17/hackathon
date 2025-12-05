@@ -1,14 +1,20 @@
 """Notes and bookmarks API routes."""
-from fastapi import APIRouter, HTTPException
+from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Depends
 
 from models.schemas import NoteCreate, NoteUpdate
 from database import add_note, update_note, get_notes, delete_note
+from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/api", tags=["notes"])
 
 
 @router.post("/interviews/{interview_id}/notes")
-async def create_note(interview_id: int, note: NoteCreate):
+async def create_note(
+    interview_id: int,
+    note: NoteCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Add a note or bookmark to an interview."""
     try:
         note_id = add_note(interview_id, note.timestamp, note.content, note.is_bookmark)
@@ -18,7 +24,10 @@ async def create_note(interview_id: int, note: NoteCreate):
 
 
 @router.get("/interviews/{interview_id}/notes")
-async def get_interview_notes(interview_id: int):
+async def get_interview_notes(
+    interview_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Get all notes for an interview."""
     try:
         notes = get_notes(interview_id)
@@ -28,7 +37,11 @@ async def get_interview_notes(interview_id: int):
 
 
 @router.put("/notes/{note_id}")
-async def update_note_endpoint(note_id: int, note: NoteUpdate):
+async def update_note_endpoint(
+    note_id: int,
+    note: NoteUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Update an existing note."""
     try:
         success = update_note(note_id, note.content, note.is_bookmark)
@@ -42,7 +55,10 @@ async def update_note_endpoint(note_id: int, note: NoteUpdate):
 
 
 @router.delete("/notes/{note_id}")
-async def delete_note_endpoint(note_id: int):
+async def delete_note_endpoint(
+    note_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Delete a note."""
     try:
         success = delete_note(note_id)

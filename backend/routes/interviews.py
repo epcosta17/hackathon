@@ -2,8 +2,8 @@
 import os
 import uuid
 import json
-from typing import Optional
-from fastapi import APIRouter, HTTPException, File, Form, UploadFile
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, File, Form, UploadFile, Depends
 
 from models.schemas import SaveInterviewRequest, UpdateInterviewRequest
 from database import (
@@ -14,6 +14,7 @@ from database import (
     delete_interview,
     add_note
 )
+from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/api", tags=["interviews"])
 
@@ -26,7 +27,8 @@ async def create_interview(
     analysis_data: str = Form(...),
     notes: Optional[str] = Form(None),
     waveform_data: Optional[str] = Form(None),
-    audio_file: Optional[UploadFile] = File(None)
+    audio_file: Optional[UploadFile] = File(None),
+    current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Save a new interview to the database."""
     try:
@@ -79,7 +81,11 @@ async def create_interview(
 
 
 @router.put("/interviews/{interview_id}")
-async def update_interview_endpoint(interview_id: int, request: UpdateInterviewRequest):
+async def update_interview_endpoint(
+    interview_id: int,
+    request: UpdateInterviewRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Update an existing interview."""
     try:
         print(f"📝 [UPDATE] Interview ID: {interview_id}")
@@ -108,7 +114,10 @@ async def update_interview_endpoint(interview_id: int, request: UpdateInterviewR
 
 
 @router.get("/interviews/{interview_id}")
-async def get_interview_endpoint(interview_id: int):
+async def get_interview_endpoint(
+    interview_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Retrieve a specific interview by ID."""
     try:
         interview = get_interview(interview_id)
@@ -122,7 +131,10 @@ async def get_interview_endpoint(interview_id: int):
 
 
 @router.get("/interviews")
-async def get_interviews_endpoint(search: Optional[str] = None):
+async def get_interviews_endpoint(
+    search: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Retrieve all interviews or search by query."""
     try:
         if search:
@@ -135,7 +147,10 @@ async def get_interviews_endpoint(search: Optional[str] = None):
 
 
 @router.delete("/interviews/{interview_id}")
-async def delete_interview_endpoint(interview_id: int):
+async def delete_interview_endpoint(
+    interview_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Delete an interview."""
     try:
         success = delete_interview(interview_id)
@@ -149,7 +164,11 @@ async def delete_interview_endpoint(interview_id: int):
 
 
 @router.post("/interviews/{interview_id}/waveform")
-async def save_waveform(interview_id: int, waveform_data: list):
+async def save_waveform(
+    interview_id: int,
+    waveform_data: list,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """Save waveform visualization data for an interview."""
     try:
         from database import get_db

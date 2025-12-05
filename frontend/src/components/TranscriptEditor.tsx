@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Pause, Edit2, Sparkles, Eye, File, FileText, Home, StickyNote, Bookmark, FilePlus2, Trash2, Download, ChevronDown } from 'lucide-react';
+import { UserMenu } from './UserMenu';
+import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
@@ -21,7 +23,7 @@ interface Note {
 
 interface TranscriptEditorProps {
   transcriptBlocks: TranscriptBlock[];
-  setTranscriptBlocks: (blocks: TranscriptBlock[]) => void;
+  setTranscriptBlocks: React.Dispatch<React.SetStateAction<TranscriptBlock[]>>;
   onAnalysisComplete: (data: AnalysisData) => void;
   onViewAnalysis: () => void;
   onBackToUpload: () => void;
@@ -32,11 +34,11 @@ interface TranscriptEditorProps {
   existingAnalysis: AnalysisData | null;
   currentInterviewId: number | null;
   notes: Note[];
-  setNotes: (notes: Note[]) => void;
+  setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
 }
 
 export function TranscriptEditor({
-  transcriptBlocks,
+  transcriptBlocks = [],
   setTranscriptBlocks,
   onAnalysisComplete,
   onViewAnalysis,
@@ -47,7 +49,7 @@ export function TranscriptEditor({
   waveformData: waveformDataProp,
   existingAnalysis,
   currentInterviewId,
-  notes,
+  notes = [],
   setNotes,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -68,7 +70,7 @@ export function TranscriptEditor({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const notesScrollRef = useRef<HTMLDivElement | null>(null);
   const virtuosoRef = useRef<any>(null);
-  
+
   // Notes and Bookmarks state  
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -87,44 +89,44 @@ export function TranscriptEditor({
       // Existing interview - optimized parallel chunk downloading:
       // 1. Start with streaming URL for instant playback
       setLocalAudioUrl(audioUrl);
-      
+
       // 2. Download in parallel chunks for 2-5x faster speed
       let blobUrl: string | null = null;
       const abortController = new AbortController();
       let isDownloading = true;
-      
+
       const downloadWithParallelChunks = async () => {
         try {
           console.log('🚀 Starting optimized parallel chunk download...');
-          
+
           // First, get file size by fetching headers only
-          const headResponse = await fetch(audioUrl, { 
+          const headResponse = await authenticatedFetch(audioUrl, {
             method: 'HEAD',
-            signal: abortController.signal 
+            signal: abortController.signal
           });
           const fileSize = parseInt(headResponse.headers.get('content-length') || '0');
           const supportsRange = headResponse.headers.get('accept-ranges') === 'bytes';
-          
+
           if (!supportsRange || fileSize === 0) {
             // Fallback to regular download if Range not supported
             console.log('⚠️ Range requests not supported, falling back to standard download');
-            const response = await fetch(audioUrl, { signal: abortController.signal });
+            const response = await authenticatedFetch(audioUrl, { signal: abortController.signal });
             const blob = await response.blob();
-            
+
             if (abortController.signal.aborted) {
               console.log('🛑 Download cancelled before blob creation');
               return;
             }
-            
+
             blobUrl = URL.createObjectURL(blob);
-            
+
             // Save state and switch to blob
             const audio = audioRef.current;
             const wasPlaying = audio && !audio.paused;
             const savedTime = audio ? audio.currentTime : 0;
-            
+
             setLocalAudioUrl(blobUrl);
-            
+
             // Restore playback state
             setTimeout(() => {
               if (audio && blobUrl) {
@@ -144,36 +146,36 @@ export function TranscriptEditor({
             }, 100);
             return;
           }
-          
+
           // Calculate optimal chunk size and count
           const duration = audioDuration || 180; // Fallback to 3 minutes if unknown
           const chunkSize = 2 * 1024 * 1024; // 2MB chunks
           const chunkCount = Math.ceil(fileSize / chunkSize);
           const actualChunks = Math.min(chunkCount, 8); // Max 8 parallel chunks
           const actualChunkSize = Math.ceil(fileSize / actualChunks);
-          
+
           console.log(`📦 File size: ${(fileSize / 1024 / 1024).toFixed(2)}MB, downloading ${actualChunks} chunks in parallel`);
-          
+
           // Create chunk ranges
           const chunks = Array.from({ length: actualChunks }, (_, i) => {
             const start = i * actualChunkSize;
             const end = Math.min(start + actualChunkSize - 1, fileSize - 1);
             return { index: i, start, end };
           });
-          
+
           // Download chunks in parallel (respecting browser connection limit of 6)
           const batchSize = 6;
           const chunkBlobs: Blob[] = new Array(actualChunks);
-          
+
           for (let i = 0; i < chunks.length; i += batchSize) {
             if (abortController.signal.aborted) {
               console.log('🛑 Download cancelled during chunk processing');
               return;
             }
-            
+
             const batch = chunks.slice(i, i + batchSize);
             const batchPromises = batch.map(async (chunk) => {
-              const response = await fetch(audioUrl, {
+              const response = await authenticatedFetch(audioUrl, {
                 headers: { 'Range': `bytes=${chunk.start}-${chunk.end}` },
                 signal: abortController.signal
               });
@@ -186,46 +188,46 @@ export function TranscriptEditor({
             });
             await Promise.all(batchPromises);
           }
-          
+
           // Combine all chunks into single blob
           if (abortController.signal.aborted) {
             console.log('🛑 Download cancelled before reassembly');
             return;
           }
-          
+
           console.log('🔧 Reassembling chunks...');
           const fullBlob = new Blob(chunkBlobs, { type: 'audio/mpeg' });
           blobUrl = URL.createObjectURL(fullBlob);
           console.log('✅ All chunks downloaded and assembled!');
-          
+
           // Save current playback state before switching
           const audio = audioRef.current;
           const wasPlaying = audio && !audio.paused;
           const savedTime = audio ? audio.currentTime : 0;
-          
+
           console.log(`💾 Saving state - Time: ${savedTime.toFixed(2)}s, Playing: ${wasPlaying}`);
-          
+
           // Switch to blob URL for better seeking performance
           setLocalAudioUrl(blobUrl);
-          
+
           // Wait for audio element to update, then restore playback state
           setTimeout(() => {
             if (audio && blobUrl) {
               // Force audio to load the new source
               audio.load();
-              
+
               // Wait for audio to be ready
               const restorePlayback = () => {
                 audio.currentTime = savedTime;
                 console.log(`✅ Restored time to ${savedTime.toFixed(2)}s`);
-                
+
                 if (wasPlaying) {
                   audio.play()
                     .then(() => console.log('▶️ Playback resumed'))
                     .catch(err => console.error('Failed to resume playback:', err));
                 }
               };
-              
+
               // Listen for when audio is ready
               if (audio.readyState >= 2) {
                 // Audio already loaded enough data
@@ -247,9 +249,9 @@ export function TranscriptEditor({
           isDownloading = false;
         }
       };
-      
+
       downloadWithParallelChunks();
-      
+
       // Cleanup: Cancel download and revoke blob URL when navigating away
       return () => {
         if (isDownloading) {
@@ -265,14 +267,14 @@ export function TranscriptEditor({
       setLocalAudioUrl(null);
     }
   }, [audioFile, audioUrl, audioDuration]);
-  
+
   // Set stored duration immediately if available (from database)
   useEffect(() => {
     if (audioDuration) {
       setDuration(audioDuration);
     }
   }, [audioDuration]);
-  
+
   // Use pre-generated waveform from props (from database or transcription)
   useEffect(() => {
     if (waveformDataProp && waveformDataProp.length > 0) {
@@ -280,7 +282,7 @@ export function TranscriptEditor({
       setWaveformData(waveformDataProp);
     }
   }, [waveformDataProp]);
-  
+
   // Generate waveform visualization when audio is cached locally (fallback)
   useEffect(() => {
     const generateWaveform = async () => {
@@ -288,61 +290,61 @@ export function TranscriptEditor({
       if (waveformData.length > 0) {
         return;
       }
-      
+
       if (!localAudioUrl || !localAudioUrl.startsWith('blob:') || isGeneratingWaveform) {
         return;
       }
-      
+
       try {
         setIsGeneratingWaveform(true);
         console.log('🎵 Generating waveform visualization...');
-        
+
         // Fetch audio data
-        const response = await fetch(localAudioUrl);
+        const response = await authenticatedFetch(localAudioUrl);
         const arrayBuffer = await response.arrayBuffer();
-        
+
         // Create audio context
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        
+
         // Get channel data (use first channel)
         const channelData = audioBuffer.getChannelData(0);
         const samples = 250; // Number of bars to display (increased for more detail)
         const blockSize = Math.floor(channelData.length / samples);
         const waveform: number[] = [];
-        
+
         // Calculate RMS (Root Mean Square) for each block for smoother visualization
         for (let i = 0; i < samples; i++) {
           const start = blockSize * i;
           let sum = 0;
-          
+
           for (let j = 0; j < blockSize; j++) {
             const sample = channelData[start + j];
             sum += sample * sample;
           }
-          
+
           const rms = Math.sqrt(sum / blockSize);
           waveform.push(rms);
         }
-        
+
         // Normalize to 0-1 range
         const max = Math.max(...waveform);
-        const normalized = waveform.map(val => val / max);
-        
-        setWaveformData(normalized);
+        const normalizedWaveform = waveform.map(val => val / max);
+
+        setWaveformData(normalizedWaveform);
         console.log('✅ Waveform generated with 250 bars (high detail)');
-        
+
         // Save to database if we have an interview ID
         if (currentInterviewId) {
           try {
-            await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/waveform`, {
+            await authenticatedFetch(`/api/interviews/${currentInterviewId}/waveform`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(normalized),
+              body: JSON.stringify({ waveform_data: normalizedWaveform }),
             });
-            console.log('💾 Waveform saved to database for next time');
-          } catch (error) {
-            console.error('Failed to save waveform:', error);
+            console.log('💾 Waveform saved to database');
+          } catch (err) {
+            console.error('Failed to save waveform:', err);
           }
         }
       } catch (error) {
@@ -351,7 +353,7 @@ export function TranscriptEditor({
         setIsGeneratingWaveform(false);
       }
     };
-    
+
     generateWaveform();
   }, [localAudioUrl, currentInterviewId, waveformData.length]);
 
@@ -369,21 +371,25 @@ export function TranscriptEditor({
       return;
     }
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`);
-      if (response.ok) {
-        const data = await response.json();
-        setNotes(data.notes || []);
-        console.timeEnd('Fetch Notes');
+      const notesData = await getJSON(`/api/interviews/${currentInterviewId}/notes`);
+      if (notesData && Array.isArray(notesData.notes)) {
+        setNotes(notesData.notes);
+      } else if (Array.isArray(notesData)) {
+        setNotes(notesData);
+      } else {
+        console.error('Unexpected notes data format:', notesData);
+        setNotes([]);
       }
+      console.timeEnd('Fetch Notes');
     } catch (error) {
-      console.error('Failed to fetch notes:', error);
+      console.error('Failed to load notes:', error);
       console.timeEnd('Fetch Notes');
     }
   };
 
   const addNote = async (isBookmark: boolean = false) => {
     if (!newNoteContent.trim() && !isBookmark) return;
-    
+
     // If no interview ID, store locally
     if (!currentInterviewId) {
       const newNote: Note = {
@@ -401,25 +407,33 @@ export function TranscriptEditor({
       toast.success(isBookmark ? 'Bookmark added!' : 'Note added!');
       return;
     }
-    
+
     // If interview exists, save to backend
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await postJSON(`/api/interviews/${currentInterviewId}/notes`, {
+        timestamp: currentTime,
+        content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
+        is_bookmark: isBookmark,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // Backend returns { id: number, message: string }
+        // We need to construct the full note object for the state
+        const savedNote: Note = {
+          id: result.id,
+          interview_id: currentInterviewId,
           timestamp: currentTime,
           content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
           is_bookmark: isBookmark,
-        }),
-      });
-      
-      if (response.ok) {
-        await fetchNotes();
-        setNewNoteContent('');
-        setIsAddingNote(false);
-        toast.success(isBookmark ? 'Bookmark added!' : 'Note added!');
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setNotes((prev: Note[]) => [...prev, savedNote]);
       }
+      setNewNoteContent('');
+      setIsAddingNote(false);
+      toast.success(isBookmark ? 'Bookmark added!' : 'Note added!');
     } catch (error) {
       console.error('Failed to add note:', error);
       toast.error('Failed to add note');
@@ -433,17 +447,15 @@ export function TranscriptEditor({
       toast.success('Note deleted!');
       return;
     }
-    
+
     // If interview exists, delete from backend
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/notes/${noteId}`, {
+      await authenticatedFetch(`/api/notes/${noteId}`, {
         method: 'DELETE',
       });
-      
-      if (response.ok) {
-        await fetchNotes();
-        toast.success('Note deleted!');
-      }
+
+      setNotes((prev: Note[]) => prev.filter((n: Note) => n.id !== noteId));
+      toast.success('Note deleted!');
     } catch (error) {
       console.error('Failed to delete note:', error);
       toast.error('Failed to delete note');
@@ -492,7 +504,7 @@ export function TranscriptEditor({
       const endTime = formatSRTTime(block.timestamp + block.duration);
       return `${index + 1}\n${startTime} --> ${endTime}\n${block.text}\n`;
     }).join('\n');
-    
+
     const blob = new Blob([srtContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -521,14 +533,14 @@ export function TranscriptEditor({
     }
     setCurrentTime(timestamp);
     setIsPlaying(true); // Update play/pause icon state
-    
+
     // Find the block for this timestamp and scroll instantly (no animation)
     const targetBlock = transcriptBlocks.find(
       (block) => timestamp >= block.timestamp && timestamp < block.timestamp + block.duration
     ) || transcriptBlocks
       .filter(b => b.timestamp <= timestamp)
       .sort((a, b) => b.timestamp - a.timestamp)[0];
-    
+
     // Scroll to the target block using Virtuoso
     if (targetBlock && virtuosoRef.current) {
       const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
@@ -542,7 +554,7 @@ export function TranscriptEditor({
         }, 50);
       }
     }
-    
+
     // Keep auto-scroll enabled for future playback
     setAutoScrollEnabled(true);
   };
@@ -585,19 +597,19 @@ export function TranscriptEditor({
     let block = transcriptBlocks.find(
       (block) => currentTime >= block.timestamp && currentTime < block.timestamp + block.duration
     );
-    
+
     // If no exact match, find the closest block (last one before or at current time)
     if (!block && transcriptBlocks.length > 0) {
       block = transcriptBlocks
         .filter(b => b.timestamp <= currentTime)
         .sort((a, b) => b.timestamp - a.timestamp)[0];
-      
+
       // If still nothing, just use the first block
       if (!block) {
         block = transcriptBlocks[0];
       }
     }
-    
+
     return block;
   };
 
@@ -643,12 +655,12 @@ export function TranscriptEditor({
 
   const handleSeekBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!seekBarRef.current || !duration) return;
-    
+
     const rect = seekBarRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
     const time = percentage * duration;
-    
+
     setHoverTime(Math.max(0, Math.min(time, duration)));
     setHoverPosition(x);
   };
@@ -660,27 +672,23 @@ export function TranscriptEditor({
 
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
-    
+
     try {
       // Send full transcript with timestamps and speakers
-      const response = await fetch('http://127.0.0.1:8000/api/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transcript_blocks: transcriptBlocks
-        }),
+      const fullText = transcriptBlocks.map(b => b.text).join(' ');
+
+      const response = await postJSON('/api/analyze', {
+        transcript_text: fullText,
+        transcript_blocks: transcriptBlocks
       });
 
-      if (response.ok) {
-        const data: AnalysisData = await response.json();
-        onAnalysisComplete(data);
-        toast.success('Analysis completed successfully!');
-      } else {
-        console.error('Analysis failed:', response.statusText);
-        toast.error('Analysis failed. Please try again.');
+      if (!response.ok) {
+        throw new Error('Analysis failed');
       }
+
+      const data: AnalysisData = await response.json();
+      onAnalysisComplete(data);
+      toast.success('Analysis completed successfully!');
     } catch (error) {
       console.error('Error during analysis:', error);
       toast.error('An error occurred during analysis. Please try again.');
@@ -691,7 +699,11 @@ export function TranscriptEditor({
 
   const [wasPlayingBeforeEdit, setWasPlayingBeforeEdit] = useState(false);
 
-  const handleSegmentClick = useCallback((blockId: string) => {
+  const handleSegmentClick = useCallback((blockId: string | null) => {
+    if (blockId === null) {
+      setEditingBlockId(null);
+      return;
+    }
     if (isPlaying) {
       setWasPlayingBeforeEdit(true);
       audioRef.current?.pause();
@@ -722,15 +734,15 @@ export function TranscriptEditor({
       audio.play();
       setIsPlaying(true);
     }
-    
+
     setAutoScrollEnabled(true);
-    
+
     const targetBlock = transcriptBlocks.find(
       (block) => timestamp >= block.timestamp && timestamp < block.timestamp + block.duration
     ) || transcriptBlocks
       .filter(b => b.timestamp <= timestamp)
       .sort((a, b) => b.timestamp - a.timestamp)[0];
-    
+
     if (targetBlock) {
       const blockIndex = transcriptBlocks.findIndex(b => b.id === targetBlock.id);
       if (blockIndex !== -1 && virtuosoRef.current) {
@@ -744,8 +756,8 @@ export function TranscriptEditor({
   }, [transcriptBlocks]);
 
   const handleBlockEdit = useCallback((id: string, newText: string) => {
-    setTranscriptBlocks((prevBlocks) =>
-      prevBlocks.map((block) =>
+    setTranscriptBlocks((prevBlocks: TranscriptBlock[]) =>
+      prevBlocks.map((block: TranscriptBlock) =>
         block.id === id ? { ...block, text: newText, words: [] } : block
       )
     );
@@ -775,7 +787,7 @@ export function TranscriptEditor({
       {localAudioUrl && (
         <audio ref={audioRef} src={localAudioUrl} preload="metadata" />
       )}
-      
+
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-8 py-4">
@@ -814,7 +826,7 @@ export function TranscriptEditor({
                 <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
                 {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
               </Button>
-              
+
               {/* Export Dropdown */}
               <div style={{ position: 'relative' }}>
                 <Button
@@ -840,11 +852,11 @@ export function TranscriptEditor({
       </header>
 
       {/* Audio Player */}
-      <motion.div 
+      <motion.div
         className="border-b border-zinc-800 bg-zinc-900/30 flex-shrink-0"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ 
+        transition={{
           duration: 0.5,
           delay: 0.1,
           ease: [0.43, 0.13, 0.23, 0.96]
@@ -855,7 +867,7 @@ export function TranscriptEditor({
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
+              transition={{
                 duration: 0.4,
                 delay: 0.2
               }}
@@ -875,12 +887,12 @@ export function TranscriptEditor({
                 )}
               </Button>
             </motion.div>
-            
-            <motion.div 
+
+            <motion.div
               className="flex-1 flex items-center gap-4"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ 
+              transition={{
                 duration: 0.5,
                 delay: 0.2,
                 ease: [0.43, 0.13, 0.23, 0.96]
@@ -889,7 +901,7 @@ export function TranscriptEditor({
               <span className="text-zinc-400 text-sm min-w-[3rem]">
                 {formatTime(currentTime)}
               </span>
-              <div 
+              <div
                 ref={seekBarRef}
                 className="flex-1 relative"
                 onMouseMove={handleSeekBarHover}
@@ -904,7 +916,7 @@ export function TranscriptEditor({
                         const barProgress = (index / waveformData.length) * 100;
                         const isPlayed = barProgress <= progress;
                         const height = Math.max(amplitude * 100, 4); // Min 4% height
-                        
+
                         return (
                           <div
                             key={index}
@@ -918,7 +930,7 @@ export function TranscriptEditor({
                               className="w-full rounded-full transition-all duration-150"
                               style={{
                                 height: `${height}%`,
-                                backgroundColor: isPlayed 
+                                backgroundColor: isPlayed
                                   ? 'rgb(99, 102, 241)' // Indigo for played
                                   : 'rgb(63, 63, 70)', // Zinc-700 for unplayed
                               }}
@@ -931,14 +943,14 @@ export function TranscriptEditor({
                     // Fallback to simple progress bar while waveform loads
                     <div className="absolute inset-0 flex items-center px-2">
                       <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-150"
                           style={{ width: `${(currentTime / duration) * 100}%` }}
                         />
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Invisible range input for seeking */}
                   <input
                     type="range"
@@ -949,10 +961,10 @@ export function TranscriptEditor({
                     onChange={handleScrub}
                     className="absolute inset-0 w-full h-full appearance-none cursor-pointer bg-transparent opacity-0 z-10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:opacity-100"
                   />
-                  
+
                   {/* Playhead indicator */}
                   {waveformData.length > 0 && (
-                    <div 
+                    <div
                       className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none z-20"
                       style={{ left: `${(currentTime / duration) * 100}%` }}
                     >
@@ -983,11 +995,11 @@ export function TranscriptEditor({
           <div className="flex w-full h-full">
             {/* Left Side - Notes & Bookmarks (20%) */}
             <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden bg-zinc-900/10 flex-shrink-0" style={{ width: '20%' }}>
-              <motion.div 
+              <motion.div
                 className="p-6 pb-4 flex items-center justify-between flex-shrink-0"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ 
+                transition={{
                   duration: 0.4,
                   ease: [0.43, 0.13, 0.23, 0.96]
                 }}
@@ -1005,19 +1017,19 @@ export function TranscriptEditor({
                     onClick={() => setIsAddingNote(!isAddingNote)}
                     className="p-1.5 hover:bg-zinc-800 rounded transition-colors"
                     title="Add Note"
-                  > 
+                  >
                     <FilePlus2 className="w-4 h-4 text-indigo-400 hover:text-indigo-300 transition-colors" />
                   </button>
                 </div>
               </motion.div>
-              
+
               {isAddingNote && (
-                <motion.div 
+                <motion.div
                   className="px-6 pb-6 flex-shrink-0"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ 
+                  transition={{
                     duration: 0.3,
                     ease: [0.43, 0.13, 0.23, 0.96]
                   }}
@@ -1066,7 +1078,7 @@ export function TranscriptEditor({
                   </div>
                 </motion.div>
               )}
-              
+
               <div
                 ref={notesScrollRef}
                 className="flex-1 overflow-y-auto px-6 pb-6"
@@ -1085,7 +1097,7 @@ export function TranscriptEditor({
                         key={note.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ 
+                        transition={{
                           duration: 0.4,
                           delay: index * 0.1,
                           ease: [0.43, 0.13, 0.23, 0.96]
@@ -1115,14 +1127,14 @@ export function TranscriptEditor({
                 </div>
               </div>
             </div>
-            
+
             {/* Middle - Transcript (45%) */}
             <div className="border-r border-zinc-800 flex flex-col h-full overflow-hidden flex-shrink-0" style={{ width: '45%' }}>
-              <motion.div 
+              <motion.div
                 className="p-8 pb-4 flex items-center justify-between flex-shrink-0"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ 
+                transition={{
                   duration: 0.4,
                   delay: 0.05,
                   ease: [0.43, 0.13, 0.23, 0.96]
@@ -1135,7 +1147,7 @@ export function TranscriptEditor({
                   Scroll to view all segments
                 </span>
               </motion.div>
-              <motion.div 
+              <motion.div
                 ref={scrollContainerRef}
                 className="flex-1 px-8 pt-6 pb-8 pr-12" // Increased right padding
                 style={{ height: 'calc(100vh - 260px)' }}
@@ -1152,8 +1164,8 @@ export function TranscriptEditor({
                   onTouchMove={() => setAutoScrollEnabled(false)}
                   components={{
                     List: React.forwardRef<HTMLDivElement, { style?: React.CSSProperties; children?: React.ReactNode }>(({ style, children }, ref) => (
-                      <div 
-                        ref={ref} 
+                      <div
+                        ref={ref}
                         style={{ ...style, maxWidth: '900px', width: '100%', paddingRight: '16px' }} // Added paddingRight
                       >
                         {children}
@@ -1176,7 +1188,7 @@ export function TranscriptEditor({
                       />
                     );
                   }}
-                  />
+                />
               </motion.div>
             </div>
 
@@ -1184,11 +1196,11 @@ export function TranscriptEditor({
             <div className="bg-zinc-900/20 p-8 overflow-y-auto h-full flex-shrink-0" style={{ width: '35%' }}>
               <div className="space-y-6">
                 {/* How to Use - Top */}
-                <motion.div 
+                <motion.div
                   className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ 
+                  transition={{
                     duration: 0.4,
                     delay: 0.1
                   }}
@@ -1222,11 +1234,11 @@ export function TranscriptEditor({
                 </motion.div>
 
                 {/* Confidence Colors - Middle */}
-                <motion.div 
+                <motion.div
                   className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ 
+                  transition={{
                     duration: 0.4,
                     delay: 0.2
                   }}
@@ -1261,11 +1273,11 @@ export function TranscriptEditor({
                 </motion.div>
 
                 {/* Statistics - Bottom */}
-                <motion.div 
+                <motion.div
                   className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ 
+                  transition={{
                     duration: 0.4,
                     delay: 0.3
                   }}
@@ -1294,17 +1306,17 @@ export function TranscriptEditor({
           </div>
         </div>
       </div>
-      
+
       {/* Export Menu Portal - This will render the menu outside of the header's stacking context */}
       {showExportMenu && createPortal(
         <>
           {/* Backdrop */}
-          <div 
+          <div
             style={{ position: 'fixed', inset: 0, zIndex: 999 }}
             onClick={() => setShowExportMenu(false)}
           />
           {/* Menu */}
-          <div 
+          <div
             style={{
               position: 'fixed',
               top: `${exportMenuPosition.top}px`,

@@ -6,13 +6,15 @@ import { Input } from './ui/input';
 import { AnalysisData } from '../App';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { 
-  SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql, 
-  SiJest, SiDocker, SiKubernetes, SiGithubactions, SiFigma, SiPython, 
-  SiJavascript, SiGo, SiRust, SiMongodb, SiMysql, SiRedis, 
+import {
+  SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql,
+  SiJest, SiDocker, SiKubernetes, SiGithubactions, SiFigma, SiPython,
+  SiJavascript, SiGo, SiRust, SiMongodb, SiMysql, SiRedis,
   SiGraphql, SiVuedotjs, SiAngular, SiDjango, SiFlask, SiFastapi,
   SiTailwindcss, SiBootstrap, SiAmazon, SiGooglecloud
 } from 'react-icons/si';
+import { UserMenu } from './UserMenu';
+import { getJSON, postJSON, postFormData, authenticatedFetch } from '../utils/api';
 
 interface Note {
   id: number;
@@ -39,8 +41,8 @@ interface AnalysisDashboardProps {
   onAnalysisSaved: () => void;
 }
 
-export function AnalysisDashboard({ 
-  analysisData, 
+export function AnalysisDashboard({
+  analysisData,
   transcriptBlocks,
   onBackToUpload,
   onBackToEditor,
@@ -57,13 +59,13 @@ export function AnalysisDashboard({
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
-  
+
   useEffect(() => {
     if (currentInterviewTitle) {
       setInterviewTitle(currentInterviewTitle);
     }
   }, [currentInterviewTitle]);
-  
+
   const [expandedSections, setExpandedSections] = useState({
     keyPoints: true,
     coding: true,
@@ -79,14 +81,11 @@ export function AnalysisDashboard({
       if (analysisData && transcriptBlocks.length > 0) {
         // Generate DOCX from existing analysis data (without re-analyzing)
         try {
-          const response = await fetch('http://127.0.0.1:8000/api/generate-report', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              analysis_data: analysisData,
-              transcript_blocks: transcriptBlocks 
-            }),
+          const response = await postJSON('/api/generate-report', {
+            analysis_data: analysisData,
+            transcript_blocks: transcriptBlocks
           });
+
           if (response.ok) {
             const data = await response.json();
             // Update the docx_path if needed
@@ -108,9 +107,8 @@ export function AnalysisDashboard({
     const loadInterviewTitle = async () => {
       if (currentInterviewId) {
         try {
-          const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`);
-          if (response.ok) {
-            const interview = await response.json();
+          const interview = await getJSON(`/api/interviews/${currentInterviewId}`);
+          if (interview) {
             setInterviewTitle(interview.title || '');
           }
         } catch (error) {
@@ -131,7 +129,7 @@ export function AnalysisDashboard({
   const getTechIcon = (techName: string) => {
     const name = techName.toLowerCase();
     const iconProps = { className: "w-6 h-6", style: { color: '#a855f7' } };
-    
+
     if (name.includes('react')) return <SiReact {...iconProps} />;
     if (name.includes('next')) return <SiNextdotjs {...iconProps} />;
     if (name.includes('typescript')) return <SiTypescript {...iconProps} />;
@@ -160,7 +158,7 @@ export function AnalysisDashboard({
     if (name.includes('bootstrap')) return <SiBootstrap {...iconProps} />;
     if (name.includes('aws') || name.includes('amazon')) return <SiAmazon {...iconProps} />;
     if (name.includes('gcp') || name.includes('google cloud')) return <SiGooglecloud {...iconProps} />;
-    
+
     // Default icon for unknown technologies
     return <Code {...iconProps} />;
   };
@@ -190,12 +188,8 @@ export function AnalysisDashboard({
           analysis_data: analysisData,
         };
         console.log('📤 PUT request body:', requestBody);
-        
-        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${currentInterviewId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
+
+        const response = await postJSON(`/api/interviews/${currentInterviewId}`, requestBody, { method: 'PUT' });
 
         console.log('PUT response status:', response.status);
         if (response.ok) {
@@ -216,26 +210,23 @@ export function AnalysisDashboard({
         formData.append('transcript_text', transcriptText);
         formData.append('transcript_words', JSON.stringify(transcriptBlocks));
         formData.append('analysis_data', JSON.stringify(analysisData));
-        
+
         // Add notes if available
         if (notes.length > 0) {
           formData.append('notes', JSON.stringify(notes));
         }
-        
+
         // Add waveform data if available
         if (waveformData && waveformData.length > 0) {
           formData.append('waveform_data', JSON.stringify(waveformData));
         }
-        
+
         // Add audio file if available
         if (audioFile) {
           formData.append('audio_file', audioFile);
         }
 
-        const response = await fetch('http://127.0.0.1:8000/api/interviews', {
-          method: 'POST',
-          body: formData,
-        });
+        const response = await postFormData('/api/interviews', formData);
 
         if (response.ok) {
           const result = await response.json();
@@ -264,7 +255,7 @@ export function AnalysisDashboard({
 
     setIsDownloading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/download-report', {
+      const response = await authenticatedFetch('/api/download-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -410,6 +401,7 @@ export function AnalysisDashboard({
                 <Download className="w-4 h-4 mr-2" />
                 {isDownloading ? 'Generating...' : 'Download Report'}
               </Button>
+              <UserMenu />
             </div>
           </div>
         </div>
@@ -421,14 +413,14 @@ export function AnalysisDashboard({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ 
+            transition={{
               duration: 0.5,
               delay: 0.1,
               ease: [0.43, 0.13, 0.23, 0.96]
             }}
             className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6 mb-8"
           >
-            <motion.div 
+            <motion.div
               className="flex items-center gap-3 mb-6"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -441,12 +433,11 @@ export function AnalysisDashboard({
             {/* Score Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Communication Score */}
-              <motion.div 
-                className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/30 rounded-lg p-6 relative"
+              <motion.div
+                className="p-2 relative"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.3 }}
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               >
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-green-500/10 rounded-lg">
@@ -455,7 +446,7 @@ export function AnalysisDashboard({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-zinc-400 text-sm">Communication Score</p>
-                      <div 
+                      <div
                         ref={communicationRef}
                         className="relative cursor-help"
                         onMouseEnter={() => handleTooltipEnter('communication', communicationRef)}
@@ -478,12 +469,11 @@ export function AnalysisDashboard({
               </motion.div>
 
               {/* Technical Depth */}
-              <motion.div 
-                className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-indigo-800/30 rounded-lg p-6 relative"
+              <motion.div
+                className="p-2 relative"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.4 }}
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               >
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-indigo-500/10 rounded-lg">
@@ -492,7 +482,7 @@ export function AnalysisDashboard({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-zinc-400 text-sm">Technical Depth</p>
-                      <div 
+                      <div
                         ref={technicalRef}
                         className="relative cursor-help"
                         onMouseEnter={() => handleTooltipEnter('technical', technicalRef)}
@@ -515,12 +505,11 @@ export function AnalysisDashboard({
               </motion.div>
 
               {/* Engagement Score */}
-              <motion.div 
-                className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-800/30 rounded-lg p-6 relative"
+              <motion.div
+                className="p-2 relative"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
-                whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
               >
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-yellow-500/10 rounded-lg">
@@ -529,7 +518,7 @@ export function AnalysisDashboard({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-zinc-400 text-sm">Engagement Score</p>
-                      <div 
+                      <div
                         ref={engagementRef}
                         className="relative cursor-help"
                         onMouseEnter={() => handleTooltipEnter('engagement', engagementRef)}
@@ -554,7 +543,7 @@ export function AnalysisDashboard({
                 </div>
               </motion.div>
             </div>
-            <motion.div 
+            <motion.div
               className="flex flex-wrap justify-between items-center gap-x-8 gap-y-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -763,7 +752,7 @@ export function AnalysisDashboard({
                       {analysisData.technologies.map((tech, idx) => (
                         <div
                           key={idx}
-                          className="px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-400/30 rounded-lg hover:from-purple-500/30 hover:to-indigo-500/30 transition-colors"
+                          className="px-4 py-2.5 rounded-lg hover:bg-zinc-800/50 transition-colors"
                         >
                           <div className="flex items-center gap-3 mb-1">
                             {getTechIcon(tech.name)}
@@ -847,7 +836,7 @@ export function AnalysisDashboard({
 
       {/* Save Interview Dialog */}
       {showSaveDialog && typeof document !== 'undefined' && createPortal(
-        <div 
+        <div
           style={{
             position: 'fixed',
             inset: 0,
@@ -875,18 +864,18 @@ export function AnalysisDashboard({
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
             }}
           >
-            <h3 style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
-              color: 'white', 
-              marginBottom: '8px' 
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '8px'
             }}>
               {currentInterviewId ? 'Update Interview' : 'Save Interview'}
             </h3>
-            <p style={{ 
-              color: '#a1a1aa', 
+            <p style={{
+              color: '#a1a1aa',
               marginBottom: '20px',
-              fontSize: '14px' 
+              fontSize: '14px'
             }}>
               Give this interview analysis a memorable title
             </p>
