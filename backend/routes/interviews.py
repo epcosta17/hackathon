@@ -32,6 +32,8 @@ async def create_interview(
 ):
     """Save a new interview to the database."""
     try:
+        user_id = current_user['uid']
+        
         # Parse JSON strings
         transcript_words_data = json.loads(transcript_words)
         analysis_data_dict = json.loads(analysis_data)
@@ -45,18 +47,20 @@ async def create_interview(
             file_extension = os.path.splitext(audio_file.filename)[1]
             audio_filename = f"{uuid.uuid4()}{file_extension}"
             
-            # DEVELOPMENT: Save locally and use API path
-            audio_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "audio_files")
-            os.makedirs(audio_dir, exist_ok=True)
-            audio_path = os.path.join(audio_dir, audio_filename)
+            # Upload to GCS
+            from services.storage_service import storage_service
+            import io
             
-            with open(audio_path, "wb") as f:
-                content = await audio_file.read()
-                f.write(content)
+            content = await audio_file.read()
+            f = io.BytesIO(content)
+            # Use user-scoped path for audio too
+            gcs_path = f"{user_id}/audio/{audio_filename}"
+            storage_service.upload_file(gcs_path, f, content_type=audio_file.content_type)
             
             audio_url = f"/api/audio/{audio_filename}"
         
         interview_id = save_interview(
+            user_id=user_id,
             title=title,
             transcript_text=transcript_text,
             transcript_words=transcript_words_data,
@@ -69,6 +73,7 @@ async def create_interview(
         if notes_data:
             for note in notes_data:
                 add_note(
+                    user_id=user_id,
                     interview_id=interview_id,
                     timestamp=note.get('timestamp', 0),
                     content=note.get('content', ''),
@@ -88,13 +93,11 @@ async def update_interview_endpoint(
 ):
     """Update an existing interview."""
     try:
+        user_id = current_user['uid']
         print(f"📝 [UPDATE] Interview ID: {interview_id}")
-        print(f"📝 [UPDATE] Title: {request.title}")
-        print(f"📝 [UPDATE] Has analysis_data: {request.analysis_data is not None}")
-        if request.analysis_data:
-            print(f"📝 [UPDATE] Analysis data keys: {list(request.analysis_data.keys())}")
         
         success = update_interview(
+            user_id=user_id,
             interview_id=interview_id,
             title=request.title,
             transcript_text=request.transcript_text,
@@ -104,7 +107,6 @@ async def update_interview_endpoint(
         if not success:
             raise HTTPException(status_code=404, detail="Interview not found")
         
-        print(f"✅ [UPDATE] Interview {interview_id} updated successfully")
         return {"message": "Interview updated successfully"}
     except HTTPException:
         raise
@@ -120,7 +122,8 @@ async def get_interview_endpoint(
 ):
     """Retrieve a specific interview by ID."""
     try:
-        interview = get_interview(interview_id)
+        user_id = current_user['uid']
+        interview = get_interview(user_id, interview_id)
         if not interview:
             raise HTTPException(status_code=404, detail="Interview not found")
         return interview
@@ -137,10 +140,11 @@ async def get_interviews_endpoint(
 ):
     """Retrieve all interviews or search by query."""
     try:
+        user_id = current_user['uid']
         if search:
-            interviews = get_interview_summaries(search)
+            interviews = get_interview_summaries(user_id, search)
         else:
-            interviews = get_interview_summaries()
+            interviews = get_interview_summaries(user_id)
         return {"interviews": interviews, "count": len(interviews)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve interviews: {str(e)}")
@@ -153,7 +157,8 @@ async def delete_interview_endpoint(
 ):
     """Delete an interview."""
     try:
-        success = delete_interview(interview_id)
+        user_id = current_user['uid']
+        success = delete_interview(user_id, interview_id)
         if not success:
             raise HTTPException(status_code=404, detail="Interview not found")
         return {"message": "Interview deleted successfully"}
@@ -171,19 +176,15 @@ async def save_waveform(
 ):
     """Save waveform visualization data for an interview."""
     try:
-        from database import get_db
-        import json
+        user_id = current_user['uid']
+        from services.storage_service import storage_service
         
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            'UPDATE interviews SET waveform_data = ? WHERE id = ?',
-            (json.dumps(waveform_data), interview_id)
-        )
-        
-        conn.commit()
-        conn.close()
+        # We need to construct the path manually or add a helper in database.py
+        # But database.py doesn't expose a simple 'save_waveform' update function.
+        # Let's use storage_service directly for this specific update, reusing the path logic.
+        # Ideally we add update_waveform to database.py, but for now:
+        gcs_path = f"{user_id}/interviews/{interview_id}/waveform.json"
+        storage_service.upload_json(gcs_path, waveform_data)
         
         return {"message": "Waveform saved successfully"}
     except Exception as e:

@@ -134,15 +134,18 @@ async def get_audio_file(
 ):
     """Serve an audio file with HTTP Range request support for parallel chunk downloading."""
     # Manual authentication check to support both Header and Query Param
+    user_id = None
     try:
         # 1. Check Authorization header
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             id_token = auth_header.split("Bearer ")[1]
-            verify_firebase_token(id_token)
+            decoded = await verify_firebase_token(id_token)
+            user_id = decoded['uid']
         # 2. Check Query Parameter
         elif token:
-            verify_firebase_token(token)
+            decoded = await verify_firebase_token(token)
+            user_id = decoded['uid']
         else:
             raise HTTPException(status_code=403, detail="Not authenticated")
     except Exception as e:
@@ -150,17 +153,16 @@ async def get_audio_file(
         raise HTTPException(status_code=403, detail="Authentication failed")
 
     try:
-        audio_dir = Path(__file__).parent.parent / "audio_files"
-        audio_path = audio_dir / audio_filename
+        from services.storage_service import storage_service
+        # Use user-scoped path
+        gcs_path = f"{user_id}/audio/{audio_filename}"
         
-        if not audio_path.exists():
+        metadata = storage_service.get_file_metadata(gcs_path)
+        if not metadata:
             raise HTTPException(status_code=404, detail="Audio file not found")
         
-        # Get file size
-        file_size = audio_path.stat().st_size
-        
-        # Determine content type
-        content_type = "audio/mpeg" if audio_filename.endswith(".mp3") else "audio/wav"
+        file_size = metadata['size']
+        content_type = metadata['content_type'] or ("audio/mpeg" if audio_filename.endswith(".mp3") else "audio/wav")
         
         # Parse Range header
         range_header = request.headers.get("range")
@@ -176,19 +178,14 @@ async def get_audio_file(
             end = min(end, file_size - 1)
             content_length = end - start + 1
             
-            # Read the requested chunk
+            # Read the requested chunk from GCS
             def iter_chunk():
-                with open(audio_path, mode="rb") as file_like:
-                    file_like.seek(start)
-                    remaining = content_length
-                    chunk_size = 8192  # 8KB chunks
-                    while remaining > 0:
-                        read_size = min(chunk_size, remaining)
-                        data = file_like.read(read_size)
-                        if not data:
-                            break
-                        remaining -= len(data)
-                        yield data
+                # GCS download_as_bytes is blocking, so we might want to chunk it if it's large
+                # But for typical audio chunks (browser requests), it's fine.
+                # Ideally we use a stream, but GCS python client doesn't expose a simple seekable stream easily.
+                # We can just fetch the range.
+                data = storage_service.get_file_range(gcs_path, start, end)
+                yield data
             
             # Return 206 Partial Content
             headers = {
@@ -205,8 +202,19 @@ async def get_audio_file(
         else:
             # No range request - serve full file
             def iterfile():
-                with open(audio_path, mode="rb") as file_like:
-                    yield from file_like
+                # Stream the whole file
+                # We can use blob.download_to_file() with a pipe, or just chunks.
+                # For simplicity with our service abstraction, let's just fetch it.
+                # Warning: Loading full file into memory is bad.
+                # Let's assume browsers usually use Range.
+                # If not, we should implement chunked streaming from GCS.
+                # storage_service.bucket.blob(gcs_path).download_to_file(file_obj)
+                # Let's use the underlying client for efficient streaming if possible.
+                blob = storage_service.bucket.blob(gcs_path)
+                with tempfile.NamedTemporaryFile() as tmp:
+                    blob.download_to_filename(tmp.name)
+                    with open(tmp.name, "rb") as f:
+                        yield from f
             
             headers = {
                 "Accept-Ranges": "bytes",

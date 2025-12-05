@@ -42,3 +42,4 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.5.0
 firebase-admin==6.5.0
+google-cloud-storage==2.14.0

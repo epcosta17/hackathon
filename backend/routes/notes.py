@@ -17,7 +17,8 @@ async def create_note(
 ):
     """Add a note or bookmark to an interview."""
     try:
-        note_id = add_note(interview_id, note.timestamp, note.content, note.is_bookmark)
+        user_id = current_user['uid']
+        note_id = add_note(user_id, interview_id, note.timestamp, note.content, note.is_bookmark)
         return {"id": note_id, "message": "Note created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create note: {str(e)}")
@@ -30,7 +31,8 @@ async def get_interview_notes(
 ):
     """Get all notes for an interview."""
     try:
-        notes = get_notes(interview_id)
+        user_id = current_user['uid']
+        notes = get_notes(user_id, interview_id)
         return {"notes": notes}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get notes: {str(e)}")
@@ -44,7 +46,8 @@ async def update_note_endpoint(
 ):
     """Update an existing note."""
     try:
-        success = update_note(note_id, note.content, note.is_bookmark)
+        user_id = current_user['uid']
+        success = update_note(user_id, note_id, note.content, note.is_bookmark)
         if not success:
             raise HTTPException(status_code=404, detail="Note not found")
         return {"message": "Note updated successfully"}
@@ -61,7 +64,8 @@ async def delete_note_endpoint(
 ):
     """Delete a note."""
     try:
-        success = delete_note(note_id)
+        user_id = current_user['uid']
+        success = delete_note(user_id, note_id)
         if not success:
             raise HTTPException(status_code=404, detail="Note not found")
         return {"message": "Note deleted successfully"}

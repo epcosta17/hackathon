@@ -23,3 +23,4 @@ backend/ai/*.bin
 
 extra/
 interviewlens-32576-5c17f1992c26.json
+.envrc
