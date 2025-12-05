@@ -42,70 +42,43 @@ def _get_interviews_ref(user_id: str):
 def _get_interview_doc(user_id: str, interview_id: int):
     return _get_interviews_ref(user_id).document(str(interview_id))
 
-def calculate_audio_duration(transcript_words: List[Dict[str, Any]]) -> Optional[float]:
-    """Calculate total audio duration from transcript blocks"""
-    if not transcript_words or len(transcript_words) == 0:
-        return None
-    last_block = transcript_words[-1]
-    # Check for both timestamp/duration or end_time
-    if 'timestamp' in last_block and 'duration' in last_block:
-        return last_block['timestamp'] + last_block['duration']
-    return None
+
 
 def save_interview(
     user_id: str,
+    interview_id: int,
     title: str,
-    transcript_text: str,
-    transcript_words: List[Dict[str, Any]],
-    analysis_data: Dict[str, Any],
-    audio_url: Optional[str] = None,
-    waveform_data: Optional[List[float]] = None
+    audio_url: Optional[str] = None
 ) -> int:
-    """Save a new interview to Firestore"""
-    print(f"💾 [SAVE] Saving interview with {len(transcript_words)} blocks...", flush=True)
-    interview_id = int(time.time() * 1000)
-    now = datetime.utcnow().isoformat()
-    
-    audio_duration = calculate_audio_duration(transcript_words)
-    
-    # Preview text
-    preview = transcript_text[:200] + '...' if len(transcript_text) > 200 else transcript_text
-
-    # 1. Main Document (Metadata)
-    interview_data = {
-        'id': interview_id, # Keep ID in body too for ease
-        'title': title,
-        'audio_url': audio_url,
-        'audio_duration': audio_duration,
-        'transcript_preview': preview,
-        'created_at': now,
-        'updated_at': now
-    }
+    """
+    Link audio URL to an interview or create minimal metadata if missing.
+    All distinct data (transcript, analysis, etc.) is now saved directly from Frontend.
+    """
+    print(f"💾 [SAVE] Linking audio_url for interview {interview_id}...", flush=True)
     
     doc_ref = _get_interview_doc(user_id, interview_id)
-    doc_ref.set(interview_data)
+    doc = doc_ref.get()
     
-    # 2. Sub-collection: data
-    # We split heavy data into separate docs to allow specialized loading
-    data_col = doc_ref.collection('data')
-    
-    # Transcript
-    data_col.document('transcript').set({
-        'text': transcript_text,
-        'words': transcript_words
-    })
-    
-    # Analysis
-    data_col.document('analysis').set(analysis_data)
-    
-    # Waveform
-    if waveform_data:
-        data_col.document('waveform').set({'data': waveform_data})
-        
-    # 3. Sub-collection: notes
-    # Empty initially, added via add_note
-    
-    print(f"✅ Saved interview {interview_id} to Firestore")
+    if not doc.exists:
+        # Fallback: Validation or minimal create if frontend failed?
+        # For now, let's assume valid flow is Frontend creates first.
+        # But we create basic doc just in case to avoid crash.
+        now = datetime.utcnow().isoformat()
+        interview_data = {
+            'id': interview_id,
+            'title': title,
+            'audio_url': audio_url,
+            'created_at': now,
+            'updated_at': now
+        }
+        doc_ref.set(interview_data, merge=True)
+        print(f"⚠️ [SAVE] Created missing document for {interview_id}")
+    else:
+        # Just update audio_url
+        if audio_url:
+            doc_ref.update({'audio_url': audio_url})
+            
+    print(f"✅ Linked audio for interview {interview_id}")
     return interview_id
 
 def update_interview(
@@ -136,7 +109,9 @@ def update_interview(
         
     # Transcript updates
     if transcript_words is not None:
-        updates['audio_duration'] = calculate_audio_duration(transcript_words)
+        # audio_duration should be passed in or handled by frontend. 
+        # We don't recalculate it here to avoid duplicate logic.
+        
         # Update preview
         t_text = transcript_text if transcript_text is not None else ""
         if not t_text and transcript_words:

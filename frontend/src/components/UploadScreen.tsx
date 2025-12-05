@@ -22,7 +22,7 @@ interface InterviewSummary {
 }
 
 interface UploadScreenProps {
-  onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[]) => void;
+  onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => void;
   onLoadInterview: (id: number) => void;
 }
 
@@ -265,7 +265,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
               // Transcription complete!
               setIsComplete(true);
               setTimeout(() => {
-                onTranscriptionComplete(data.transcript, file, data.waveform);
+                onTranscriptionComplete(data.transcript, file, data.waveform, data.audio_url);
               }, 1500); // Give user time to see "Transcription Finished" message
             }
           }

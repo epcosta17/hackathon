@@ -12,8 +12,8 @@ import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { db, auth } from './config/firebase';
-import { collection, query, where, getDocs, doc, getDoc, writeBatch } from 'firebase/firestore';
-import { getJSON, postJSON, postFormData, authenticatedFetch } from './utils/api';
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { authenticatedFetch } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 
@@ -120,10 +120,10 @@ function MainApp() {
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
-  const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
+  const [preUploadedAudioUrl, setPreUploadedAudioUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
 
@@ -134,13 +134,24 @@ function MainApp() {
     }
   }, [currentInterviewTitle]);
 
-  const handleTranscriptionComplete = (blocks: TranscriptBlock[], file: File, waveform?: number[]) => {
-    setTranscriptBlocks(blocks);
+  const handleTranscriptionComplete = (transcript: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => {
+    setTranscriptBlocks(transcript);
     setAudioFile(file);
-    setAudioUrl(null); // Clear URL when using new file
-    setAudioDuration(null); // Clear stored duration for new file
+    const url = URL.createObjectURL(file);
+    setAudioUrl(url); // Local blob for immediate playback
+    if (audioUrl) {
+      console.log('✅ Received pre-uploaded audio URL:', audioUrl);
+      setPreUploadedAudioUrl(audioUrl); // Remote URL for saving
+    } else {
+      console.warn('⚠️ No pre-uploaded audio URL received');
+    }
 
-    // Store waveform data if provided (from backend generation)
+    // Calculate duration from last timestamp
+    if (transcript.length > 0) {
+      const lastBlock = transcript[transcript.length - 1];
+      setAudioDuration(lastBlock.timestamp + lastBlock.duration);
+    }
+
     if (waveform && waveform.length > 0) {
       setWaveformData(waveform);
       console.log('✨ Received waveform from backend with', waveform.length, 'bars');
@@ -166,40 +177,29 @@ function MainApp() {
     // Auto-update if interview already exists
     if (currentInterviewId) {
       console.log('🔄 Auto-updating existing interview with new analysis...');
-      // We need to use the latest state, but state updates are async.
-      // So we'll construct the update payload directly here.
-      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
 
-      const updateInterview = async () => {
+      const updateAnalysis = async () => {
         try {
-          const requestBody = {
-            interview_id: currentInterviewId,
-            title: currentInterviewTitle, // Keep existing title
-            transcript_text: transcriptText,
-            transcript_words: transcriptBlocks,
-            analysis_data: dataWithTimestamp,
-          };
+          const uid = auth.currentUser?.uid;
+          if (!uid) return;
 
-          const response = await authenticatedFetch(`/api/interviews/${currentInterviewId}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          });
-          if (response.ok) {
-            console.log('✅ Auto-update successful');
-            toast.success('Interview updated with new analysis');
-            setHasNewAnalysis(false); // It's already saved
-          } else {
-            console.error('❌ Auto-update failed');
-          }
+          // Update Analysis Subcollection
+          const analysisRef = doc(db, 'users', uid, 'interviews', String(currentInterviewId), 'data', 'analysis');
+          await setDoc(analysisRef, dataWithTimestamp, { merge: true }); // set/merge is safer than update if doc missing
+
+          // Update Metadata (timestamp)
+          const interviewRef = doc(db, 'users', uid, 'interviews', String(currentInterviewId));
+          await setDoc(interviewRef, { updated_at: new Date().toISOString() }, { merge: true });
+
+          console.log('✅ Auto-update successful (Firestore)');
+          toast.success('Interview updated with new analysis');
+          setHasNewAnalysis(false);
         } catch (err) {
           console.error('❌ Auto-update error:', err);
         }
       };
 
-      updateInterview();
+      updateAnalysis();
     } else {
       // New interview (not saved yet) - just show analysis complete
       toast.success('Analysis completed successfully!');
@@ -210,8 +210,11 @@ function MainApp() {
     setHasNewAnalysis(false);
   };
 
-  const handleSaveInterview = async () => {
-    if (!interviewTitle.trim()) {
+  const handleSaveInterview = async (titleOverride?: string | number) => {
+    // Determine title: override (if string) or state
+    const titleToUse = (typeof titleOverride === 'string' && titleOverride) ? titleOverride : interviewTitle;
+
+    if (!titleToUse.trim()) {
       toast.error('Please enter a title for this interview');
       return;
     }
@@ -223,10 +226,13 @@ function MainApp() {
     }
 
     // 1. Optimistic UI: Close immediately
+    console.time('Save Dialog Close');
     setShowSaveDialog(false);
+    console.timeEnd('Save Dialog Close');
 
     // 2. Start Background Process
     const savePromise = async () => {
+      console.time('Save Promise Start');
       const uid = user.uid;
       // If creating new, generate ID. If updating, use existing.
       const interviewId = currentInterviewId || Date.now();
@@ -237,17 +243,21 @@ function MainApp() {
       const batch = writeBatch(db);
 
       // --- 1. Main Document (Metadata) ---
-      // Note: We do NOT set audio_url here anymore, the backend handles it.
       const interviewRef = doc(db, 'users', uid, 'interviews', String(interviewId));
       const interviewData: any = {
         id: interviewId,
-        title: interviewTitle,
+        title: titleToUse,
         transcript_preview: preview,
         updated_at: now,
       };
 
       if (!currentInterviewId) {
         interviewData.created_at = now;
+      }
+
+      // If we have a pre-uploaded audio URL (from concurrent upload), save it directly!
+      if (preUploadedAudioUrl) {
+        interviewData.audio_url = preUploadedAudioUrl;
       }
 
       // Calculate Duration
@@ -288,32 +298,41 @@ function MainApp() {
       }
 
       // --- 3. Commit Firestore Data ---
+      console.log('💾 Committing batch to Firestore...', {
+        id: interviewId,
+        blocks: transcriptBlocks.length,
+        audioUrl: preUploadedAudioUrl
+      });
       await batch.commit();
+      console.timeEnd('Save Promise Start');
 
-      // --- 4. Upload Audio to Backend (Hybrid) ---
-      if (audioFile) {
-        const formData = new FormData();
-        formData.append('audio_file', audioFile);
-
-        // This call goes to Backend -> Uploads to GCS -> Updates Firestore Doc
-        await postFormData(`/api/interviews/${interviewId}/audio`, formData);
+      // --- 4. Upload Audio to Backend (Hybrid/Fallback) ---
+      // REMOVED per user request to rely 100% on concurrent upload. 
+      // If preUploadedAudioUrl is missing, we log a warning but don't block.
+      if (!preUploadedAudioUrl && audioFile) {
+        console.warn('⚠️ Audio file exists but NO pre-uploaded URL. Audio might be missing on cloud.');
+        // Optional: Add toast warning?
       }
 
       return interviewId;
     };
 
-    toast.promise(savePromise(), {
-      loading: 'Saving interview...',
-      success: (id) => {
-        // Update state after success
-        setCurrentInterviewId(id);
-        setCurrentInterviewTitle(interviewTitle);
-        handleAnalysisSaved();
-        setAudioFile(null); // Clear file as it's saved
-        return 'Interview saved successfully!';
-      },
-      error: 'Failed to save interview'
-    });
+    // Yield to UI loop to ensure dialog closes visually first
+    setTimeout(() => {
+      toast.promise(savePromise(), {
+        loading: 'Saving interview in background...',
+        success: (id) => {
+          // Update state after success
+          setCurrentInterviewId(id);
+          setCurrentInterviewTitle(titleToUse);
+          handleAnalysisSaved();
+          setAudioFile(null); // Clear file as it's saved
+          setPreUploadedAudioUrl(null); // Clear URL
+          return 'Interview saved successfully!';
+        },
+        error: 'Failed to save interview'
+      });
+    }, 0);
   };
 
   const handleDownloadReport = async () => {
@@ -518,7 +537,7 @@ function MainApp() {
             onBackToEditor={handleBackToEditor}
             currentInterviewId={currentInterviewId}
             currentInterviewTitle={currentInterviewTitle}
-            onSaveInterview={handleInterviewSaved} // Use the state updater, not the API caller
+            onSaveInterview={(input: string | number) => handleSaveInterview(input)}
             audioFile={audioFile}
             notes={notes}
             waveformData={waveformData}
@@ -575,12 +594,11 @@ function MainApp() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleSaveInterview}
-                  disabled={isSaving}
+                  onClick={() => handleSaveInterview()}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                 >
                   <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  Save Interview
                 </Button>
               </div>
             </motion.div>

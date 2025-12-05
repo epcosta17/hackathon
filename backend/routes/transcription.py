@@ -1,12 +1,12 @@
-"""Transcription-related API routes."""
-import os
 import json
 import asyncio
 import tempfile
+import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse, Response
 from pathlib import Path
 from typing import Dict, Any
+import os
 
 router = APIRouter(prefix="/api", tags=["transcription"])
 
@@ -34,43 +34,88 @@ async def transcribe_stream_endpoint(
         try:
             yield f"data: {json.dumps({'progress': 5, 'message': 'Uploading file...'})}\n\n"
             await asyncio.sleep(0.1)
+
+            # 0. Setup File & GCS Paths (Common for all methods)
+            user_id = current_user['uid']
+            raw_filename = audio_file.filename or "audio.mp3"
+            # Prefer extension from filename, else fallback to content-type guess
+            ext_from_file = os.path.splitext(raw_filename)[1]
+            ext = ext_from_file if ext_from_file else file_extension
             
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
+            # Create Temp File
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
             temp_file.write(file_content)
             temp_file.close()
             
+            # Setup GCS Path
+            remote_filename = f"{uuid.uuid4()}{ext}"
+            gcs_path = f"{user_id}/audio/{remote_filename}"
+            audio_url = f"/api/audio/{remote_filename}"
             # Priority: Deepgram API > whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
             deepgram_key = os.getenv("DEEPGRAM_API_KEY")
             
             if deepgram_key:
-                print(f"🚀 [BACKEND] Starting Deepgram transcription for: {temp_file.name}")
-                yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with Deepgram AI...'})}\n\n"
-                await asyncio.sleep(0.1)
+                print(f"🚀 [BACKEND] Starting Parallel Deepgram + GCS Upload...")
+                yield f"data: {json.dumps({'progress': 10, 'message': 'Starting parallel processing...'})}\n\n"
                 
-                # Deepgram is fast, so we don't have granular progress updates like whisper.cpp
-                # But we can simulate some progress while waiting
-                yield f"data: {json.dumps({'progress': 30, 'message': 'Analyzing audio with Nova-2...'})}\n\n"
+                # Define upload wrapper
+                async def upload_audio_to_gcs():
+                    # Check if file exists in temp before opening
+                    if not os.path.exists(temp_file.name):
+                         print("❌ [BACKEND] Temp file missing for upload")
+                         return None
+                    
+                    print(f"🚀 [BACKEND] Starting background upload to {gcs_path}")
+                    from services.storage_service import storage_service
+                    
+                    # We need to open a NEW file handle for reading, as temp_file was written and closed
+                    with open(temp_file.name, 'rb') as f_up:
+                         # Run in thread pool to avoid blocking event loop
+                         await asyncio.to_thread(storage_service.upload_file, gcs_path, f_up, content_type=audio_file.content_type)
+                    
+                    print(f"✅ [BACKEND] Background upload complete: {audio_url}")
+                    return audio_url
+
+                # Create tasks
+                # 1. Deepgram Transcription
+                deepgram_task = asyncio.create_task(transcribe_with_deepgram(temp_file.name))
                 
-                print("⚙️  [BACKEND] Creating Deepgram task...")
-                # Deepgram is usually very fast (seconds)
-                transcript_blocks = await transcribe_with_deepgram(temp_file.name)
+                # 2. GCS Upload
+                upload_task = asyncio.create_task(upload_audio_to_gcs())
+                
+                # Wait for both (Deepgram is usually slower, so upload hides behind it)
+                yield f"data: {json.dumps({'progress': 20, 'message': 'Transcribing & Uploading parallelly...'})}\n\n"
+                
+                # We can await them together
+                results = await asyncio.gather(deepgram_task, upload_task)
+                transcript_blocks = results[0]
+                uploaded_url = results[1]
                 
                 yield f"data: {json.dumps({'progress': 90, 'message': 'Processing results...'})}\n\n"
-                print(f"🎉 [BACKEND] Deepgram complete! Created {len(transcript_blocks)} blocks")
+                print(f"🎉 [BACKEND] Parallel tasks complete! Blocks: {len(transcript_blocks)}, URL: {uploaded_url}")
 
             elif os.path.exists("/opt/homebrew/bin/whisper-cli"):
+                # (Keep existing whisper logic, but maybe add upload task here too if needed later)
+                # For now focusing on Deepgram optimization as requested
+                
+                # ... standard whisper logic ...
+                # For consistency, we should do the upload here too, but serially for now or copy logic
+                # Let's just do inline upload for whisper path to keep it simple for now as it wasn't the focus
+                
+                # Inline Upload (Legacy for Whisper)
+                from services.storage_service import storage_service
+                with open(temp_file.name, 'rb') as f_up:
+                     storage_service.upload_file(gcs_path, f_up, content_type=audio_file.content_type)
+                
                 print(f"🚀 [BACKEND] Starting whisper-cli transcription for: {temp_file.name}")
                 yield f"data: {json.dumps({'progress': 10, 'message': 'Transcribing with whisper.cpp (FREE!)...'})}\n\n"
-                await asyncio.sleep(0.1)
                 
                 progress_queue = asyncio.Queue()
-                print("⚙️  [BACKEND] Creating transcription task...")
                 transcription_task = asyncio.create_task(
                     transcribe_with_whisper_cpp(temp_file.name, progress_queue)
                 )
                 
                 last_progress = 10
-                print("📡 [BACKEND] Streaming progress updates to frontend...")
                 while not transcription_task.done():
                     try:
                         progress_pct, message = await asyncio.wait_for(
@@ -79,37 +124,30 @@ async def transcribe_stream_endpoint(
                         )
                         if progress_pct > last_progress:
                             last_progress = progress_pct
-                            print(f"📤 [BACKEND] Sending to frontend: {progress_pct}% - {message}")
                             yield f"data: {json.dumps({'progress': progress_pct, 'message': message})}\n\n"
                     except asyncio.TimeoutError:
                         pass
                 
-                print("⏳ [BACKEND] Awaiting final transcription result...")
                 transcript_blocks = await transcription_task
-                print(f"🎉 [BACKEND] whisper-cli complete! Created {len(transcript_blocks)} blocks")
                 yield f"data: {json.dumps({'progress': 90, 'message': 'Processing results...'})}\n\n"
-                await asyncio.sleep(0.1)
-                
+
             else:
-                print("📋 [BACKEND] No transcription method available, using mock data")
-                yield f"data: {json.dumps({'progress': 50, 'message': 'Using mock data...'})}\n\n"
-                await asyncio.sleep(1)
+                # Mock path
                 transcript_blocks = generate_mock_transcript()
-            
-            # Generate waveform visualization (fast, while audio file still exists)
+
+            # Generate waveform visualization
             print(f"🎵 [BACKEND] Generating waveform visualization...")
             yield f"data: {json.dumps({'progress': 92, 'message': 'Generating waveform...'})}\n\n"
             await asyncio.sleep(0.1)
             
             from services.waveform_service import generate_waveform_universal
             waveform_data = generate_waveform_universal(temp_file.name, samples=275)
-            print(f"✅ [BACKEND] Waveform generated with {len(waveform_data)} bars")
             
             print(f"📦 [BACKEND] Preparing final response with {len(transcript_blocks)} blocks...")
+            # Serialization fix: Convert Pydantic models to dicts
             transcript_data = [block.model_dump() for block in transcript_blocks]
-            print(f"💾 [BACKEND] Serialized transcript size: {len(str(transcript_data))} chars")
-            print(f"🎬 [BACKEND] Sending 100% complete to frontend!")
-            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete!', 'transcript': transcript_data, 'waveform': waveform_data})}\n\n"
+            
+            yield f"data: {json.dumps({'progress': 100, 'message': 'Complete', 'transcript': transcript_data, 'waveform': waveform_data, 'audio_url': audio_url})}\n\n"
             
         except Exception as e:
             print(f"💥 [BACKEND] ERROR in transcription: {str(e)}")

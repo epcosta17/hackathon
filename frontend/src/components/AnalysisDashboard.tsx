@@ -15,8 +15,8 @@ import {
 } from 'react-icons/si';
 import { UserMenu } from './UserMenu';
 import { db, auth } from '../config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { getJSON, postJSON, postFormData, authenticatedFetch } from '../utils/api';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
 
 interface Note {
   id: number;
@@ -35,7 +35,7 @@ interface AnalysisDashboardProps {
   onBackToEditor: () => void;
   currentInterviewId: number | null;
   currentInterviewTitle: string;
-  onSaveInterview: (id: number) => void;
+  onSaveInterview: (titleOrId: number | string) => void;
   audioFile: File | null;
   notes: Note[];
   waveformData: number[] | null;
@@ -178,75 +178,44 @@ export function AnalysisDashboard({
 
     setIsSaving(true);
     try {
-      // Get full transcript text
-      const transcriptText = transcriptBlocks.map(block => block.text).join(' ');
-
       if (currentInterviewId) {
-        // UPDATE existing interview
-        console.log('📝 Updating interview:', currentInterviewId);
-        console.log('📊 Analysis data to save:', analysisData);
-        const requestBody = {
-          interview_id: currentInterviewId,
+        // UPDATE existing interview in Firestore (Direct)
+        console.log('📝 Updating interview title:', currentInterviewId);
+
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        const interviewRef = doc(db, 'users', uid, 'interviews', String(currentInterviewId));
+
+        await setDoc(interviewRef, {
           title: interviewTitle,
-          transcript_text: transcriptText,
-          transcript_words: transcriptBlocks,
-          analysis_data: analysisData,
-        };
-        console.log('📤 PUT request body:', requestBody);
+          updated_at: new Date().toISOString()
+        }, { merge: true });
 
-        const response = await postJSON(`/api/interviews/${currentInterviewId}`, requestBody, { method: 'PUT' });
+        console.log('✅ Update successful (Firestore)');
+        toast.success('Interview updated successfully!');
 
-        console.log('PUT response status:', response.status);
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Update successful:', result);
-          onAnalysisSaved(); // Clear the hasNewAnalysis flag
-          setShowSaveDialog(false);
-          toast.success('Interview updated successfully!');
-        } else {
-          const errorText = await response.text();
-          console.error('Update failed:', response.statusText, errorText);
-          toast.error('Failed to update interview. Please try again.');
+        // Also update Analysis subcollection if needed? 
+        // Usually analysis is saved when "AI Analysis" finishes. 
+        // But if we want to be safe:
+        if (analysisData) {
+          const analysisRef = doc(db, 'users', uid, 'interviews', String(currentInterviewId), 'data', 'analysis');
+          await setDoc(analysisRef, analysisData, { merge: true });
         }
+
+        onAnalysisSaved();
+        setShowSaveDialog(false);
       } else {
-        // CREATE new interview
-        const formData = new FormData();
-        formData.append('title', interviewTitle);
-        formData.append('transcript_text', transcriptText);
-        formData.append('transcript_words', JSON.stringify(transcriptBlocks));
-        formData.append('analysis_data', JSON.stringify(analysisData));
-
-        // Add notes if available
-        if (notes.length > 0) {
-          formData.append('notes', JSON.stringify(notes));
-        }
-
-        // Add waveform data if available
-        if (waveformData && waveformData.length > 0) {
-          formData.append('waveform_data', JSON.stringify(waveformData));
-        }
-
-        // Add audio file if available
-        if (audioFile) {
-          formData.append('audio_file', audioFile);
-        }
-
-        const response = await postFormData('/api/interviews', formData);
-
-        if (response.ok) {
-          const result = await response.json();
-          onSaveInterview(result.id);
-          onAnalysisSaved(); // Clear the hasNewAnalysis flag
-          setShowSaveDialog(false);
-          toast.success('Interview saved successfully!');
-        } else {
-          console.error('Save failed:', response.statusText);
-          toast.error('Failed to save interview. Please try again.');
-        }
+        // CREATE new interview -> Delegate to Parent (App.tsx)
+        // We pass the title so App.tsx can use it.
+        console.log('🆕 Delegating creation to App.tsx with title:', interviewTitle);
+        // We cast to any because the prop signature might need adjustment in parent
+        onSaveInterview(interviewTitle);
+        onAnalysisSaved();
+        setShowSaveDialog(false);
       }
     } catch (error) {
       console.error('Error saving interview:', error);
-      toast.error(currentInterviewId ? 'An error occurred while updating the interview.' : 'An error occurred while saving the interview.');
+      toast.error('An error occurred while saving.');
     } finally {
       setIsSaving(false);
     }

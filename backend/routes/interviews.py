@@ -19,27 +19,28 @@ from middleware.auth_middleware import get_current_user
 router = APIRouter(prefix="/api", tags=["interviews"])
 
 
+import time
+
 @router.post("/interviews")
 async def create_interview(
     title: str = Form(...),
-    transcript_text: str = Form(...),
-    transcript_words: str = Form(...),
-    analysis_data: str = Form(...),
+    # Optional fields kept for API compatibility but ignored for persistence
+    transcript_text: Optional[str] = Form(None),
+    transcript_words: Optional[str] = Form(None),
+    analysis_data: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     waveform_data: Optional[str] = Form(None),
     audio_file: Optional[UploadFile] = File(None),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Save a new interview to the database."""
+    """
+    Create a container interview document. 
+    NOTE: Detailed data (transcript, analysis) must be saved via Client SDK to subcollections.
+    This endpoint primarily handles audio upload if provided.
+    """
     try:
         user_id = current_user['uid']
-        
-        # Parse JSON strings
-        transcript_words_data = json.loads(transcript_words)
-        print(f"📥 [CREATE] Received {len(transcript_words_data)} transcript blocks", flush=True)
-        analysis_data_dict = json.loads(analysis_data)
-        notes_data = json.loads(notes) if notes else []
-        waveform_data_list = json.loads(waveform_data) if waveform_data else None
+        interview_id = int(time.time() * 1000)
         
         # Save audio file if provided
         audio_url = None
@@ -60,28 +61,16 @@ async def create_interview(
             
             audio_url = f"/api/audio/{audio_filename}"
         
-        interview_id = save_interview(
+        # New signature: user_id, interview_id, title, audio_url
+        save_interview(
             user_id=user_id,
+            interview_id=interview_id,
             title=title,
-            transcript_text=transcript_text,
-            transcript_words=transcript_words_data,
-            analysis_data=analysis_data_dict,
-            audio_url=audio_url,
-            waveform_data=waveform_data_list
+            audio_url=audio_url
         )
         
-        # Save notes if provided
-        if notes_data:
-            for note in notes_data:
-                add_note(
-                    user_id=user_id,
-                    interview_id=interview_id,
-                    timestamp=note.get('timestamp', 0),
-                    content=note.get('content', ''),
-                    is_bookmark=note.get('is_bookmark', False)
-                )
-        
-        return {"id": interview_id, "message": "Interview saved successfully"}
+        print(f"⚠️ [CREATE] Created interview container {interview_id}. Client must save subcollections!")
+        return {"id": interview_id, "message": "Interview container created successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save interview: {str(e)}")
 
