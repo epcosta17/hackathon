@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, Chrome, User } from 'lucide-react';
+import { Mail, Lock, Chrome, User, ScanEye } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { DoodleBackground } from './DoodleBackground';
@@ -70,6 +70,16 @@ export function LoginPage() {
             <DoodleBackground />
 
             <div className="w-full max-w-md relative z-10">
+                {/* App Title */}
+                <div className="flex items-center justify-center gap-3 mb-8">
+                    <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                        <ScanEye className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tight">
+                        Interview Lens
+                    </h1>
+                </div>
+
                 <div className="bg-[#1a1a1a] rounded-lg border border-[#2a2a2a] p-8 shadow-2xl">
                     {/* Logo/Title Section */}
                     <div className="mb-8 text-center">

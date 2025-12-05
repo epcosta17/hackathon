@@ -856,6 +856,7 @@ export function TranscriptEditor({
                   <ChevronDown className="w-3 h-3 ml-1" />
                 </Button>
               </div>
+              <UserMenu />
             </div>
           </div>
         </div>
