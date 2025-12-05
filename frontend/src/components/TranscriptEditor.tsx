@@ -459,24 +459,31 @@ export function TranscriptEditor({
   };
 
   const deleteNote = async (noteId: number) => {
-    // If no interview ID, delete from local state
+    // 1. Optimistic UI: Remove from list immediately
+    setNotes((prev: Note[]) => prev.filter((n: Note) => n.id !== noteId));
+
+    // Close any potential menus/dialogs associated if needed (none for notes usually)
+
+    // If no interview ID, we are done (local only)
     if (!currentInterviewId) {
-      setNotes(notes.filter(note => note.id !== noteId));
-      toast.success('Note deleted!');
+      // toast.success('Note deleted!'); // Silent
       return;
     }
 
-    // If interview exists, delete from backend
+    // 2. Background Process: Silent Backend Delete
     try {
-      await authenticatedFetch(`/api/notes/${noteId}`, {
+      const response = await authenticatedFetch(`/api/notes/${noteId}`, {
         method: 'DELETE',
       });
 
-      setNotes((prev: Note[]) => prev.filter((n: Note) => n.id !== noteId));
-      toast.success('Note deleted!');
+      if (!response.ok) {
+        console.error('Background note delete failed');
+        toast.error('Failed to sync note deletion');
+        // We could revert here, but simpler to just warn.
+      }
     } catch (error) {
       console.error('Failed to delete note:', error);
-      toast.error('Failed to delete note');
+      toast.error('Failed to sync note deletion');
     }
   };
 

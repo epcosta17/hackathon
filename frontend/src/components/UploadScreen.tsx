@@ -163,19 +163,27 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
   const confirmDelete = async () => {
     if (deleteConfirmId === null) return;
 
+    // 1. Optimistic UI: Close dialog and remove from list immediately
+    const idToDelete = deleteConfirmId;
+    setDeleteConfirmId(null); // Close dialog
+    setInterviews(prev => prev.filter(i => i.id !== idToDelete)); // Optimistic remove
+
+    // 2. Background Process: Silent Delete
     try {
-      const response = await authenticatedFetch(`/api/interviews/${deleteConfirmId}`, {
+      const response = await authenticatedFetch(`/api/interviews/${idToDelete}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        // fetchInterviews(searchQuery); // Listener handles this
-        toast.success('Interview deleted successfully!');
+
+      if (!response.ok) {
+        // Only warn on failure
+        console.error('Background delete failed');
+        // Optional: Revert state? For now, we rely on the next Snapshot update to fix consistency if it failed.
+        toast.error('Failed to delete interview on server');
       }
+      // Success is silent
     } catch (error) {
       console.error('Failed to delete interview:', error);
-      toast.error('Failed to delete interview. Please try again.');
-    } finally {
-      setDeleteConfirmId(null);
+      toast.error('Failed to delete interview on server');
     }
   };
 
