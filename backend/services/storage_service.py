@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, List, Optional
 from google.cloud import storage
 from google.oauth2 import service_account
-from datetime import datetime
+from datetime import datetime, timezone
 
 class StorageService:
     def __init__(self):
@@ -68,6 +68,38 @@ class StorageService:
             
         new_blob = self.bucket.rename_blob(blob, new_path)
         return new_blob.public_url
+
+    def cleanup_temp_files(self, user_id: str, max_age_hours: int = 2):
+        """
+        Deletes files in {user_id}/temp_audio/ that are older than max_age_hours.
+        Returns the count of deleted files.
+        """
+        self._check_client()
+        prefix = f"{user_id}/temp_audio/"
+        blobs = self.bucket.list_blobs(prefix=prefix)
+        
+        count = 0
+        now = datetime.now(timezone.utc)
+        
+        print(f"🧹 [CLEANUP] Checking temp files for {user_id}...")
+        
+        for blob in blobs:
+            # Check age
+            if blob.time_created:
+                age = now - blob.time_created
+                age_hours = age.total_seconds() / 3600
+                
+                if age_hours > max_age_hours:
+                    try:
+                        print(f"🗑️ [CLEANUP] Deleting old temp file: {blob.name} (Age: {age_hours:.1f}h)")
+                        blob.delete()
+                        count += 1
+                    except Exception as e:
+                        print(f"⚠️ [CLEANUP] Failed to delete {blob.name}: {e}")
+        
+        if count > 0:
+            print(f"✨ [CLEANUP] Removed {count} old temp files.")
+        return count
 
     def list_files(self, prefix: str) -> List[str]:
         """Lists files with a given prefix."""

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from services.storage_service import storage_service
 from middleware.auth_middleware import get_current_user
 
@@ -10,7 +10,11 @@ class FinalizeAudioRequest(BaseModel):
     audio_url: str
 
 @router.post("/api/audio/finalize")
-async def finalize_audio(request: FinalizeAudioRequest, token: dict = Depends(get_current_user)):
+async def finalize_audio(
+    request: FinalizeAudioRequest, 
+    background_tasks: BackgroundTasks,
+    token: dict = Depends(get_current_user)
+):
     """
     Moves an audio file from temp_audio/ to audio/ (making it permanent).
     """
@@ -43,4 +47,8 @@ async def finalize_audio(request: FinalizeAudioRequest, token: dict = Depends(ge
         return {"audio_url": f"/api/audio/{filename}"}
 
     # Return the clean API URL for the permanent file
+    
+    # Trigger cleanup of old temp files for this user (garbage collection)
+    background_tasks.add_task(storage_service.cleanup_temp_files, user_id=user_id)
+    
     return {"audio_url": f"/api/audio/{filename}"}

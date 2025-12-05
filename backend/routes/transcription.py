@@ -1,8 +1,9 @@
+
 import json
 import asyncio
 import tempfile
 import uuid
-from fastapi import APIRouter, File, UploadFile, HTTPException, Request, Depends
+from fastapi import APIRouter, File, UploadFile, HTTPException, Request, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse, Response
 from pathlib import Path
 from typing import Dict, Any
@@ -12,12 +13,16 @@ router = APIRouter(prefix="/api", tags=["transcription"])
 
 # Import transcription functions from service
 from services.transcription_service import transcribe_with_whisper_cpp, transcribe_with_deepgram, generate_mock_transcript
+from services.storage_service import storage_service
 from middleware.auth_middleware import get_current_user, verify_firebase_token
 
 
 @router.post("/transcribe-stream")
 async def transcribe_stream_endpoint(
+    background_tasks: BackgroundTasks,
     audio_file: UploadFile = File(...),
+    token: str = None, 
+    request: Request = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -29,6 +34,9 @@ async def transcribe_stream_endpoint(
     file_content = await audio_file.read()
     file_extension = ".mp3" if "mp3" in audio_file.content_type else ".wav"
     
+    # Extract user_id for outer scope usage (cleanup task)
+    user_id = current_user['uid']
+    
     async def event_generator():
         temp_file = None
         try:
@@ -36,7 +44,7 @@ async def transcribe_stream_endpoint(
             await asyncio.sleep(0.1)
 
             # 0. Setup File & GCS Paths (Common for all methods)
-            user_id = current_user['uid']
+            # user_id is now available from outer scope
             raw_filename = audio_file.filename or "audio.mp3"
             # Prefer extension from filename, else fallback to content-type guess
             ext_from_file = os.path.splitext(raw_filename)[1]
@@ -161,6 +169,10 @@ async def transcribe_stream_endpoint(
                 except:
                     pass
     
+    # Trigger cleanup of old temp files for this user (garbage collection)
+    # This ensures abandoned files from previous sessions are removed when user returns.
+    background_tasks.add_task(storage_service.cleanup_temp_files, user_id=user_id)
+
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
