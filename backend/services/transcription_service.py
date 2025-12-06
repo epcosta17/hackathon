@@ -47,7 +47,7 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
         
         # Configure Deepgram options for audio analysis
         options = dict(
-            model="nova-3-medical",
+            model="nova-3-general",
             smart_format=True,
             diarize=True,
             punctuate=True,
