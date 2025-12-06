@@ -20,7 +20,6 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
     logger = logging.getLogger(__name__)
     
     logger.info(f"transcribe_with_deepgram called for: {audio_file_path}")
-    start_time = time.time()
     
     try:
         from deepgram import DeepgramClient
@@ -83,11 +82,8 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
                 **file_options
             )
             
-        api_duration = time.time() - start_time
-        logger.info(f"⏱️ [DEEPGRAM SPEC] API Call took {api_duration:.2f}s")
         logger.info("Received response from Deepgram")
 
-        parsing_start = time.time()
         # Parse the response
         transcript_blocks = []
         
@@ -103,10 +99,6 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
         utterances = response.results.utterances if response.results.utterances else []
             
         logger.info(f"Parsing {len(utterances)} utterances from Deepgram")
-        
-        # Optimization: User pointed out that 'utterance' object already has 'words' list
-        # We don't need to manually match words from the global list.
-        # This drastically simplifies the logic.
         
         for utterance in utterances:
             start_time = utterance.start
@@ -162,8 +154,6 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
             )
             transcript_blocks.append(block)
 
-        parsing_duration = time.time() - parsing_start
-        logger.info(f"⏱️ [DEEPGRAM SPEC] Parsing/Logic took {parsing_duration:.2f}s")
         logger.info(f"Created {len(transcript_blocks)} transcript blocks from Deepgram")
         return transcript_blocks
 

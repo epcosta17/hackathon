@@ -28,10 +28,8 @@ async def transcribe_endpoint(
 ):
     """
     Handles audio file upload and transcription (Standard JSON response).
-    """
     import logging
     logger = logging.getLogger(__name__)
-    overall_start = time.time()
 
     if audio_file.content_type not in ["audio/mpeg", "audio/wav", "audio/mp3", "audio/x-wav"]:
         raise HTTPException(status_code=400, detail="Invalid file type. Only MP3 and WAV supported.")
@@ -59,12 +57,8 @@ async def transcribe_endpoint(
         
         # Helper to run waveform generation safely in thread
         def run_waveform_gen():
-            wf_start = time.time()
             try:
-                res = generate_waveform_universal(temp_file.name, samples=275)
-                wf_duration = time.time() - wf_start
-                logger.info(f"⏱️ [TIMING] Waveform Generation took {wf_duration:.2f}s")
-                return res
+                return generate_waveform_universal(temp_file.name, samples=275)
             except Exception as ex:
                 logger.error(f"Waveform generation failed: {ex}")
                 return []
@@ -103,10 +97,7 @@ async def transcribe_endpoint(
                 return audio_url
 
             # 1. GCS Upload
-            upload_start = time.time()
             uploaded_url = await upload_audio_to_gcs()
-            upload_duration = time.time() - upload_start
-            logger.info(f"⏱️ [TIMING] GCS Upload took {upload_duration:.2f}s")
             
             # Generate a signed URL for Deepgram
             from services.storage_service import storage_service
@@ -121,10 +112,7 @@ async def transcribe_endpoint(
                 source_for_deepgram = temp_file.name
             
             # 2. Deepgram Transcription
-            transcribe_start = time.time()
             transcript_blocks = await transcribe_with_deepgram(source_for_deepgram)
-            transcription_duration = time.time() - transcribe_start
-            logger.info(f"⏱️ [TIMING] Deepgram Transcription took {transcription_duration:.2f}s")
             
             logger.info(f"Parallel tasks complete! Blocks: {len(transcript_blocks)}, URL: {uploaded_url}")
 
@@ -145,11 +133,7 @@ async def transcribe_endpoint(
 
         # Retrieve Waveform (Should be done by now)
         logger.info("Retrieving waveform data...")
-        wf_wait_start = time.time()
         waveform_data = await waveform_task
-        wf_wait_duration = time.time() - wf_wait_start
-        if wf_wait_duration > 0.1:
-             logger.info(f"⏱️ [TIMING] Main thread waited {wf_wait_duration:.2f}s for waveform")
         
         logger.info(f"Preparing final response with {len(transcript_blocks)} blocks...")
         # Serialization fix: Convert Pydantic models to dicts
@@ -160,9 +144,6 @@ async def transcribe_endpoint(
             'waveform': waveform_data, 
             'audio_url': audio_url
         }
-        
-        total_time = time.time() - overall_start
-        logger.info(f"⏱️ [TIMING SPEC] Total: {total_time:.2f}s | Upload: {locals().get('upload_duration', 0):.2f}s | Transcribe: {locals().get('transcription_duration', 0):.2f}s")
         
     except Exception as e:
         logger.error(f"ERROR in transcription: {str(e)}")
