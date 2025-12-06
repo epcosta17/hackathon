@@ -53,7 +53,6 @@ async def create_payment_intent(
 async def stripe_webhook(request: Request):
     """Handle Stripe Webhooks to fulfill orders"""
     payload = await request.body()
-    print(f"ℹ️ [BILLING] Webhook payload: {payload}")
     sig_header = request.headers.get('stripe-signature')
 
     try:
