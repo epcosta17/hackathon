@@ -59,18 +59,55 @@ async def generate_docx_async(analysis_data: AnalysisData, full_transcript: str,
         # Statistics
         doc.add_heading('Expert Statistics', 1)
         stats = analysis_data.statistics
-        doc.add_paragraph(f"Total Duration: {stats.duration}")
-        doc.add_paragraph(f"Technical Time: {stats.technicalTime}")
-        doc.add_paragraph(f"Q&A Time: {stats.qaTime}")
-        doc.add_paragraph(f"Technical Questions: {stats.technicalQuestions}")
-        doc.add_paragraph(f"Follow-up Questions: {stats.followUpQuestions}")
-        doc.add_paragraph(f"Technologies Count: {stats.technologiesCount}")
-        doc.add_paragraph(f"Complexity: {stats.complexity}")
-        doc.add_paragraph(f"Pace: {stats.pace}")
-        doc.add_paragraph(f"Engagement Opportunities: {stats.engagement}")
-        doc.add_paragraph(f"Communication Score: {stats.communicationScore}/100")
-        doc.add_paragraph(f"Technical Depth Score: {stats.technicalDepthScore}/100")
-        doc.add_paragraph(f"Engagement Score: {stats.engagementScore}/100")
+        
+        # Metrics at the top
+        p = doc.add_paragraph()
+        p.add_run("Communication Score: ").bold = True
+        p.add_run(f"{stats.communicationScore}/100")
+        
+        p = doc.add_paragraph()
+        run = p.add_run(stats.communicationScoreExplanation)
+        run.font.color.rgb = RGBColor(0, 0, 0)
+        
+        p = doc.add_paragraph()
+        p.add_run("Technical Depth Score: ").bold = True
+        p.add_run(f"{stats.technicalDepthScore}/100")
+        
+        p = doc.add_paragraph()
+        run = p.add_run(stats.technicalDepthScoreExplanation)
+        run.font.color.rgb = RGBColor(0, 0, 0)
+        
+        p = doc.add_paragraph()
+        p.add_run("Engagement Score: ").bold = True
+        p.add_run(f"{stats.engagementScore}/100")
+        
+        p = doc.add_paragraph()
+        run = p.add_run(stats.engagementScoreExplanation)
+        run.font.color.rgb = RGBColor(0, 0, 0)
+        
+        # Other stats in a 3x3 Grid
+        table = doc.add_table(rows=3, cols=3)
+        table.autofit = True
+        
+        stats_list = [
+            ("Total Duration", str(stats.duration)),
+            ("Technical Time", str(stats.technicalTime)),
+            ("Q&A Time", str(stats.qaTime)),
+            ("Technical Questions", str(stats.technicalQuestions)),
+            ("Follow-up Questions", str(stats.followUpQuestions)),
+            ("Technologies Count", str(stats.technologiesCount)),
+            ("Complexity", str(stats.complexity)),
+            ("Pace", str(stats.pace)),
+            ("Engagement Opportunities", str(stats.engagement))
+        ]
+        
+        for i, (label, value) in enumerate(stats_list):
+            row = i // 3
+            col = i % 3
+            cell = table.cell(row, col)
+            p = cell.paragraphs[0]
+            p.add_run(f"{label}: ").bold = True
+            p.add_run(value)
         
         # Save to BytesIO
         docx_buffer = io.BytesIO()
