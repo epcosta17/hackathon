@@ -298,16 +298,16 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             <div className="flex items-center gap-3">
               <button
                 onClick={onNavigateToSettings}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors group"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors group text-left"
               >
-                <div className="bg-indigo-500/20 p-1 rounded">
+                <div className="bg-indigo-500/10 p-1 rounded group-hover:bg-indigo-500/20 transition-colors">
                   <span className="text-indigo-400 text-xs font-bold w-4 h-4 flex items-center justify-center">
                     $
                   </span>
                 </div>
-                <div className="text-left">
-                  <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider leading-none">Credits</p>
-                  <p className="text-sm text-white font-bold leading-none mt-0.5">{credits !== null ? credits : '-'}</p>
+                <div>
+                  <p className="text-[10px] text-zinc-500 group-hover:text-zinc-400 font-medium uppercase tracking-wider leading-none transition-colors">Credits</p>
+                  <p className="text-sm text-zinc-300 group-hover:text-white font-bold leading-none mt-0.5 transition-colors">{credits !== null ? credits : '-'}</p>
                 </div>
               </button>
               <UserMenu />
