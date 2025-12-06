@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Pause, Edit2, Sparkles, Eye, File, FileText, Home, StickyNote, Bookmark, FilePlus2, Trash2, Download, ChevronDown } from 'lucide-react';
-import { UserMenu } from './UserMenu';
+
 import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -811,15 +811,15 @@ export function TranscriptEditor({
 
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
-        <div className="max-w-[1800px] mx-auto px-8 py-4">
+        <div className="w-full px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FileText className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-white">Interview Transcript</h1>
-                <p className="text-zinc-400 text-sm">Review, edit, and verify the transcription</p>
+              <div className="min-w-0">
+                <h1 className="text-white text-xl font-bold leading-tight">Interview Transcript</h1>
+                <p className="text-zinc-400 text-sm truncate">Review, edit, and verify the transcription</p>
               </div>
             </div>
             <div className="flex gap-3">
@@ -876,7 +876,7 @@ export function TranscriptEditor({
                   <ChevronDown className="w-3 h-3 ml-1" />
                 </Button>
               </div>
-              <UserMenu />
+
             </div>
           </div>
         </div>

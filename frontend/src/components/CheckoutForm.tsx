@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from './ui/button';
+import { CheckCheck } from 'lucide-react';
 
 // Initialize Stripe Key
 const stripePromise = loadStripe("pk_test_51SbMfL4fEK1Kwnr2XtcuK1ooN6qTKueKGpaGssq76aDSLHf7At8iQQ5hlab60SoDYZphhdfBSRedF2WA87aEg7Bg00qGGhSi2V");
@@ -59,15 +60,27 @@ function PaymentForm({ onComplete }: { onComplete: () => void }) {
         <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto p-4">
             <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
 
-            {message && <div id="payment-message" className="mt-4 text-red-400 text-sm">{message}</div>}
+            {message === "Payment succeeded!" ? (
+                <div className="mt-4 flex flex-col items-center justify-center p-4 bg-green-500/10 border border-green-500/20 rounded-lg animate-in fade-in zoom-in duration-300">
+                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-2 shadow-lg shadow-green-500/20">
+                        <CheckCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <p className="text-green-400 font-semibold">Payment Successful!</p>
+                    <p className="text-zinc-400 text-xs mt-1">Adding credits to your account...</p>
+                </div>
+            ) : (
+                message && <div id="payment-message" className="mt-4 text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-center">{message}</div>
+            )}
 
-            <Button
-                disabled={isLoading || !stripe || !elements}
-                id="submit"
-                className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-                {isLoading ? "Processing..." : "Pay Now"}
-            </Button>
+            {message !== "Payment succeeded!" && (
+                <Button
+                    disabled={isLoading || !stripe || !elements}
+                    id="submit"
+                    className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                    {isLoading ? "Processing..." : "Pay Now"}
+                </Button>
+            )}
         </form>
     );
 }

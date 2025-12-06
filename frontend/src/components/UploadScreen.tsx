@@ -284,30 +284,31 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     <div className="min-h-screen max-h-screen flex flex-col bg-zinc-950 overflow-hidden">
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm flex-shrink-0">
-        <div className="px-4 py-4">
+        <div className="w-full px-8 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FileAudio className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-white">Interview Lens</h1>
-                <p className="text-zinc-400 text-sm">AI-Powered Interview Intelligence Platform</p>
+              <div className="min-w-0">
+                <h1 className="text-white text-xl font-bold leading-tight">Interview Lens</h1>
+                <p className="text-zinc-400 text-sm truncate">AI-Powered Interview Intelligence Platform</p>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
               <button
                 onClick={onNavigateToSettings}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors group text-left"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
               >
-                <div className="bg-indigo-500/10 p-1 rounded group-hover:bg-indigo-500/20 transition-colors">
-                  <span className="text-indigo-400 text-xs font-bold w-4 h-4 flex items-center justify-center">
+                <div className="bg-white/10 p-1 rounded group-hover:bg-white/20 transition-colors">
+                  <span className="text-white text-xs font-bold w-4 h-4 flex items-center justify-center">
                     $
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] text-zinc-500 group-hover:text-zinc-400 font-medium uppercase tracking-wider leading-none transition-colors">Credits</p>
-                  <p className="text-sm text-zinc-300 group-hover:text-white font-bold leading-none mt-0.5 transition-colors">{credits !== null ? credits : '-'}</p>
+                  <p className="text-[10px] text-indigo-100 font-medium uppercase tracking-wider leading-none">Credits</p>
+                  <p className="text-sm text-white font-bold leading-none mt-0.5">{credits !== null ? credits : '-'}</p>
                 </div>
               </button>
               <UserMenu />
@@ -447,15 +448,18 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
         {/* Main Upload Area */}
         <div className="flex-1 flex flex-col px-8 py-4">
-          {/* Hamburger button to open sidebar */}
-          {!isSidebarOpen && (
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="self-start p-2 mb-4 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
+          <div className="w-full flex items-center mb-4 min-h-[40px]">
+            <div>
+              {!isSidebarOpen && (
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="flex-1 flex items-center justify-center">
             <motion.div

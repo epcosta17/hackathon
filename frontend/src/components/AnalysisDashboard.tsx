@@ -13,7 +13,7 @@ import {
   SiGraphql, SiVuedotjs, SiAngular, SiDjango, SiFlask, SiFastapi,
   SiTailwindcss, SiBootstrap, SiAmazon, SiGooglecloud
 } from 'react-icons/si';
-import { UserMenu } from './UserMenu';
+
 import { db, auth } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
@@ -328,8 +328,8 @@ export function AnalysisDashboard({
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-white text-2xl font-bold">Interview Analysis Report</h1>
-                <p className="text-zinc-400 text-sm">AI-generated insights and evaluation metrics</p>
+                <h1 className="text-white text-xl font-bold leading-tight">Interview Analysis Report</h1>
+                <p className="text-zinc-400 text-sm truncate">AI-generated insights and evaluation metrics</p>
               </div>
             </div>
             <div className="flex gap-3 flex-shrink-0">
@@ -375,7 +375,7 @@ export function AnalysisDashboard({
                 <Download className="w-4 h-4 mr-2" />
                 {isDownloading ? 'Generating...' : 'Download Report'}
               </Button>
-              <UserMenu />
+
             </div>
           </div>
         </div>
