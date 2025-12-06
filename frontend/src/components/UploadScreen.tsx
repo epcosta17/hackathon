@@ -30,7 +30,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(100);
   const [isComplete, setIsComplete] = useState(false);
   const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,14 +223,15 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
     if (!file) return;
 
     setIsTranscribing(true);
-    setProgress(0);
+    // Set to -1 to trigger the indeterminate "Processing" state immediately
+    setProgress(-1);
 
     try {
       const formData = new FormData();
       formData.append("audio_file", file);
 
-      // Use Server-Sent Events for real-time progress
-      const response = await authenticatedFetch('/api/transcribe-stream', {
+      // Use Standard Post for transcription (Wait for response)
+      const response = await authenticatedFetch('/api/transcribe', {
         method: 'POST',
         body: formData,
         // Don't set Content-Type for FormData
@@ -240,50 +241,27 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      // Wait for the full JSON response
+      const data = await response.json();
 
-      if (!reader) {
-        throw new Error('No response body');
+      if (data.error) {
+        throw new Error(data.error);
       }
 
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
+      // Transcription complete!
+      setIsComplete(true);
+      setProgress(100);
 
-        if (done) break;
+      setTimeout(() => {
+        onTranscriptionComplete(data.transcript, file, data.waveform, data.audio_url);
+      }, 1500); // Give user time to see "Transcription Finished" message
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            if (data.progress !== undefined) {
-              setProgress(data.progress);
-            }
-
-            if (data.transcript) {
-              // Transcription complete!
-              setIsComplete(true);
-              setTimeout(() => {
-                onTranscriptionComplete(data.transcript, file, data.waveform, data.audio_url);
-              }, 1500); // Give user time to see "Transcription Finished" message
-            }
-          }
-        }
-      }
     } catch (error) {
       console.error('Error during transcription:', error);
       toast.error('An error occurred during transcription. Please try again.');
       setIsTranscribing(false);
       setIsComplete(false);
+      setProgress(0);
     }
   };
 
@@ -559,7 +537,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
 
                   <div className="relative">
                     <Progress
-                      value={isComplete ? 100 : null}
+                      value={isComplete ? 100 : (progress === -1 ? null : progress)}
                       variant={isComplete ? "success" : "default"}
                       className="h-2"
                     />

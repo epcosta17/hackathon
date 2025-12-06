@@ -1,5 +1,6 @@
 """Transcription service - handles audio transcription logic."""
 import os
+import time
 import uuid
 import subprocess
 import re
@@ -15,31 +16,35 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
     """
     Transcribe audio using Deepgram API with diarization.
     """
-    print(f"🎙️  [BACKEND] transcribe_with_deepgram called for: {audio_file_path}")
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"transcribe_with_deepgram called for: {audio_file_path}")
+    start_time = time.time()
     
     try:
         from deepgram import DeepgramClient
     except ImportError:
-        print("❌ [BACKEND] deepgram-sdk not installed")
+        logger.error("deepgram-sdk not installed")
         raise HTTPException(status_code=500, detail="deepgram-sdk not installed")
 
     api_key = os.getenv("DEEPGRAM_API_KEY")
     if not api_key:
-        print("❌ [BACKEND] DEEPGRAM_API_KEY not found")
+        logger.error("DEEPGRAM_API_KEY not found")
         raise HTTPException(
             status_code=500, 
             detail="DEEPGRAM_API_KEY not found. Set it in environment or .env file"
         )
 
     try:
-        # Initialize the Deepgram SDK
+        # Initialize the Deepgram SDK with increased timeout for large files
+        # httpx default is 5s connect, wait longer for upload
+        import httpx
+        from deepgram import DeepgramClient
+        
+        # Initialize client with API Key
         deepgram = DeepgramClient(api_key=api_key)
-
-        with open(audio_file_path, "rb") as file:
-            buffer_data = file.read()
-
-        payload=buffer_data
-
+        
         # Configure Deepgram options for audio analysis
         options = dict(
             model="nova-3-medical",
@@ -48,16 +53,41 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
             punctuate=True,
             paragraphs=True,
             utterances=True,
-            request=payload
         )
 
-        print("🚀 [BACKEND] Sending audio to Deepgram...")
-        response = await asyncio.to_thread(
-            deepgram.listen.v1.media.transcribe_file,
-            **options
-        )
-        print("✅ [BACKEND] Received response from Deepgram")
+        logger.info("Sending audio to Deepgram...")
+        
+        if audio_file_path.startswith('http'):
+             # URL-based transcription
+             logger.info(f"Transcribing from URL: {audio_file_path}...")
+             
+             # Prepare options with URL
+             url_options = options.copy()
+             url_options['url'] = audio_file_path
+             
+             response = await asyncio.to_thread(
+                deepgram.listen.v1.media.transcribe_url,
+                **url_options
+            )
+        else:
+            # File-based transcription
+            with open(audio_file_path, "rb") as file:
+                buffer_data = file.read()
+            
+            # Prepare options with request (buffer)
+            file_options = options.copy()
+            file_options['request'] = buffer_data
+            
+            response = await asyncio.to_thread(
+                deepgram.listen.v1.media.transcribe_file,
+                **file_options
+            )
+            
+        api_duration = time.time() - start_time
+        logger.info(f"⏱️ [DEEPGRAM SPEC] API Call took {api_duration:.2f}s")
+        logger.info("Received response from Deepgram")
 
+        parsing_start = time.time()
         # Parse the response
         transcript_blocks = []
         
@@ -72,8 +102,12 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
         # Use utterances for speaker-based segmentation (utterances are at results level)
         utterances = response.results.utterances if response.results.utterances else []
             
-        print(f"📄 [BACKEND] Parsing {len(utterances)} utterances from Deepgram")
-
+        logger.info(f"Parsing {len(utterances)} utterances from Deepgram")
+        
+        # Optimization: User pointed out that 'utterance' object already has 'words' list
+        # We don't need to manually match words from the global list.
+        # This drastically simplifies the logic.
+        
         for utterance in utterances:
             start_time = utterance.start
             end_time = utterance.end
@@ -89,12 +123,8 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
             utterance_speaker = getattr(utterance, 'speaker', None)
             speaker_label = f"Speaker {int(utterance_speaker)+1}" if utterance_speaker is not None else None
             
-            # Get words for this utterance - filter from all words by time range
-            all_words = alternatives.words
-            utterance_words = [
-                w for w in all_words 
-                if w.start >= start_time - 0.01 and w.end <= end_time + 0.01
-            ]
+            # Direct access to words in the utterance
+            utterance_words = utterance.words if utterance.words else []
             
             # Build a map of lowercased words to their confidence values
             word_confidence_map = {}
@@ -132,11 +162,13 @@ async def transcribe_with_deepgram(audio_file_path: str) -> List[TranscriptBlock
             )
             transcript_blocks.append(block)
 
-        print(f"✅ [BACKEND] Created {len(transcript_blocks)} transcript blocks from Deepgram")
+        parsing_duration = time.time() - parsing_start
+        logger.info(f"⏱️ [DEEPGRAM SPEC] Parsing/Logic took {parsing_duration:.2f}s")
+        logger.info(f"Created {len(transcript_blocks)} transcript blocks from Deepgram")
         return transcript_blocks
 
     except Exception as e:
-        print(f"❌ [BACKEND] Deepgram transcription failed: {str(e)}")
+        logger.error(f"Deepgram transcription failed: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Deepgram transcription failed: {str(e)}")

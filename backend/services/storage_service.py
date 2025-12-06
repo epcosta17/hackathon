@@ -45,10 +45,39 @@ class StorageService:
         content = blob.download_as_string()
         return json.loads(content)
 
-    def upload_file(self, path: str, file_obj, content_type: str = None) -> str:
-        """Uploads a file object to GCS."""
+    def upload_file(self, path: str, file_obj, content_type: str = None, callback=None) -> str:
+        """
+        Uploads a file object to GCS.
+        Args:
+           path: GCS destination path
+           file_obj: File-like object to upload
+           content_type: MIME type
+           callback: Optional function(uploaded_bytes: int) -> None
+        """
         self._check_client()
         blob = self.bucket.blob(path)
+
+        if callback:
+            # Wrapper to intercept read() calls for progress tracking
+            class ProgressFileReader:
+                def __init__(self, file, progress_callback):
+                    self.file = file
+                    self.callback = progress_callback
+                    self.total_read = 0
+
+                def read(self, size=-1):
+                    data = self.file.read(size)
+                    if data:
+                        self.total_read += len(data)
+                        self.callback(self.total_read)
+                    return data
+                
+                # Proxy other methods
+                def __getattr__(self, name):
+                    return getattr(self.file, name)
+            
+            file_obj = ProgressFileReader(file_obj, callback)
+
         blob.upload_from_file(file_obj, content_type=content_type)
         return blob.public_url
 
@@ -142,7 +171,9 @@ class StorageService:
         """Generates a signed URL for a GCS object."""
         self._check_client()
         blob = self.bucket.blob(gcs_path)
-        return blob.generate_signed_url(expiration=expiration, method='GET')
+        
+        from datetime import timedelta
+        return blob.generate_signed_url(expiration=timedelta(seconds=expiration), method='GET', version='v4')
 
     # --- Interview Specific Methods ---
 

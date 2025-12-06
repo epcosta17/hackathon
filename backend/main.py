@@ -3,6 +3,15 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -11,7 +20,7 @@ load_dotenv()
 from services.auth_service import initialize_firebase
 
 # Import routers
-from routes import transcription, analysis, interviews, notes, auth
+from routes import transcription, analysis, interviews, notes, auth, billing
 
 # --- FastAPI Setup ---
 
@@ -46,16 +55,17 @@ app.include_router(interviews.router)
 app.include_router(notes.router)
 from routes import audio
 app.include_router(audio.router)
+app.include_router(billing.router)
 
 
 # Initialize database and Firebase on startup
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on app startup"""
-    print("✅ Storage Service initialized (GCS)")
+    logger.info("Storage Service initialized (GCS)")
     
     initialize_firebase()
-    print("✅ Firebase Admin SDK initialized")
+    logger.info("Firebase Admin SDK initialized")
 
 
 # --- Uvicorn Runner ---

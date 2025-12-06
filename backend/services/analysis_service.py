@@ -15,6 +15,9 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
     """Generate comprehensive interview analysis report using Google Vertex AI (Enterprise)."""
     
     # Load the JSON prompt template
+    import logging
+    logger = logging.getLogger(__name__)
+
     prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ai", "PROMPT_JSON.md")
     try:
         with open(prompt_path, 'r') as f:
@@ -26,12 +29,12 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
     
     if project_id:
         try:
-            print(f"🤖 Using Google Vertex AI (Enterprise) for analysis [Project: {project_id}]...")
+            logger.info(f"Using Google Vertex AI (Enterprise) for analysis [Project: {project_id}]...")
             
             # Initialize Vertex AI with the same project as your storage
             vertexai.init(project=project_id, location="us-central1")
             
-            # Use Gemini 2.5 Flash Lite (User Preference)
+            # Use Gemini 2.5 Flash
             model = GenerativeModel("gemini-2.5-flash")
             
             generation_config = GenerationConfig(
@@ -55,18 +58,18 @@ def generate_analysis_report(transcript_text: str) -> AnalysisData:
                 # Parse JSON response
                 json_response = json.loads(response.text)
                 analysis_data = AnalysisData(**json_response)
-                print("✅ Vertex AI analysis complete!")
+                logger.info("Vertex AI analysis complete!")
                 return analysis_data
             else:
-                print(f"⚠️ Empty response from Vertex AI")
-                print("📋 Falling back to mock data...")
+                logger.warning(f"Empty response from Vertex AI")
+                logger.info("Falling back to mock data...")
             
         except Exception as e:
-            print(f"⚠️ Vertex AI error: {str(e)}")
-            print("📋 Falling back to mock data...")
+            logger.error(f"Vertex AI error: {str(e)}")
+            logger.info("Falling back to mock data...")
     else:
-        print("⚠️ GCS_PROJECT_ID not found. Cannot initialize Vertex AI.")
-        print("📋 Using mock analysis data...")
+        logger.warning("GCS_PROJECT_ID not found. Cannot initialize Vertex AI.")
+        logger.info("Using mock analysis data...")
     
     # Fallback to mock data if API is not available
     mock_data = {

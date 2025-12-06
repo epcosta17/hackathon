@@ -34,9 +34,37 @@ async def analyze_endpoint(
     
     full_transcript = "\n".join(formatted_transcript)
     
-    # Run AI analysis
+    # ---------------------------------------------------------
+    # Credit Check
+    # ---------------------------------------------------------
+    user_credits = current_user.get("credits", 0)
+    if user_credits < 1:
+        raise HTTPException(
+            status_code=402, # Payment Required
+            detail="Insufficient credits. Please purchase more credits to run analysis."
+        )
+
+    # ---------------------------------------------------------
+    # Run AI Analysis
+    # ---------------------------------------------------------
     analysis_data = generate_analysis_report(full_transcript)
     
+    # ---------------------------------------------------------
+    # Deduct Credit (Atomic)
+    # ---------------------------------------------------------
+    try:
+        from database import get_firestore_db
+        from google.cloud import firestore
+        
+        db = get_firestore_db()
+        user_ref = db.collection('users').document(current_user['uid'])
+        user_ref.update({"credits": firestore.Increment(-1)})
+        print(f"💰 [BILLING] Deducted 1 credit for user {current_user['uid']}")
+    except Exception as e:
+        print(f"⚠️ [BILLING] Failed to deduct credit: {e}")
+        # Don't fail the request, just log error. 
+        # (In production, strict consistency might be preferred)
+
     # Generate unique cache key
     cache_key = f"docx_{int(time.time())}_{hash(full_transcript)}"
     analysis_data.docx_path = cache_key
