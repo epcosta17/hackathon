@@ -28,6 +28,7 @@ async def transcribe_endpoint(
 ):
     """
     Handles audio file upload and transcription (Standard JSON response).
+    """
     import logging
     logger = logging.getLogger(__name__)
 
