@@ -6,7 +6,7 @@ from database import get_firestore_db
 from middleware.auth_middleware import get_current_user
 from typing import Dict, Any
 
-router = APIRouter()
+router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 # Initialize Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -18,12 +18,12 @@ CREDIT_PACKS = {
     "pack_20": {"credits": 20, "price_cents": 1500, "name": "20 Interview Credits (Best Value)"}
 }
 
-@router.post("/create-checkout-session")
-async def create_checkout_session(
+@router.post("/create-payment-intent")
+async def create_payment_intent(
     data: Dict[str, str], 
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    """Create a Stripe Checkout Session for buying credits"""
+    """Create a Stripe PaymentIntent for buying credits (Elements Flow)"""
     pack_id = data.get("pack_id", "pack_5")
     pack = CREDIT_PACKS.get(pack_id)
     
@@ -31,34 +31,22 @@ async def create_checkout_session(
         raise HTTPException(status_code=400, detail="Invalid credit pack")
 
     try:
-        domain_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[
-                {
-                    'price_data': {
-                        'currency': 'usd',
-                        'product_data': {
-                            'name': pack['name'],
-                            'description': 'AI Analysis Credits',
-                        },
-                        'unit_amount': pack['price_cents'],
-                    },
-                    'quantity': 1,
-                },
-            ],
-            mode='payment',
-            success_url=domain_url + '/dashboard?success=true',
-            cancel_url=domain_url + '/dashboard?canceled=true',
+        # Create a PaymentIntent with the order amount and currency
+        intent = stripe.PaymentIntent.create(
+            amount=pack['price_cents'],
+            currency='usd',
+            automatic_payment_methods={
+                'enabled': True,
+            },
             metadata={
                 "user_id": current_user['uid'],
                 "credits": pack['credits'],
                 "pack_id": pack_id
             }
         )
-        return {"url": checkout_session.url}
+        return {"clientSecret": intent.client_secret}
     except Exception as e:
+        print(f"❌ [BILLING] Create Intent Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/webhook")
@@ -73,13 +61,22 @@ async def stripe_webhook(request: Request):
         )
     except ValueError as e:
         # Invalid payload
+        print(f"❌ [BILLING] Invalid payload: {e}")
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError as e:
         # Invalid signature
+        print(f"❌ [BILLING] Invalid signature: {e}")
+        print(f"ℹ️ [BILLING] Secret used: {endpoint_secret[:5]}..." if endpoint_secret else "ℹ️ [BILLING] No Secret Found")
         raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        print(f"❌ [BILLING] Webhook Error: {e}")
+        raise HTTPException(status_code=400, detail="Webhook error")
 
     # Handle the event
-    if event['type'] == 'checkout.session.completed':
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        await fulfilling_order(payment_intent)
+    elif event['type'] == 'checkout.session.completed':
         session = event['data']['object']
         await fulfilling_order(session)
 

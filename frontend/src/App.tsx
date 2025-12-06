@@ -15,9 +15,10 @@ import { db, auth } from './config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { authenticatedFetch } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { BillingScreen } from './components/BillingScreen';
 
 
-export type Screen = 'upload' | 'editor' | 'analysis';
+export type Screen = 'upload' | 'editor' | 'analysis' | 'settings';
 
 export interface Word {
   text: string;
@@ -129,6 +130,24 @@ function MainApp() {
   const [preUploadedAudioUrl, setPreUploadedAudioUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
+
+  // Handle Stripe Redirects
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('success')) {
+      toast.success('Credits added successfully!');
+      // Clean URL without reloading
+      window.history.replaceState({}, document.title, "/");
+    }
+    if (query.get('canceled')) {
+      toast.error('Payment canceled');
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
+
+  const handleNavigateToSettings = () => {
+    setCurrentScreen('settings');
+  };
 
   // Pre-fill title when loading existing interview
   useEffect(() => {
@@ -533,7 +552,11 @@ function MainApp() {
         <UploadScreen
           onTranscriptionComplete={handleTranscriptionComplete}
           onLoadInterview={handleLoadInterview}
+          onNavigateToSettings={handleNavigateToSettings}
         />
+      )}
+      {currentScreen === 'settings' && (
+        <BillingScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'editor' && (
         <ErrorBoundary>

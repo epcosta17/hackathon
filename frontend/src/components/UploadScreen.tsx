@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { UserMenu } from './UserMenu';
 import { getJSON, authenticatedFetch } from '../utils/api';
 import { db, auth } from '../config/firebase';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/firestore';
 
 // ... (interfaces)
 
@@ -24,9 +24,10 @@ interface InterviewSummary {
 interface UploadScreenProps {
   onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => void;
   onLoadInterview: (id: number) => void;
+  onNavigateToSettings: () => void;
 }
 
-export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: UploadScreenProps) {
+export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavigateToSettings }: UploadScreenProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -38,6 +39,20 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
+  const [credits, setCredits] = useState<number | null>(null);
+
+  // Listen for credits
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnapshot) => { // Renamed doc to docSnapshot to avoid conflict with imported doc function
+      if (docSnapshot.exists()) {
+        setCredits(docSnapshot.data().credits || 0);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Real-time Firestore Listener
   useEffect(() => {
@@ -280,7 +295,23 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview }: Uploa
                 <p className="text-zinc-400 text-sm">AI-Powered Interview Intelligence Platform</p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onNavigateToSettings}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors group"
+              >
+                <div className="bg-indigo-500/20 p-1 rounded">
+                  <span className="text-indigo-400 text-xs font-bold w-4 h-4 flex items-center justify-center">
+                    $
+                  </span>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider leading-none">Credits</p>
+                  <p className="text-sm text-white font-bold leading-none mt-0.5">{credits !== null ? credits : '-'}</p>
+                </div>
+              </button>
+              <UserMenu />
+            </div>
           </div>
         </div>
       </header>
