@@ -1,7 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies
-# ffmpeg is required for audio processing
+# Install system dependencies (ffmpeg for audio, git for pip git dependencies)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
