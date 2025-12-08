@@ -249,6 +249,17 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
     } catch (error: any) {
       console.error('Error during transcription:', error);
+
+      // Check for insufficient credits error
+      if (error.message && (error.message.includes('Insufficient credits') || error.message.includes('402'))) {
+        setShowNoCreditsDialog(true);
+        setError(null); // Clear generic error
+        setIsTranscribing(false);
+        setIsComplete(false);
+        setProgress(100);
+        return;
+      }
+
       setIsTranscribing(false);
       setIsComplete(false);
       setProgress(100);
