@@ -27,9 +27,9 @@ const plans = [
     features: [
       '20 Interview Credits',
       'Save 25% per interview',
-      'Priority Support',
       'Advanced Export Options',
-      'Full History Access'
+      'Full History Access',
+      'Priority Support'
     ],
     cta: 'Get Started',
     highlighted: true
@@ -54,9 +54,13 @@ export function Pricing() {
           <div
             key={plan.name}
             className={`relative p-8 rounded-2xl border backdrop-blur-xl transition-all ${plan.highlighted
-              ? 'bg-white/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-105'
+              ? 'bg-white/10 scale-105'
               : 'bg-white/5 border-white/10 hover:bg-white/10'
               }`}
+            style={plan.highlighted ? {
+              borderColor: 'rgba(59, 130, 246, 0.4)',
+              boxShadow: '0 0 60px -15px rgba(59, 130, 246, 0.5)'
+            } : undefined}
           >
             {plan.highlighted && (
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm flex items-center gap-1">
