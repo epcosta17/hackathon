@@ -91,6 +91,7 @@ class AnalysisData(BaseModel):
 class AnalyzeRequest(BaseModel):
     """Request model for analysis endpoint."""
     transcript_blocks: List[TranscriptBlock]
+    is_reanalysis: bool = False
 
 
 class GenerateReportRequest(BaseModel):

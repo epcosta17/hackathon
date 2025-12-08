@@ -7,9 +7,10 @@ import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
 import { toast } from 'sonner';
 import { UserMenu } from './UserMenu';
-import { getJSON, authenticatedFetch } from '../utils/api';
+import { authenticatedFetch } from '../utils/api';
 import { db, auth } from '../config/firebase';
-import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc } from 'firebase/firestore';
+import { NoCreditsDialog } from './NoCreditsDialog';
 
 // ... (interfaces)
 
@@ -41,6 +42,8 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
   const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
   const [credits, setCredits] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showNoCreditsDialog, setShowNoCreditsDialog] = useState(false);
+  const [hasDismissedCreditsDialog, setHasDismissedCreditsDialog] = useState(false);
 
   // Listen for credits
   useEffect(() => {
@@ -49,11 +52,12 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     const userRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
-        setCredits(docSnapshot.data().credits || 0);
+        const val = docSnapshot.data().credits || 0;
+        setCredits(val);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [hasDismissedCreditsDialog]); // Add hasDismissedCreditsDialog dependency
 
   // Real-time Firestore Listener
   useEffect(() => {
@@ -202,6 +206,11 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
   };
 
   const startTranscription = async () => {
+    // Block if no credits
+    if (credits !== null && credits <= 0) {
+      setShowNoCreditsDialog(true);
+      return;
+    }
     if (!file) return;
 
     setIsTranscribing(true);
@@ -516,6 +525,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
               {/* Progress Section */}
               {/* Show if Transcribing, OR Complete, OR Error */}
+              {/* Progress Section */}
               {
                 (isTranscribing || isComplete || error) && (
                   <motion.div
@@ -727,6 +737,18 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
           document.body
         )
       }
-    </div >
+
+      import {NoCreditsDialog} from './NoCreditsDialog';
+
+      // ... (in component)
+      <NoCreditsDialog
+        isOpen={showNoCreditsDialog}
+        onClose={() => {
+          setShowNoCreditsDialog(false);
+          setHasDismissedCreditsDialog(true);
+        }}
+        onNavigateToSettings={onNavigateToSettings}
+      />
+    </div>
   );
 }

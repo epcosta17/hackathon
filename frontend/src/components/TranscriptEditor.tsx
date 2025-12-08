@@ -10,8 +10,9 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Virtuoso } from 'react-virtuoso';
 import { db, auth } from '../config/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { TranscriptSegment } from './TranscriptSegment';
+import { NoCreditsDialog } from './NoCreditsDialog';
 
 interface Note {
   id: number;
@@ -38,6 +39,7 @@ interface TranscriptEditorProps {
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
   onSave: () => void;
+  onNavigateToSettings: () => void;
 }
 
 export function TranscriptEditor({
@@ -55,12 +57,14 @@ export function TranscriptEditor({
   notes = [],
   setNotes,
   onSave,
+  onNavigateToSettings,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showNoCreditsDialog, setShowNoCreditsDialog] = useState(false);
   const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -695,28 +699,66 @@ export function TranscriptEditor({
     setHoverPosition(null);
   };
 
+  const [credits, setCredits] = useState<number | null>(null);
+
+  // Listen for user credits
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        setCredits(doc.data().credits ?? 0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const handleRunAnalysis = async () => {
+    // Logic: First analysis is free (included in 1 credit). Re-analysis costs 0.5.
+    const isReanalysis = !!existingAnalysis;
+
+    // Frontend Credit Check (Only for Re-analysis)
+    if (isReanalysis) {
+      if (credits !== null && credits < 0.5) {
+        setShowNoCreditsDialog(true);
+        return;
+      }
+    }
+
     setIsAnalyzing(true);
 
     try {
-
       const response = await postJSON('/api/analyze', {
-        transcript_blocks: transcriptBlocks
+        transcript_blocks: transcriptBlocks,
+        is_reanalysis: isReanalysis
       });
 
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        if (response.status === 402) {
+          setShowNoCreditsDialog(true);
+          throw new Error('Insufficient credits for re-analysis.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Analysis failed');
       }
 
       const data: AnalysisData = await response.json();
       onAnalysisComplete(data);
-    } catch (error) {
-      console.error('Error during analysis:', error);
-      toast.error('An error occurred during analysis. Please try again.');
+    } catch (error: any) {
+      // Don't show toast for credit error since we show dialog
+      if (error.message !== 'Insufficient credits for re-analysis.') {
+        console.error('Error during analysis:', error);
+        toast.error(error.message || 'An error occurred during analysis. Please try again.');
+      }
     } finally {
       setIsAnalyzing(false);
     }
   };
+
+
 
   const [wasPlayingBeforeEdit, setWasPlayingBeforeEdit] = useState(false);
 
@@ -1442,6 +1484,12 @@ export function TranscriptEditor({
         </>,
         document.body
       )}
+
+      <NoCreditsDialog
+        isOpen={showNoCreditsDialog}
+        onClose={() => setShowNoCreditsDialog(false)}
+        onNavigateToSettings={onNavigateToSettings}
+      />
     </div>
   );
 }

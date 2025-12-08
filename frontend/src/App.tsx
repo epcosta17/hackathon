@@ -39,7 +39,7 @@ export interface TranscriptBlock {
 
 export interface Note {
   id: number;
-  interview_id: number;
+  interview_id: string | number;
   timestamp: number;
   content: string;
   is_bookmark: boolean;
@@ -467,7 +467,7 @@ function MainApp() {
   };
 
   // Optimistic Navigation: Switch screen immediately
-  const handleLoadInterview = (interviewId: number) => {
+  const handleLoadInterview = (interviewId: string | number) => {
     console.log('🚀 Optimistic Load: Switching to editor immediately');
     setCurrentInterviewId(interviewId);
     setCurrentScreen('editor');
@@ -484,7 +484,7 @@ function MainApp() {
   };
 
   // Inside App component
-  const fetchInterviewData = async (interviewId: number) => {
+  const fetchInterviewData = async (interviewId: string | number) => {
     console.time('Fetch Interview Data (Firestore)');
     try {
       const user = auth.currentUser;
@@ -652,6 +652,7 @@ function MainApp() {
             notes={notes}
             setNotes={setNotes}
             onSave={() => setShowSaveDialog(true)}
+            onNavigateToSettings={handleNavigateToSettings}
           />
         </ErrorBoundary>
       )}
