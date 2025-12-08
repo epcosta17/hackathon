@@ -4,7 +4,7 @@ import { APP_URL } from '../config';
 
 export function Hero() {
   return (
-    <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-32">
+    <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-48">
       {/* Background gradient orbs */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-20 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />

@@ -32,12 +32,12 @@ const steps = [
 export function HowItWorks() {
   return (
     <section id="features" className="relative max-w-7xl mx-auto px-6 py-32">
-      <div className="text-center mb-20">
+      <div className="text-center mb-16">
         <h2 className="text-white mb-4">How It Works</h2>
         <p className="text-gray-400 text-xl">Three simple steps to transform your interview process</p>
       </div>
 
-      <div className="space-y-32">
+      <div className="space-y-28">
         {steps.map((step, index) => (
           <div
             key={step.number}
