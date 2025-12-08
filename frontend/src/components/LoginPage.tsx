@@ -76,11 +76,8 @@ export function LoginPage() {
             const provider = new GoogleAuthProvider();
 
             // Use Redirect for Production (deployed), Popup for Dev (localhost)
-            if (import.meta.env.PROD) {
-                await signInWithRedirect(auth, provider);
-            } else {
-                await signInWithPopup(auth, provider);
-            }
+            // Use Popup method for both Dev and Prod to prevent redirect loops and cookie issues
+            await signInWithPopup(auth, provider);
         } catch (err: any) {
             console.error('Google login error:', err);
             if (err.code === 'auth/popup-closed-by-user') {
