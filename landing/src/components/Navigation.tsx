@@ -1,4 +1,5 @@
 import { Mic } from 'lucide-react';
+import { APP_URL } from '../config';
 
 export function Navigation() {
   return (
@@ -10,7 +11,7 @@ export function Navigation() {
           </div>
           <span className="text-white">Interview Lens</span>
         </div>
-        
+
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-gray-400 hover:text-white transition-colors">
             Features
@@ -22,11 +23,15 @@ export function Navigation() {
             FAQ
           </a>
         </div>
-        
-        <button className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/50 transition-all">
-          Start Analyzing Free
-        </button>
+
+        <a
+          href={APP_URL}
+          className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/50 transition-all font-medium inline-block"
+        >
+          Start Analyzing
+        </a>
       </div>
     </nav>
   );
 }
+

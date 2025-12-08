@@ -1,14 +1,15 @@
 import { Play } from 'lucide-react';
 import uploadImage from '../assets/review.mp4';
+import { APP_URL } from '../config';
 
 export function Hero() {
   return (
     <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-32">
       {/* Background gradient orbs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
-      <div className="absolute top-20 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl" />
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-20 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative">
+      <div className="relative z-10">
         <div className="text-center max-w-4xl mx-auto mb-16">
           <h1 className="text-white mb-6">
             Stop Re-listening to Interviews. Get Insights in Seconds.
@@ -19,9 +20,9 @@ export function Hero() {
           </p>
 
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            <button className="px-8 py-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-xl hover:shadow-blue-500/50 transition-all">
+            <a href={APP_URL} className="px-8 py-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-xl hover:shadow-blue-500/50 transition-all inline-block">
               Upload Your First Interview
-            </button>
+            </a>
             <button className="px-8 py-4 rounded-lg border border-white/10 text-white hover:bg-white/5 transition-all flex items-center gap-2">
               <Play className="w-5 h-5" />
               Watch Demo
