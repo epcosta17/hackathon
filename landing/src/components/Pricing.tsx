@@ -38,7 +38,7 @@ const plans = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="relative max-w-7xl mx-auto px-6 pt-32 pb-32">
+    <section id="pricing" className="relative max-w-7xl mx-auto px-6 pt-48 pb-32">
       <div className="text-center mb-12">
         <h2 className="text-white mb-4">Simple, Pay-As-You-Go Pricing</h2>
         <p className="text-gray-400 text-xl mb-8">No subscriptions. Credits never expire. Purchase only what you need.</p>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Lock, Chrome, User, ScanEye } from 'lucide-react';
+import { Mail, Lock, Chrome, User, ScanEye, FileAudio } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
@@ -106,7 +106,7 @@ export function LoginPage() {
                 {/* App Title */}
                 <div className="flex items-center justify-center gap-3 mb-8">
                     <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
-                        <ScanEye className="w-8 h-8 text-indigo-400" />
+                        <FileAudio className="w-8 h-8 text-indigo-400" />
                     </div>
                     <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tight">
                         Interview Lens
@@ -117,10 +117,7 @@ export function LoginPage() {
                     {/* Logo/Title Section */}
                     <div className="mb-8 text-center">
                         <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] rounded-lg mb-4">
-                            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z" />
-                                <path d="M12 6v6l4 2" />
-                            </svg>
+                            <FileAudio className="w-6 h-6 text-white" />
                         </div>
                         <h1 className="text-white mb-2">{isSignUp ? 'Create Account' : 'Welcome Back'}</h1>
                         <p className="text-[#888888]">

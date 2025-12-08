@@ -1,4 +1,4 @@
-import { Mic } from 'lucide-react';
+import { FileAudio } from 'lucide-react';
 import { APP_URL } from '../config';
 
 export function Navigation() {
@@ -7,7 +7,7 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <Mic className="w-5 h-5 text-white" />
+            <FileAudio className="w-5 h-5 text-white" />
           </div>
           <span className="text-white">Interview Lens</span>
         </div>
@@ -18,9 +18,6 @@ export function Navigation() {
           </a>
           <a href="#pricing" className="text-gray-400 hover:text-white transition-colors">
             Pricing
-          </a>
-          <a href="#faq" className="text-gray-400 hover:text-white transition-colors">
-            FAQ
           </a>
         </div>
 
@@ -34,4 +31,3 @@ export function Navigation() {
     </nav>
   );
 }
-
