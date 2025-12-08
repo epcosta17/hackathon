@@ -16,6 +16,8 @@ router = APIRouter(prefix="/api", tags=["transcription"])
 from services.transcription_service import transcribe_with_whisper_cpp, transcribe_with_deepgram, generate_mock_transcript
 from services.storage_service import storage_service
 from middleware.auth_middleware import get_current_user, verify_firebase_token
+from database import get_firestore_db
+from google.cloud import firestore
 
 
 @router.post("/transcribe")
@@ -41,7 +43,11 @@ async def transcribe_endpoint(
     # Extract user_id for outer scope usage (cleanup task)
     user_id = current_user['uid']
     
+    # State tracking for cleanups
     temp_file = None
+    credit_deducted = False
+    user_ref = None
+
     try:
         # 0. Setup File & GCS Paths (Common for all methods)
         raw_filename = audio_file.filename or "audio.mp3"
@@ -54,7 +60,7 @@ async def transcribe_endpoint(
         temp_file.close()
         
         # Define Waveform Task (Run in parallel but don't await yet)
-        from services.waveform_service import generate_waveform_universal
+        from services.waveform_service import generate_waveform_universal, get_audio_duration
         
         # Helper to run waveform generation safely in thread
         def run_waveform_gen():
@@ -63,6 +69,47 @@ async def transcribe_endpoint(
             except Exception as ex:
                 logger.error(f"Waveform generation failed: {ex}")
                 return []
+        
+        # --- DURATION CHECK (1.5 Hours Limit) ---
+        duration_seconds = get_audio_duration(temp_file.name)
+        MAX_DURATION = 60 * 60 # 1.5 hours in seconds
+        
+        if duration_seconds and duration_seconds > MAX_DURATION:
+             logger.warning(f"🚫 [TRANSCRIPTION] File too long: {duration_seconds}s > {MAX_DURATION}s")
+             raise HTTPException(status_code=400, detail="Audio file exceeds the 1 hour 30 minute limit.")
+             
+        logger.info(f"✅ [TRANSCRIPTION] Duration verified: {duration_seconds}s")
+        # ----------------------------------------
+
+        # --- CREDIT CHECK & DEDUCTION ---
+        # Now that file is valid, we check and deduct credits
+        # (Moved from top to avoid refund complexity on invalid files)
+        
+        db = get_firestore_db()
+        user_ref = db.collection('users').document(user_id)
+        
+        # 1. Check Credits (Read)
+        user_snap = user_ref.get()
+        current_credits = user_snap.get('credits') if user_snap.exists else 0
+        
+        # Handle None or non-int
+        if not isinstance(current_credits, int):
+            current_credits = 0
+
+        if current_credits <= 0:
+            logger.warning(f"🚫 [TRANSCRIPTION] Blocked request for user {user_id}: Insufficient credits ({current_credits})")
+            raise HTTPException(status_code=402, detail="Insufficient credits. Please top up to continue.")
+
+        # 2. Deduct Credit (Atomic Write)
+        try:
+            logger.info(f"💰 [TRANSCRIPTION] Deducting 1 credit for user {user_id} (Current: {current_credits})")
+            user_ref.update({"credits": firestore.Increment(-1)})
+            credit_deducted = True # Mark as deducted so we know to refund if failure occurs later
+        except Exception as e:
+            logger.error(f"Failed to deduct credit: {e}")
+            raise HTTPException(status_code=500, detail="Transaction failed")
+        
+        # --------------------------------
 
         # Launch waveform generation immediately in background thread
         # CRITICAL FIX: asyncio.to_thread returns a coroutine. It MUST be wrapped in create_task
@@ -146,10 +193,35 @@ async def transcribe_endpoint(
             'audio_url': audio_url
         }
         
+    except HTTPException as http_ex:
+        # Re-raise HTTP exceptions directly (e.g. 400 Bad Request, 402 Payment)
+        # We do NOT refund here because logic generally throws these BEFORE deduction
+        # OR explicitly handles refund internally if needed.
+        # But for safety, if we HAVE deducted, we should refund.
+        if credit_deducted and user_ref:
+             try:
+                logger.info(f"↩️ [TRANSCRIPTION] Refunding credit due to HTTPException ({http_ex.status_code})")
+                user_ref.update({"credits": firestore.Increment(1)})
+             except Exception as r_err:
+                logger.error(f"CRITICAL: Failed to refund: {r_err}")
+        
+        raise http_ex
+
     except Exception as e:
         logger.error(f"ERROR in transcription: {str(e)}")
         import traceback
         logger.error(f"Traceback:\n{traceback.format_exc()}")
+        
+        # --- CREDIT REFUND ---
+        # If we failed AND we deducted credit, give it back
+        if credit_deducted and user_ref:
+            try:
+                logger.info(f"↩️ [TRANSCRIPTION] Refunding credit to user {user_id} due to failure")
+                user_ref.update({"credits": firestore.Increment(1)})
+            except Exception as refund_error:
+                logger.error(f"CRITICAL: Failed to refund credit after error: {refund_error}")
+        # ---------------------
+
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if temp_file and os.path.exists(temp_file.name):

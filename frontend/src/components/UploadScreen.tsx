@@ -40,13 +40,14 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
   const [credits, setCredits] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Listen for credits
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnapshot) => { // Renamed doc to docSnapshot to avoid conflict with imported doc function
+    const unsubscribe = onSnapshot(userRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         setCredits(docSnapshot.data().credits || 0);
       }
@@ -56,7 +57,6 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
   // Real-time Firestore Listener
   useEffect(() => {
-    // Wait for auth to be ready
     const unsubscribeAuth = auth.onAuthStateChanged(user => {
       if (user) {
         setupListener(user.uid);
@@ -72,19 +72,13 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       setIsLoadingInterviews(true);
       const path = `users/${uid}/interviews`;
       console.log(`📡 [Firestore] Listening to: ${path}`);
-      // toast.info(`Listening to: ${path}`); // Debug toast
 
       const interviewsRef = collection(db, 'users', uid, 'interviews');
-
-      // Simple query: order by created_at desc
-      // Removing orderBy temporarily to debug missing index issue
       const q = query(interviewsRef);
-      // const q = query(interviewsRef, orderBy('created_at', 'desc'));
 
       unsubscribeFirestore = onSnapshot(q, (snapshot) => {
         const loadedInterviews: InterviewSummary[] = [];
         snapshot.forEach((doc) => {
-          // Basic validation
           const data = doc.data();
           loadedInterviews.push({
             id: data.id,
@@ -95,10 +89,8 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
           });
         });
 
-        // Sort manually for now since we removed orderBy
         loadedInterviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        // Client-side filter for search query
         const filtered = searchQuery
           ? loadedInterviews.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
           : loadedInterviews;
@@ -115,14 +107,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       unsubscribeAuth();
       if (unsubscribeFirestore) unsubscribeFirestore();
     };
-  }, [searchQuery]); // Re-run if search query changes? 
-  // actually, better to filter inside the snapshot or have a separate effect for filtering.
-  // Re-subscribing on every search keystroke is bad.
-  // Let's refactor: Listener fetches ALL, separate Effect filters.
-
-  // Refactored approach below
-
-  /* ... skipping fetchInterviews ... */
+  }, [searchQuery]);
 
   const fetchFunFact = async () => {
     try {
@@ -132,39 +117,21 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
         setCurrentFact(data.text);
       }
     } catch (error) {
-      // Fallback if API fails
       console.error("Failed to fetch fact", error);
     }
   };
 
-  // Rotate fun facts from API
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 
     if (isTranscribing && !isComplete) {
-      // Fetch initial fact immediately
       fetchFunFact();
-
       interval = setInterval(() => {
         fetchFunFact();
-      }, 6000); // Change fact every 6 seconds (giving more time to read random facts)
+      }, 6000);
     }
     return () => clearInterval(interval);
   }, [isTranscribing, isComplete]);
-
-  // Debounced search effect
-  // Refactored to filter client-side with Firestore listener
-  /*
-  useEffect(() => {
-    // Search is handled by the Firestore listener's setInterviews filtering
-  }, [searchQuery]);
-  */
-
-  /*
-  const fetchInterviews = async (search?: string) => {
-     // Legacy API call replaced by Firestore onSnapshot
-  };
-  */
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -177,25 +144,19 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
   const confirmDelete = async () => {
     if (deleteConfirmId === null) return;
-
-    // 1. Optimistic UI: Close dialog and remove from list immediately
     const idToDelete = deleteConfirmId;
-    setDeleteConfirmId(null); // Close dialog
-    setInterviews(prev => prev.filter(i => i.id !== idToDelete)); // Optimistic remove
+    setDeleteConfirmId(null);
+    setInterviews(prev => prev.filter(i => i.id !== idToDelete));
 
-    // 2. Background Process: Silent Delete
     try {
       const response = await authenticatedFetch(`/api/interviews/${idToDelete}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        // Only warn on failure
         console.error('Background delete failed');
-        // Optional: Revert state? For now, we rely on the next Snapshot update to fix consistency if it failed.
         toast.error('Failed to delete interview on server');
       }
-      // Success is silent
     } catch (error) {
       console.error('Failed to delete interview:', error);
       toast.error('Failed to delete interview on server');
@@ -224,6 +185,9 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile && (droppedFile.type === 'audio/mpeg' || droppedFile.type === 'audio/wav')) {
       setFile(droppedFile);
+      setError(null);
+      setIsComplete(false);
+      setProgress(0);
     }
   }, []);
 
@@ -231,6 +195,9 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
+      setError(null);
+      setIsComplete(false);
+      setProgress(0);
     }
   };
 
@@ -238,7 +205,8 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     if (!file) return;
 
     setIsTranscribing(true);
-    // Set to -1 to trigger the indeterminate "Processing" state immediately
+    setError(null);
+    // Set to -1 to trigger the indeterminate "Validating" state immediately
     setProgress(-1);
 
     try {
@@ -249,15 +217,14 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       const response = await authenticatedFetch('/api/transcribe', {
         method: 'POST',
         body: formData,
-        // Don't set Content-Type for FormData
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       // Wait for the full JSON response
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || `HTTP error! status: ${response.status}`);
+      }
 
       if (data.error) {
         throw new Error(data.error);
@@ -269,14 +236,14 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
       setTimeout(() => {
         onTranscriptionComplete(data.transcript, file, data.waveform, data.audio_url);
-      }, 1500); // Give user time to see "Transcription Finished" message
+      }, 1500);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error during transcription:', error);
-      toast.error('An error occurred during transcription. Please try again.');
       setIsTranscribing(false);
       setIsComplete(false);
-      setProgress(0);
+      setProgress(100);
+      setError(error.message || 'An error occurred.');
     }
   };
 
@@ -548,58 +515,78 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
               </motion.div>
 
               {/* Progress Section */}
-              {(isTranscribing || isComplete) && (
-                <motion.div
-                  className={`space-y-4 rounded-xl p-6 border transition-colors ${isComplete
-                    ? 'bg-green-500/10 border-green-500/30'
-                    : 'bg-zinc-900/50 border-zinc-800'
-                    }`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div className="flex items-center justify-between min-h-[24px]">
-                    <span className={`${isComplete ? 'text-green-400' : 'text-zinc-300'} font-medium`}>
-                      {isComplete ? 'Transcription complete!' : ''}
-                    </span>
-                    {!isComplete && (
-                      <span className="text-xs text-indigo-400 font-medium animate-pulse">
-                        Processing
+              {/* Show if Transcribing, OR Complete, OR Error */}
+              {
+                (isTranscribing || isComplete || error) && (
+                  <motion.div
+                    className={`space-y-4 rounded-xl p-6 border transition-colors ${error
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : isComplete
+                        ? 'bg-green-500/10 border-green-500/30'
+                        : 'bg-zinc-900/50 border-zinc-800'
+                      }`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="flex items-center justify-between min-h-[24px]">
+                      <span className={`${error ? 'text-red-400' : isComplete ? 'text-green-400' : 'text-zinc-300'
+                        } font-medium`}>
+                        {error
+                          ? 'Upload Failed'
+                          : isComplete
+                            ? 'Transcription complete!'
+                            : 'Processing Audio...'}
                       </span>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <Progress
-                      value={isComplete ? 100 : (progress === -1 ? null : progress)}
-                      variant={isComplete ? "success" : "default"}
-                      className="h-2"
-                    />
-                  </div>
-
-                  {/* Fun Facts Section */}
-                  {!isComplete && (
-                    <div className="pt-2 flex items-start gap-3">
-                      <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
-                      <div className="h-12 overflow-hidden relative w-full">
-                        <AnimatePresence mode="wait">
-                          <motion.p
-                            key={currentFact}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.5 }}
-                            className="text-sm text-zinc-400 leading-relaxed absolute w-full"
-                          >
-                            <span className="text-purple-300 font-medium">Did you know?</span> {currentFact}
-                          </motion.p>
-                        </AnimatePresence>
-                      </div>
+                      {!isComplete && !error && progress > 0 && (
+                        <span className="text-xs text-indigo-400 font-medium animate-pulse">
+                          {Math.round(progress)}%
+                        </span>
+                      )}
                     </div>
-                  )}
-                </motion.div>
-              )}
+
+                    <div className="relative">
+                      <Progress
+                        value={isComplete || error ? 100 : (progress === -1 ? null : progress)}
+                        variant={error ? "destructive" : isComplete ? "success" : "default"}
+                        className="h-2"
+                      />
+                    </div>
+
+                    {/* Error Message Display */}
+                    {error ? (
+                      <div className="pt-2 flex items-start gap-3">
+                        <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-300 leading-relaxed">
+                          {error}
+                        </p>
+                      </div>
+                    ) : (
+                      /* Fun Facts Section */
+                      !isComplete && (
+                        <div className="pt-2 flex items-start gap-3">
+                          <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                          <div className="h-12 overflow-hidden relative w-full">
+                            <AnimatePresence mode="wait">
+                              <motion.p
+                                key={currentFact}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.5 }}
+                                className="text-sm text-zinc-400 leading-relaxed absolute w-full"
+                              >
+                                <span className="text-purple-300 font-medium">Did you know?</span> {currentFact}
+                              </motion.p>
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </motion.div>
+                )
+              }
 
               {/* Action Button */}
               <motion.div
@@ -636,108 +623,110 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                   )}
                 </Button>
               </motion.div>
-            </motion.div>
-          </div>
-        </div>
-      </main>
+            </motion.div >
+          </div >
+        </div >
+      </main >
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmId !== null && typeof document !== 'undefined' && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(4px)'
-          }}
-          onClick={() => setDeleteConfirmId(null)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={(e) => e.stopPropagation()}
+      {
+        deleteConfirmId !== null && typeof document !== 'undefined' && createPortal(
+          <div
             style={{
-              backgroundColor: '#18181b',
-              border: '1px solid #3f3f46',
-              borderRadius: '12px',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '420px',
-              margin: '16px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+              position: 'fixed',
+              inset: 0,
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(4px)'
             }}
+            onClick={() => setDeleteConfirmId(null)}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #dc2626, #991b1b)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#18181b',
+                border: '1px solid #3f3f46',
+                borderRadius: '12px',
+                padding: '24px',
+                width: '100%',
+                maxWidth: '420px',
+                margin: '16px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #dc2626, #991b1b)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <AlertTriangle style={{ width: '24px', height: '24px', color: 'white' }} />
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    marginBottom: '4px'
+                  }}>
+                    Delete Interview
+                  </h3>
+                  <p style={{
+                    color: '#a1a1aa',
+                    fontSize: '14px',
+                    margin: 0
+                  }}>
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+
+              <p style={{
+                color: '#d4d4d8',
+                marginBottom: '24px',
+                fontSize: '14px',
+                lineHeight: '1.5'
               }}>
-                <AlertTriangle style={{ width: '24px', height: '24px', color: 'white' }} />
-              </div>
-              <div>
-                <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  marginBottom: '4px'
-                }}>
-                  Delete Interview
-                </h3>
-                <p style={{
-                  color: '#a1a1aa',
-                  fontSize: '14px',
-                  margin: 0
-                }}>
-                  This action cannot be undone
-                </p>
-              </div>
-            </div>
+                Are you sure you want to permanently delete this interview? All analysis data will be lost.
+              </p>
 
-            <p style={{
-              color: '#d4d4d8',
-              marginBottom: '24px',
-              fontSize: '14px',
-              lineHeight: '1.5'
-            }}>
-              Are you sure you want to permanently delete this interview? All analysis data will be lost.
-            </p>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <Button
-                onClick={() => setDeleteConfirmId(null)}
-                variant="outline"
-                className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmDelete}
-                style={{
-                  background: 'linear-gradient(to right, #ef4444, #f43f5e)',
-                  color: 'white',
-                  border: 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #e11d48)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #f43f5e)'}
-              >
-                <Trash2 className="w-4 h-4 mr-1.5" />
-                Delete
-              </Button>
-            </div>
-          </motion.div>
-        </div>,
-        document.body
-      )}
-    </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <Button
+                  onClick={() => setDeleteConfirmId(null)}
+                  variant="outline"
+                  className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmDelete}
+                  style={{
+                    background: 'linear-gradient(to right, #ef4444, #f43f5e)',
+                    color: 'white',
+                    border: 'none'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #dc2626, #e11d48)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(to right, #ef4444, #f43f5e)'}
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Delete
+                </Button>
+              </div>
+            </motion.div>
+          </div>,
+          document.body
+        )
+      }
+    </div >
   );
 }

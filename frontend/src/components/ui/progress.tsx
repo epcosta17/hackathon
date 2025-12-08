@@ -10,7 +10,7 @@ function Progress({
   value,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root> & { variant?: "default" | "success" }) {
+}: React.ComponentProps<typeof ProgressPrimitive.Root> & { variant?: "default" | "success" | "destructive" }) {
   const isIndeterminate = value === null || value === undefined;
 
   return (
@@ -36,7 +36,9 @@ function Progress({
             "h-full w-full flex-1 transition-all",
             variant === "success"
               ? "bg-gradient-to-r from-green-500 to-emerald-500"
-              : "bg-gradient-to-r from-indigo-600 to-purple-600"
+              : variant === "destructive"
+                ? "bg-gradient-to-r from-red-500 to-rose-600"
+                : "bg-gradient-to-r from-indigo-600 to-purple-600"
           )}
           style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
         />

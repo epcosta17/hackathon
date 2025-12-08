@@ -152,3 +152,41 @@ def generate_waveform_universal(audio_path: str, samples: int = 250) -> List[flo
     random.seed(hash(audio_path))  # Consistent per file
     return [random.uniform(0.3, 1.0) for _ in range(samples)]
 
+
+def get_audio_duration(audio_path: str) -> Optional[float]:
+    """
+    Get duration of audio file in seconds.
+    Supports WAV (native) and MP3 (via ffprobe).
+    """
+    try:
+        # 1. Try WAV native
+        if audio_path.lower().endswith('.wav'):
+            try:
+                with wave.open(audio_path, 'rb') as wav_file:
+                    return wav_file.getnframes() / float(wav_file.getframerate())
+            except Exception:
+                pass # Fallback to ffprobe if wave fails (e.g. funny headers)
+
+        # 2. Use ffprobe for everything else (universal)
+        import subprocess
+        
+        # ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 input.mp3
+        cmd = [
+            'ffprobe',
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            audio_path
+        ]
+        
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+        else:
+            print(f"⚠️ ffprobe failed: {result.stderr}")
+            return None
+            
+    except Exception as e:
+        print(f"⚠️ Failed to get duration: {str(e)}")
+        return None
