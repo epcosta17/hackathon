@@ -9,7 +9,6 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt .
-# Install CPU-only torch first to avoid downloading huge CUDA wheels (saves ~2GB+)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
