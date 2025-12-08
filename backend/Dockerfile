@@ -10,7 +10,6 @@ WORKDIR /app
 # Install Python dependencies
 COPY requirements.txt .
 # Install CPU-only torch first to avoid downloading huge CUDA wheels (saves ~2GB+)
-RUN pip install --no-cache-dir torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
