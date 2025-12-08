@@ -1,4 +1,4 @@
-import { Play } from 'lucide-react';
+
 import uploadImage from '../assets/review.mp4';
 import { APP_URL } from '../config';
 
@@ -23,10 +23,7 @@ export function Hero() {
             <a href={APP_URL} className="px-8 py-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-xl hover:shadow-blue-500/50 transition-all inline-block">
               Upload Your First Interview
             </a>
-            <button className="px-8 py-4 rounded-lg border border-white/10 text-white hover:bg-white/5 transition-all flex items-center gap-2">
-              <Play className="w-5 h-5" />
-              Watch Demo
-            </button>
+
           </div>
         </div>
 
