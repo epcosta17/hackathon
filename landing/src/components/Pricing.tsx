@@ -12,7 +12,8 @@ const plans = [
       '5 Interview Credits',
       'Full AI Analysis',
       'Detailed Transcripts',
-      'PDF Export'
+      'Advanced Export Options',
+      'Full History Access'
     ],
     cta: 'Get Started',
     highlighted: false
@@ -37,7 +38,7 @@ const plans = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="relative max-w-7xl mx-auto px-6 py-24">
+    <section id="pricing" className="relative max-w-7xl mx-auto px-6 pt-32 pb-32">
       <div className="text-center mb-12">
         <h2 className="text-white mb-4">Simple, Pay-As-You-Go Pricing</h2>
         <p className="text-gray-400 text-xl mb-8">No subscriptions. Credits never expire. Purchase only what you need.</p>
@@ -48,8 +49,8 @@ export function Pricing() {
           <div
             key={plan.name}
             className={`relative p-8 rounded-2xl border backdrop-blur-xl transition-all ${plan.highlighted
-                ? 'bg-white/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-105'
-                : 'bg-white/5 border-white/10 hover:bg-white/10'
+              ? 'bg-white/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-105'
+              : 'bg-white/5 border-white/10 hover:bg-white/10'
               }`}
           >
             {plan.highlighted && (
@@ -85,9 +86,9 @@ export function Pricing() {
 
             <a
               href={APP_URL}
-              className={`w-full py-3 rounded-lg transition-all block text-center ${plan.highlighted
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/50'
-                  : 'border border-white/20 text-white hover:bg-white/5'
+              className={`w-full py-3 px-6 rounded-lg transition-all inline-flex items-center justify-center text-center font-medium ${plan.highlighted
+                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/50'
+                : 'border border-white/20 text-white hover:bg-white/5'
                 }`}
             >
               {plan.cta}

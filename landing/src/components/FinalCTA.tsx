@@ -2,7 +2,7 @@ import { APP_URL } from '../config';
 
 export function FinalCTA() {
   return (
-    <section className="relative max-w-4xl mx-auto px-6 py-32">
+    <section className="relative max-w-4xl mx-auto px-6 pt-24 pb-32">
       <div className="relative p-12 rounded-3xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 backdrop-blur-xl text-center overflow-hidden">
         {/* Background gradient orbs */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/30 rounded-full blur-3xl" />
@@ -17,7 +17,7 @@ export function FinalCTA() {
             Join hundreds of technical recruiters who are already saving 20+ hours per week with Interview Lens.
           </p>
 
-          <a href="https://app.getinterviewlens.com" className="px-10 py-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-xl hover:shadow-blue-500/50 transition-all inline-block font-medium">
+          <a href={APP_URL} className="px-10 py-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-xl hover:shadow-blue-500/50 transition-all inline-block font-medium">
             Get Started
           </a>
         </div>
