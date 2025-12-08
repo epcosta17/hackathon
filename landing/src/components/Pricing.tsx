@@ -42,6 +42,11 @@ export function Pricing() {
       <div className="text-center mb-12">
         <h2 className="text-white mb-4">Simple, Pay-As-You-Go Pricing</h2>
         <p className="text-gray-400 text-xl mb-8">No subscriptions. Credits never expire. Purchase only what you need.</p>
+
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium">
+          <Zap className="w-4 h-4" />
+          Get 3 free credits on signup immediately
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mt-12">

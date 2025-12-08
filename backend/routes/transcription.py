@@ -72,7 +72,7 @@ async def transcribe_endpoint(
         
         # --- DURATION CHECK (1.5 Hours Limit) ---
         duration_seconds = get_audio_duration(temp_file.name)
-        MAX_DURATION = 60 * 60 # 1.5 hours in seconds
+        MAX_DURATION = 90 * 60 # 1.5 hours in seconds
         
         if duration_seconds and duration_seconds > MAX_DURATION:
              logger.warning(f"🚫 [TRANSCRIPTION] File too long: {duration_seconds}s > {MAX_DURATION}s")

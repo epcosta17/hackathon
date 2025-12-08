@@ -25,7 +25,7 @@ export function Navigation() {
           href={APP_URL}
           className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/50 transition-all font-medium inline-block"
         >
-          Start Analyzing
+          Start Analyzing Free
         </a>
       </div>
     </nav>
