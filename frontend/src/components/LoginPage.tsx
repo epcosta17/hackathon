@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Mail, Lock, Chrome, User, ScanEye } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { DoodleBackground } from './DoodleBackground';
 
 export function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
@@ -102,9 +101,6 @@ export function LoginPage() {
 
             {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] via-[#0a0a0a]/95 to-[#1a1a2e]/80" />
-
-            {/* Decorative Doodles */}
-            <DoodleBackground />
 
             <div className="w-full max-w-md relative z-10">
                 {/* App Title */}
