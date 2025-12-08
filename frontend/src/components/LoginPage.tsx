@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, Lock, Chrome, User, ScanEye } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { DoodleBackground } from './DoodleBackground';
 
@@ -52,17 +52,44 @@ export function LoginPage() {
         }
     };
 
+    useEffect(() => {
+        // Check for redirect result when the component mounts (Needed for Prod)
+        const checkRedirectResult = async () => {
+            try {
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    // User successfully signed in with Google
+                    // The auth state listener in App.tsx/AuthProvider will handle the redirect to dashboard
+                }
+            } catch (err: any) {
+                console.error('Redirect auth error:', err);
+                setError('Failed to sign in with Google');
+            }
+        };
+
+        checkRedirectResult();
+    }, []);
+
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         setError('');
         try {
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
-        } catch (err) {
+
+            // Use Redirect for Production (deployed), Popup for Dev (localhost)
+            if (import.meta.env.PROD) {
+                await signInWithRedirect(auth, provider);
+            } else {
+                await signInWithPopup(auth, provider);
+            }
+        } catch (err: any) {
             console.error('Google login error:', err);
-            setError('Failed to sign in with Google');
-        } finally {
-            setIsLoading(false);
+            if (err.code === 'auth/popup-closed-by-user') {
+                setError('Sign in cancelled');
+            } else {
+                setError('Failed to sign in with Google');
+            }
+            setIsLoading(false); // Only needed here, Redirect flow navigates away
         }
     };
 
