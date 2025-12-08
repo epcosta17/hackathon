@@ -20,7 +20,7 @@ import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
 
 interface Note {
   id: number;
-  interview_id: number;
+  interview_id: string | number;
   timestamp: number;
   content: string;
   is_bookmark: boolean;
@@ -33,7 +33,7 @@ interface AnalysisDashboardProps {
   transcriptBlocks: any[];
   onBackToUpload: () => void;
   onBackToEditor: () => void;
-  currentInterviewId: number | null;
+  currentInterviewId: string | number | null;
   currentInterviewTitle: string;
   onSaveInterview: (titleOrId: number | string) => void;
   audioFile: File | null;

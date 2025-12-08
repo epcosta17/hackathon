@@ -32,6 +32,15 @@ async def get_current_user(
         uid = decoded_token.get('uid')
         
         # ---------------------------------------------------------
+        # Email Verification Check
+        # ---------------------------------------------------------
+        if not decoded_token.get('email_verified', False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email not verified. Please verify your email to access the platform.",
+            )
+        
+        # ---------------------------------------------------------
         # Sync with Firestore (Credit Initialization)
         # ---------------------------------------------------------
         from database import get_firestore_db

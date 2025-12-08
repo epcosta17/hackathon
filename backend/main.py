@@ -49,6 +49,7 @@ app.add_middleware(
 
 # Register modular routers
 app.include_router(auth.router)
+app.include_router(auth.action_router)
 app.include_router(transcription.router)
 app.include_router(analysis.router)
 app.include_router(interviews.router)

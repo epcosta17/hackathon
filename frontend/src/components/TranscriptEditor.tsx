@@ -15,7 +15,7 @@ import { TranscriptSegment } from './TranscriptSegment';
 
 interface Note {
   id: number;
-  interview_id: number;
+  interview_id: string | number;
   timestamp: number;
   content: string;
   is_bookmark: boolean;
@@ -34,7 +34,7 @@ interface TranscriptEditorProps {
   audioDuration: number | null;
   waveformData: number[] | null;
   existingAnalysis: AnalysisData | null;
-  currentInterviewId: number | null;
+  currentInterviewId: string | number | null;
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
   onSave: () => void;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Mail, Lock, Chrome, User, ScanEye } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { DoodleBackground } from './DoodleBackground';
 
@@ -20,9 +20,19 @@ export function LoginPage() {
         try {
             if (isSignUp) {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                // Send Verification Email with redirect URL
+                await sendEmailVerification(userCredential.user, {
+                    url: window.location.origin + '/verify-email',
+                    handleCodeInApp: true,
+                });
+
                 if (name) {
                     await updateProfile(userCredential.user, { displayName: name });
                 }
+
+                // We do NOT sign out. The App component will detect !emailVerified and show Pending screen.
+                return;
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
             }

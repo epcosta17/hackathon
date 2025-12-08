@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { LoginPage } from './components/LoginPage';
+import { VerifyEmail } from './components/VerifyEmail';
+import { EmailVerificationPending } from './components/EmailVerificationPending';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
@@ -103,6 +106,17 @@ export interface AnalysisData {
 // Inner component that uses authentication
 function AuthenticatedApp() {
   const { currentUser } = useAuth();
+  const location = useLocation();
+
+  // Allow Verification Route bypassing Auth check
+  if (location.pathname === '/verify-email') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
+        <VerifyEmail />
+        <Toaster position="bottom-right" theme="dark" />
+      </div>
+    );
+  }
 
   // Show login page if not authenticated
   if (!currentUser) {
@@ -115,6 +129,7 @@ function AuthenticatedApp() {
 
 // Main app logic (extracted from original App component)
 function MainApp() {
+  const { currentUser, loading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -122,7 +137,7 @@ function MainApp() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
-  const [currentInterviewId, setCurrentInterviewId] = useState<number | null>(null);
+  const [currentInterviewId, setCurrentInterviewId] = useState<string | number | null>(null);
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -131,19 +146,59 @@ function MainApp() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
 
+  // Sync user data with backend (initializes credits for new users)
+  useEffect(() => {
+    const syncUser = async () => {
+      try {
+        await authenticatedFetch('/api/auth/me');
+        console.log('✅ User synced with backend');
+      } catch (error) {
+        // If 403 (unverified), it's fine, we just want to trigger creation if possible. 
+        // But wait, our middleware BLOCKS unverified users. 
+        // So we might need to allow unverified users on /api/auth/me OR handle it.
+        // Actually, if blocked, it means they can't get credits yet anyway.
+        // Credits should be assigned *after* verification?
+        // Let's check middleware.
+        console.error('Failed to sync user:', error);
+      }
+    };
+    if (currentUser) {
+      syncUser();
+    }
+  }, [currentUser]);
+
   // Handle Stripe Redirects
+  // Handle Query Params (Stripe Success & Email Verification)
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
+
+    // Stripe Success
     if (query.get('success')) {
       toast.success('Credits added successfully!');
-      // Clean URL without reloading
       window.history.replaceState({}, document.title, "/");
     }
+
+    // Email Verified via Custom Handler
+    if (query.get('verified')) {
+      toast.success('Email verified successfully!');
+      window.history.replaceState({}, document.title, "/");
+
+      // Force reload user to update UI state if needed
+      if (currentUser) {
+        currentUser.reload().then(() => {
+          currentUser.getIdToken(true); // refresh token
+        }).catch(e => console.error(e));
+      }
+    }
+
+    // Stripe Canceled
     if (query.get('canceled')) {
       toast.error('Payment canceled');
       window.history.replaceState({}, document.title, "/");
     }
-  }, []);
+  }, [currentUser]);
+
+  // Handle Stripe Redirects
 
   const handleNavigateToSettings = () => {
     setCurrentScreen('settings');
@@ -539,11 +594,33 @@ function MainApp() {
     exit: "exit"
   };
 
-  const handleInterviewSaved = (id: number) => {
+  const handleInterviewSaved = (id: string) => {
     setCurrentInterviewId(id);
     setHasNewAnalysis(false);
     console.log('✅ Interview saved/updated, ID:', id);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
+  // Check verification status
+  if (!currentUser.emailVerified) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
+        <EmailVerificationPending />
+        <Toaster position="bottom-right" theme="dark" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">

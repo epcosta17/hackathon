@@ -14,7 +14,7 @@ import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/fir
 // ... (interfaces)
 
 interface InterviewSummary {
-  id: number;
+  id: string | number;
   title: string;
   transcript_preview: string;
   created_at: string;
@@ -23,7 +23,7 @@ interface InterviewSummary {
 
 interface UploadScreenProps {
   onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => void;
-  onLoadInterview: (id: number) => void;
+  onLoadInterview: (id: string | number) => void;
   onNavigateToSettings: () => void;
 }
 
