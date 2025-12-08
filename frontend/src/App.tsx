@@ -16,7 +16,7 @@ import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { db, auth } from './config/firebase';
 import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
-import { authenticatedFetch } from './utils/api';
+import { authenticatedFetch, API_BASE_URL } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BillingScreen } from './components/BillingScreen';
 
@@ -551,7 +551,7 @@ function MainApp() {
         }
 
         // interviewData.audio_url is the relative path stored by backend e.g. "/api/audio/..."
-        const baseUrl = `http://127.0.0.1:8000${interviewData.audio_url}`;
+        const baseUrl = `${API_BASE_URL}${interviewData.audio_url}`;
         setAudioUrl(token ? `${baseUrl}?token=${token}` : baseUrl);
       } else {
         setAudioUrl(null);
