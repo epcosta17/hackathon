@@ -10,7 +10,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Virtuoso } from 'react-virtuoso';
 import { db, auth } from '../config/firebase';
-import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { TranscriptSegment } from './TranscriptSegment';
 import { NoCreditsDialog } from './NoCreditsDialog';
 
@@ -699,12 +699,14 @@ export function TranscriptEditor({
     const userRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
-        setCredits(doc.data().credits ?? 0);
+        const val = doc.data().credits ?? 0;
+        console.log(`💰 [TranscriptEditor] Fetched credits: ${val} (Type: ${typeof val})`);
+        setCredits(val);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth.currentUser]);
 
   const handleRunAnalysis = async () => {
     // Logic: First analysis is free (included in 1 credit). Re-analysis costs 0.5.
@@ -720,10 +722,47 @@ export function TranscriptEditor({
 
     setIsAnalyzing(true);
 
+    // Fetch latest analysis settings
+    // Default to all blocks if no settings found (ensures prompt_config is always sent)
+    const { PROMPT_BLOCKS } = await import('./SettingsScreen');
+    // Fetch settings if available, else default
+    let promptConfig = PROMPT_BLOCKS.map(b => b.id);
+    let modelConfig = 'fast'; // Default to fast
+
+    if (auth.currentUser) {
+      try {
+        const settingsSnap = await getDoc(doc(db, 'users', auth.currentUser.uid, 'settings', 'analysis'));
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (data.enabled_blocks) promptConfig = data.enabled_blocks;
+          if (data.model_mode) modelConfig = data.model_mode;
+        }
+      } catch (err) {
+        console.warn('Failed to load settings, using defaults', err);
+      }
+    }
+
+    console.log('🚀 Sending analysis request with config:', { promptConfig, modelConfig });
+
+    // Get auth token for the request
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      throw new Error('Authentication token not found.');
+    }
+
     try {
-      const response = await postJSON('/v1/analyze', {
-        transcript_blocks: transcriptBlocks,
-        is_reanalysis: isReanalysis
+      const response = await fetch('http://localhost:8000/v1/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          transcript_blocks: transcriptBlocks,
+          is_reanalysis: isReanalysis,
+          prompt_config: promptConfig,
+          analysis_mode: modelConfig
+        })
       });
 
       if (!response.ok) {

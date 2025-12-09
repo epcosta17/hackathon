@@ -92,8 +92,8 @@ async def transcribe_endpoint(
         user_snap = user_ref.get()
         current_credits = user_snap.get('credits') if user_snap.exists else 0
         
-        # Handle None or non-int
-        if not isinstance(current_credits, int):
+        # Handle None or non-number
+        if not isinstance(current_credits, (int, float)):
             current_credits = 0
 
         if current_credits <= 0:

@@ -98,6 +98,16 @@ async def get_current_user(
                 'updated_at': now
             }
             user_ref.set(db_user_data)
+            
+            # Initialize Default Analysis Settings
+            from services.prompt_blocks import DEFAULT_BLOCK_ORDER
+            settings_ref = db.collection('users').document(uid).collection('settings').document('analysis')
+            settings_ref.set({
+                'enabled_blocks': DEFAULT_BLOCK_ORDER,
+                'model_mode': 'fast',
+                'updated_at': now
+            })
+            print(f"✅ Initialized default analysis settings for user {uid}")
         else:
             # Existing User: Fetch latest credit balance
             db_user_data = user_doc.to_dict()

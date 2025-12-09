@@ -1,4 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { SettingsScreen } from './components/SettingsScreen';
+
+export type Screen = 'upload' | 'editor' | 'analysis' | 'settings' | 'analysis-settings';
+
+// ... (existing code)
+
 import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,9 +25,6 @@ import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } fr
 import { authenticatedFetch, API_BASE_URL } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BillingScreen } from './components/BillingScreen';
-
-
-export type Screen = 'upload' | 'editor' | 'analysis' | 'settings';
 
 export interface Word {
   text: string;
@@ -94,12 +97,24 @@ export interface Statistics {
 }
 
 export interface AnalysisData {
-  generalComments: GeneralComments;
-  keyPoints: KeyPoint[];
-  codingChallenge: CodingChallenge;
-  technologies: Technology[];
-  qaTopics: QATopic[];
-  statistics: Statistics;
+  executiveSummary?: string;
+  generalComments?: GeneralComments;
+  strengthsWeaknesses?: {
+    strengths: string[];
+    weaknesses: string[];
+  };
+  thinkingProcess?: {
+    methodology: string;
+    edgeCaseHandling: number;
+    edgeCaseExplanation: string;
+    structureScore: number;
+    structureExplanation: string;
+  };
+  keyPoints?: KeyPoint[];
+  codingChallenge?: CodingChallenge;
+  technologies?: Technology[];
+  qaTopics?: QATopic[];
+  statistics?: Statistics;
   docx_path?: string;
 }
 
@@ -205,6 +220,10 @@ function MainApp() {
 
   const handleNavigateToSettings = () => {
     setCurrentScreen('settings');
+  };
+
+  const handleNavigateToAnalysisConfig = () => {
+    setCurrentScreen('analysis-settings');
   };
 
   // Pre-fill title when loading existing interview
@@ -633,10 +652,14 @@ function MainApp() {
           onTranscriptionComplete={handleTranscriptionComplete}
           onLoadInterview={handleLoadInterview}
           onNavigateToSettings={handleNavigateToSettings}
+          onNavigateToAnalysisConfig={handleNavigateToAnalysisConfig}
         />
       )}
       {currentScreen === 'settings' && (
         <BillingScreen onBack={handleBackToUpload} />
+      )}
+      {currentScreen === 'analysis-settings' && (
+        <SettingsScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'editor' && (
         <ErrorBoundary>

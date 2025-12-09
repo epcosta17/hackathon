@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
 from models.schemas import AnalysisData, AnalyzeRequest, GenerateReportRequest, DownloadRequest
-from services.docx_service import generate_docx_async, get_cached_docx
+from services.docx_service import generate_docx_async, get_cached_docx, generate_docx_bytes
 from services.analysis_service import generate_analysis_report
 from middleware.auth_middleware import get_current_user
 
@@ -51,10 +51,13 @@ async def analyze_endpoint(
 
     # ---------------------------------------------------------
     # Run AI Analysis
-    # ---------------------------------------------------------
-    analysis_data = generate_analysis_report(full_transcript)
-    
-    # ---------------------------------------------------------
+    # ---------------------------------------------------------        # Generate Analysis
+    analysis_data = await asyncio.to_thread(
+        generate_analysis_report, 
+        full_transcript, 
+        request.prompt_config,
+        request.analysis_mode
+    ) # ---------------------------------------------------------
     # Deduct Credit (Atomic)
     # ---------------------------------------------------------
     if should_charge:
@@ -107,33 +110,37 @@ async def generate_report_endpoint(
 
 @router.post("/download-report")
 async def download_report_endpoint(
-    request: DownloadRequest,
+    request: GenerateReportRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Download cached DOCX file. If not in cache, return error message.
-    Frontend should regenerate analysis to get a new report.
+    Generate and download DOCX report on demand.
+    Accepts the full analysis data and returns the file stream.
     """
-    cache_key = request.docx_path
-    
-    # Check if in cache
-    docx_data = get_cached_docx(cache_key)
-    if not docx_data:
-        raise HTTPException(
-            status_code=404, 
-            detail="Report not found. Please run analysis again to generate a new report."
+    try:
+        # Convert dict to AnalysisData model if needed
+        if isinstance(request.analysis_data, dict):
+            analysis_data = AnalysisData(**request.analysis_data)
+        else:
+            analysis_data = request.analysis_data
+            
+        print(f"📥 Generating report for download (User: {current_user.get('uid')})")
+        
+        # Generate DOCX in memory (synchronous op run in thread)
+        docx_buffer = await asyncio.to_thread(generate_docx_bytes, analysis_data)
+        
+        # Return as download
+        timestamp = int(time.time())
+        filename = f"interview_analysis_{timestamp}.docx"
+        
+        return StreamingResponse(
+            docx_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
-    
-    # Create BytesIO from cached data
-    docx_buffer = io.BytesIO(docx_data)
-    docx_buffer.seek(0)
-    
-    # Return as download
-    return StreamingResponse(
-        docx_buffer,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename=interview_analysis_{int(time.time())}.docx"}
-    )
+    except Exception as e:
+        print(f"❌ Download failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
 
 
 @router.get("/ping")

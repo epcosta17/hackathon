@@ -1,5 +1,5 @@
 """Pydantic models for API requests and responses."""
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -74,13 +74,18 @@ class Statistics(BaseModel):
 
 
 class AnalysisData(BaseModel):
-    """Data model for the AI analysis output."""
-    generalComments: GeneralComments
-    keyPoints: List[KeyPoint]
-    codingChallenge: CodingChallenge
-    technologies: List[Technology]
-    qaTopics: List[QATopic]
-    statistics: Statistics
+    """Data model for the analysis report.
+    All fields are optional because the user can disable specific blocks.
+    """
+    generalComments: Optional[Dict[str, str]] = None
+    executiveSummary: Optional[str] = None
+    strengthsWeaknesses: Optional[Dict[str, List[str]]] = None
+    thinkingProcess: Optional[Dict[str, Any]] = None
+    keyPoints: Optional[List[Dict[str, str]]] = None
+    codingChallenge: Optional[Dict[str, str]] = None
+    technologies: Optional[List[Dict[str, str]]] = None
+    qaTopics: Optional[List[Dict[str, str]]] = None
+    statistics: Optional[Dict[str, Any]] = None
     docx_path: Optional[str] = None
 
     model_config = ConfigDict(extra='ignore')  # Changed to 'ignore' to allow frontend timestamp field
@@ -92,6 +97,8 @@ class AnalyzeRequest(BaseModel):
     """Request model for analysis endpoint."""
     transcript_blocks: List[TranscriptBlock]
     is_reanalysis: bool = False
+    prompt_config: Optional[List[str]] = None
+    analysis_mode: Optional[str] = "fast" # 'deep' or 'fast'
 
 
 class GenerateReportRequest(BaseModel):
