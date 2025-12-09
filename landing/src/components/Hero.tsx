@@ -32,10 +32,11 @@ export function Hero() {
         <div className="relative max-w-5xl mx-auto" style={{ marginTop: '-3px' }}>
           <div className="relative" style={{ perspective: '1500px' }}>
             <div
-              className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-500/20"
+              className="relative rounded-2xl overflow-hidden border shadow-2xl shadow-blue-500/20"
               style={{
                 transform: 'rotateX(8deg) rotateY(-8deg)',
-                transformStyle: 'preserve-3d'
+                transformStyle: 'preserve-3d',
+                borderColor: 'rgba(59, 130, 246, 0.4)'
               }}
             >
               {/* Glassmorphism overlay */}
