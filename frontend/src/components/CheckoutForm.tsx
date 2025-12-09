@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { CheckCheck } from 'lucide-react';
 
 // Initialize Stripe Key
-const stripePromise = loadStripe("pk_test_51SbMfL4fEK1Kwnr2XtcuK1ooN6qTKueKGpaGssq76aDSLHf7At8iQQ5hlab60SoDYZphhdfBSRedF2WA87aEg7Bg00qGGhSi2V");
+const stripePromise = loadStripe("pk_live_51SbMfL4fEK1Kwnr2m9bCv4EXYNpjaFiAQsjiOOvPxwaupSlZ74oGhrWjiaJaXd6CFI52hbsAOsprm7woAKv5RmpT0015RxdwHy");
 
 export interface CheckoutFormProps {
     clientSecret: string;
