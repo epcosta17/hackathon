@@ -1,10 +1,12 @@
 import os
 import stripe
+import requests
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from database import get_firestore_db
 from middleware.auth_middleware import get_current_user
 from typing import Dict, Any
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
@@ -18,8 +20,8 @@ CREDIT_PACKS = {
     "pack_20": {"credits": 20, "price_cents": 1500, "name": "20 Interview Credits (Best Value)"}
 }
 
-# Exchange Rates (Approximate for Demo)
-EXCHANGE_RATES = {
+# Fallback Exchange Rates (if API fails)
+FALLBACK_EXCHANGE_RATES = {
     "usd": 1.0,
     "eur": 0.92,
     "gbp": 0.79,
@@ -27,8 +29,54 @@ EXCHANGE_RATES = {
     "inr": 84.50,
     "aud": 1.52,
     "jpy": 150.0,
-    "cny": 7.25
+    "cny": 7.25,
+    "mxn": 20.0
 }
+
+# Cache for exchange rates (1 hour)
+EXCHANGE_RATES_CACHE = {
+    "rates": None,
+    "last_updated": None
+}
+
+def get_exchange_rates() -> Dict[str, float]:
+    """Fetch real-time exchange rates from API with caching and fallback"""
+    # Check cache (1 hour TTL)
+    if (EXCHANGE_RATES_CACHE["rates"] and 
+        EXCHANGE_RATES_CACHE["last_updated"] and
+        datetime.now() - EXCHANGE_RATES_CACHE["last_updated"] < timedelta(hours=1)):
+        return EXCHANGE_RATES_CACHE["rates"]
+    
+    try:
+        # Fetch from ExchangeRate-API (free, no API key needed)
+        response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Extract rates we support
+        rates = {
+            "usd": 1.0,
+            "eur": data["rates"].get("EUR", FALLBACK_EXCHANGE_RATES["eur"]),
+            "gbp": data["rates"].get("GBP", FALLBACK_EXCHANGE_RATES["gbp"]),
+            "cad": data["rates"].get("CAD", FALLBACK_EXCHANGE_RATES["cad"]),
+            "inr": data["rates"].get("INR", FALLBACK_EXCHANGE_RATES["inr"]),
+            "aud": data["rates"].get("AUD", FALLBACK_EXCHANGE_RATES["aud"]),
+            "jpy": data["rates"].get("JPY", FALLBACK_EXCHANGE_RATES["jpy"]),
+            "cny": data["rates"].get("CNY", FALLBACK_EXCHANGE_RATES["cny"]),
+            "mxn": data["rates"].get("MXN", FALLBACK_EXCHANGE_RATES["mxn"])
+        }
+        
+        # Update cache
+        EXCHANGE_RATES_CACHE["rates"] = rates
+        EXCHANGE_RATES_CACHE["last_updated"] = datetime.now()
+        
+        print(f"✅ [BILLING] Exchange rates updated from API")
+        return rates
+        
+    except Exception as e:
+        print(f"⚠️ [BILLING] Failed to fetch exchange rates from API: {e}")
+        print(f"ℹ️ [BILLING] Using fallback exchange rates")
+        return FALLBACK_EXCHANGE_RATES
 
 @router.post("/create-payment-intent")
 async def create_payment_intent(
@@ -44,7 +92,10 @@ async def create_payment_intent(
     if not pack:
         raise HTTPException(status_code=400, detail="Invalid credit pack")
 
-    if currency not in EXCHANGE_RATES:
+    # Get current exchange rates (cached or from API)
+    exchange_rates = get_exchange_rates()
+    
+    if currency not in exchange_rates:
         # Fallback to USD if unsupported
         currency = "usd"
 
@@ -56,7 +107,7 @@ async def create_payment_intent(
         # This simple logic might need refinement for zero-decimal currencies but works for standard 2-decimal.
         
         base_price_cents = pack['price_cents']
-        rate = EXCHANGE_RATES.get(currency, 1.0)
+        rate = exchange_rates.get(currency, 1.0)
         
         # Stripe expects integer amounts
         final_amount = int(base_price_cents * rate)
@@ -89,6 +140,16 @@ async def create_payment_intent(
     except Exception as e:
         print(f"❌ [BILLING] Create Intent Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/exchange-rates")
+async def get_current_exchange_rates():
+    """Get current exchange rates for frontend display"""
+    try:
+        rates = get_exchange_rates()
+        return {"rates": rates, "base": "USD"}
+    except Exception as e:
+        print(f"❌ [BILLING] Exchange Rates Error: {e}")
+        return {"rates": FALLBACK_EXCHANGE_RATES, "base": "USD"}
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request):

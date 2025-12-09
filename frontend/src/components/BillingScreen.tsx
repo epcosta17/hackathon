@@ -25,7 +25,8 @@ const EXCHANGE_RATES: Record<string, number> = {
     inr: 84.50,
     aud: 1.52,
     jpy: 150.0,
-    cny: 7.25
+    cny: 7.25,
+    mxn: 20.0
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -36,7 +37,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
     inr: '₹',
     aud: '$',
     jpy: '¥',
-    cny: '¥'
+    cny: '¥',
+    mxn: '$'
 };
 
 interface BillingScreenProps {
@@ -49,13 +51,35 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
     const [isCheckingOut, setIsCheckingOut] = useState<string | null>(null);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [currency, setCurrency] = useState('usd');
+    const [exchangeRates, setExchangeRates] = useState(EXCHANGE_RATES);
+
+    // Fetch real-time exchange rates from backend
+    useEffect(() => {
+        const fetchExchangeRates = async () => {
+            try {
+                const response = await authenticatedFetch('/v1/billing/exchange-rates');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.rates) {
+                        setExchangeRates(data.rates);
+                        console.log('✅ [Billing] Exchange rates updated from backend');
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ [Billing] Failed to fetch exchange rates, using fallback:', error);
+            }
+        };
+
+        fetchExchangeRates();
+    }, []);
 
     // Auto-detect currency on mount
     useEffect(() => {
         const browserLang = navigator.language.toLowerCase();
         let detectedCurrency = 'usd';
 
-        if (browserLang.includes('gb')) detectedCurrency = 'gbp';
+        if (browserLang.includes('mx')) detectedCurrency = 'mxn';
+        else if (browserLang.includes('gb')) detectedCurrency = 'gbp';
         else if (browserLang.includes('ca')) detectedCurrency = 'cad';
         else if (browserLang.includes('au')) detectedCurrency = 'aud';
         else if (browserLang.includes('jp')) detectedCurrency = 'jpy';
@@ -63,13 +87,13 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
         else if (['fr', 'de', 'it', 'es', 'pt', 'nl'].some(code => browserLang.includes(code))) detectedCurrency = 'eur';
 
         // Only set if we support it
-        if (EXCHANGE_RATES[detectedCurrency]) {
+        if (exchangeRates[detectedCurrency]) {
             setCurrency(detectedCurrency);
         }
-    }, []);
+    }, [exchangeRates]);
 
     const formatPrice = (cents: number, curr: string) => {
-        const rate = EXCHANGE_RATES[curr] || 1.0;
+        const rate = exchangeRates[curr] || 1.0;
         const symbol = CURRENCY_SYMBOLS[curr] || '$';
 
         // Calculate amount
@@ -176,6 +200,7 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
                                 <SelectItem value="usd">USD ($)</SelectItem>
+                                <SelectItem value="mxn">MXN ($)</SelectItem>
                                 <SelectItem value="eur">EUR (€)</SelectItem>
                                 <SelectItem value="gbp">GBP (£)</SelectItem>
                                 <SelectItem value="cad">CAD ($)</SelectItem>
