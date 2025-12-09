@@ -3,6 +3,7 @@ import { Hero } from './components/Hero';
 import { HowItWorks } from './components/HowItWorks';
 import { ValuePropsGrid } from './components/ValuePropsGrid';
 import { Pricing } from './components/Pricing';
+import { FAQ } from './components/FAQ';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 
@@ -14,6 +15,7 @@ export default function App() {
       <HowItWorks />
       <ValuePropsGrid />
       <Pricing />
+      <FAQ />
       <FinalCTA />
       <Footer />
     </div>

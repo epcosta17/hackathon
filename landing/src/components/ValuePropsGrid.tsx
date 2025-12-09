@@ -20,7 +20,7 @@ const valueProps = [
 
 export function ValuePropsGrid() {
   return (
-    <section className="relative max-w-7xl mx-auto px-6 pt-24 pb-32">
+    <section className="relative max-w-7xl mx-auto px-6 py-32">
       <div className="grid md:grid-cols-3 gap-8">
         {valueProps.map((prop) => {
           const Icon = prop.icon;

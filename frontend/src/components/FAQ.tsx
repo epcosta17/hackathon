@@ -129,7 +129,7 @@ export function FAQ() {
   };
 
   return (
-    <section className="py-32 px-6 relative overflow-hidden">
+    <section id="faq" className="py-32 px-6 relative overflow-hidden">
       {/* Animated background gradients */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -186,6 +186,26 @@ export function FAQ() {
           {/* Glow effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-3xl blur-2xl opacity-50 group-hover/cta:opacity-75 transition-opacity" />
 
+          <div className="relative p-10 rounded-3xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/10 backdrop-blur-xl text-center overflow-hidden">
+            {/* Animated gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-purple-500/10 to-blue-500/0 animate-pulse" />
+
+            <div className="relative z-10">
+              <h3 className="text-white mb-4">
+                Still have questions?
+              </h3>
+              <p className="text-white/60 mb-8 text-lg max-w-md mx-auto">
+                Our team is here to help you get started with Interview Lens and answer any questions you may have.
+              </p>
+              <a
+                href="#contact"
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-105 duration-300 group/btn"
+              >
+                <span>Contact Support</span>
+                <ChevronDown className="w-4 h-4 rotate-[-90deg] group-hover/btn:translate-x-1 transition-transform" />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
