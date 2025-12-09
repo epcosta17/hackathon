@@ -29,7 +29,7 @@ export function Hero() {
         </div>
 
         {/* Hero visual - 3D tilted perspective */}
-        <div className="relative max-w-5xl mx-auto">
+        <div className="relative max-w-5xl mx-auto" style={{ marginTop: '-3px' }}>
           <div className="relative" style={{ perspective: '1500px' }}>
             <div
               className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-500/20"
@@ -47,6 +47,7 @@ export function Hero() {
                 loop
                 playsInline
                 className="w-full h-auto"
+                style={{ objectPosition: '0 -2px' }}
               >
                 <source src={heroVideo} type="video/mp4" />
               </video>
