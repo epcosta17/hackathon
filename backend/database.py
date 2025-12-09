@@ -249,7 +249,7 @@ def delete_interview(user_id: str, interview_id: int) -> bool:
             clean_url = audio_url.split('?')[0]
             
             # Extract filename
-            # Handles both /api/audio/filename.mp3 and full GCS URLs
+            # Handles both /v1/audio/filename.mp3 and full GCS URLs
             filename = clean_url.split('/')[-1]
             
             if filename:

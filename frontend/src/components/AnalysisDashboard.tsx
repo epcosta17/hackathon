@@ -229,7 +229,7 @@ export function AnalysisDashboard({
 
     setIsDownloading(true);
     try {
-      const response = await authenticatedFetch('/api/download-report', {
+      const response = await authenticatedFetch('/v1/download-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

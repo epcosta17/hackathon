@@ -731,7 +731,7 @@ export function TranscriptEditor({
     setIsAnalyzing(true);
 
     try {
-      const response = await postJSON('/api/analyze', {
+      const response = await postJSON('/v1/analyze', {
         transcript_blocks: transcriptBlocks,
         is_reanalysis: isReanalysis
       });
