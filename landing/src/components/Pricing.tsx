@@ -98,7 +98,7 @@ export function Pricing() {
 
               <a
                 href="https://app.getinterviewlens.com"
-                className={`w-full py-3.5 rounded-xl transition-all group block text-center ${plan.highlighted
+                className={`w-full px-8 py-4 rounded-xl transition-all group block text-center ${plan.highlighted
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 hover:shadow-lg hover:shadow-blue-500/50'
                   : 'border border-white/20 text-white hover:bg-white/10 hover:border-white/30'
                   }`}
