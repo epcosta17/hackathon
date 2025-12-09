@@ -13,14 +13,14 @@ const steps = [
     number: '02',
     title: 'Deep Signal Analysis',
     description: 'Go beyond commodity transcription. Our proprietary AI automatically diarizes speakers and performs multi-dimensional analysis: gauging technical depth, evaluating communication clarity, and flagging potential behavioral red flags directly on the interactive waveform.',
-    video: '/videos/analysis.mp4',
+    video: '/videos/review.mp4',
     videoAlt: 'Analysis Screen with Waveform'
   },
   {
     number: '03',
     title: 'Decision-Grade Intelligence',
     description: 'Generate polished, unbiased executive summaries in seconds. Access structured technical scores, behavioral insights, and critical takeaways formatted for high-stakes decision making. Share definitive insights with hiring managers without editing a single line.',
-    video: '/videos/review.mp4',
+    video: '/videos/analysis.mp4',
     videoAlt: 'Report Screen'
   }
 ];

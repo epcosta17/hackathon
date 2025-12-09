@@ -29,7 +29,7 @@ export function Hero() {
         <div className="relative max-w-5xl mx-auto">
           <div className="relative" style={{ perspective: '1500px' }}>
             <div
-              className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-500/20"
+              className="relative rounded-2xl overflow-hidden  border-white/10 shadow-2xl shadow-blue-500/20"
               style={{
                 transform: 'rotateX(8deg) rotateY(-8deg)',
                 transformStyle: 'preserve-3d'
