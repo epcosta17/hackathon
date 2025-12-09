@@ -1,4 +1,5 @@
 
+import { Zap } from 'lucide-react';
 
 const steps = [
   {
@@ -28,11 +29,18 @@ export function HowItWorks() {
   return (
     <section id="features" className="relative max-w-7xl mx-auto px-6 py-32">
       <div className="text-center mb-20">
-        <h2 className="text-white mb-4">How It Works</h2>
-        <p className="text-gray-400 text-xl">Three simple steps to transform your interview process</p>
+        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 border border-blue-500/30 mb-8 backdrop-blur-xl relative group/badge">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/30 to-purple-500/30 blur-md opacity-0 group-hover/badge:opacity-100 transition-opacity" />
+          <Zap className="w-4 h-4 text-blue-400 relative z-10" />
+          <span className="text-sm text-blue-300 relative z-10">How It Works</span>
+        </div>
+        <h2 className="text-white mb-5 bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent">
+          Three Simple Steps to Transform Your Interview Process
+        </h2>
+        <p className="text-white/60 text-xl max-w-2xl mx-auto">Streamlined, automated, and unbiased hiring at scale.</p>
       </div>
 
-      <div className="space-y-32">
+      <div className="space-y-16">
         {steps.map((step, index) => (
           <div
             key={step.number}

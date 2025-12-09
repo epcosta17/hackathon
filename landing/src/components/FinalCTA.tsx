@@ -1,6 +1,6 @@
 export function FinalCTA() {
   return (
-    <section className="relative max-w-4xl mx-auto px-6 py-32">
+    <section className="relative max-w-4xl mx-auto px-6 py-24 pb-32">
       <div className="relative p-12 rounded-3xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 backdrop-blur-xl text-center overflow-hidden">
         {/* Background gradient orbs */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-blue-500/30 rounded-full blur-3xl" />

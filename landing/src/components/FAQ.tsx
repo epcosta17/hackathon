@@ -129,7 +129,7 @@ export function FAQ() {
   };
 
   return (
-    <section className="py-32 px-6 relative overflow-hidden">
+    <section id="faq" className="py-24 px-6 relative overflow-hidden">
       {/* Animated background gradients */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
