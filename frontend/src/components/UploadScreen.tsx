@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { UserMenu } from './UserMenu';
 import { authenticatedFetch } from '../utils/api';
 import { db, auth } from '../config/firebase';
-import { collection, query, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { NoCreditsDialog } from './NoCreditsDialog';
 
 // ... (interfaces)
@@ -45,17 +45,39 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
   const [showNoCreditsDialog, setShowNoCreditsDialog] = useState(false);
   const [hasDismissedCreditsDialog, setHasDismissedCreditsDialog] = useState(false);
 
-  // Listen for credits
+  // Listen for credits with initial fetch
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
+
     const userRef = doc(db, 'users', user.uid);
+
+    // Initial fetch to ensure credits show immediately
+    const fetchInitialCredits = async () => {
+      try {
+        const docSnapshot = await getDoc(userRef);
+        if (docSnapshot.exists()) {
+          const val = docSnapshot.data().credits || 0;
+          setCredits(val);
+          console.log(`💰 [Credits] Initial fetch: ${val} credits`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial credits:', error);
+      }
+    };
+
+    // Fetch immediately
+    fetchInitialCredits();
+
+    // Then set up real-time listener
     const unsubscribe = onSnapshot(userRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
         const val = docSnapshot.data().credits || 0;
         setCredits(val);
+        console.log(`💰 [Credits] Updated: ${val} credits`);
       }
     });
+
     return () => unsubscribe();
   }, [hasDismissedCreditsDialog]); // Add hasDismissedCreditsDialog dependency
 
@@ -749,9 +771,6 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
         )
       }
 
-      import {NoCreditsDialog} from './NoCreditsDialog';
-
-      // ... (in component)
       <NoCreditsDialog
         isOpen={showNoCreditsDialog}
         onClose={() => {
