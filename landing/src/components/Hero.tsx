@@ -40,7 +40,7 @@ export function Hero() {
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 z-10" />
 
               <video
-                src="/videos/hero.mp4"
+                src="/videos/hero.mp4?v=2"
                 autoPlay
                 muted
                 loop
