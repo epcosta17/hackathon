@@ -1,6 +1,7 @@
 
-import uploadImage from '../assets/review.mp4';
 import { APP_URL } from '../config';
+
+const heroVideo = '/videos/hero.mp4';
 
 export function Hero() {
   return (
@@ -47,7 +48,7 @@ export function Hero() {
                 playsInline
                 className="w-full h-auto"
               >
-                <source src={uploadImage} type="video/mp4" />
+                <source src={heroVideo} type="video/mp4" />
               </video>
             </div>
 

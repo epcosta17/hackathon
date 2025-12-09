@@ -1,13 +1,13 @@
-import uploadImage from '../assets/upload.mp4';
-import reviewImage from '../assets/review.mp4';
-import exportImage from '../assets/report.mp4';
+const uploadVideo = '/videos/upload.mp4';
+const reviewVideo = '/videos/review.mp4';
+const analysisVideo = '/videos/analysis.mp4';
 
 const steps = [
   {
     number: '01',
     title: 'Seamless Ingestion',
     description: 'Drag and drop your raw interview audio in any format—MP3, WAV, or M4A. Our high-throughput engine processes 60 minutes of conversation in under 60 seconds, transforming unstructured audio into structured data instantly. Eliminate manual note-taking and focus on the candidate.',
-    image: uploadImage,
+    image: uploadVideo,
     imageAlt: 'Upload Screen showing fast processing',
     isVideo: true
   },
@@ -15,7 +15,7 @@ const steps = [
     number: '02',
     title: 'Deep Signal Analysis',
     description: 'Go beyond commodity transcription. Our proprietary AI automatically diarizes speakers and performs multi-dimensional analysis: gauging technical depth, evaluating communication clarity, and flagging potential behavioral red flags directly on the interactive waveform.',
-    image: reviewImage,
+    image: reviewVideo,
     imageAlt: 'Analysis Screen highlighting candidate insights',
     isVideo: true
   },
@@ -23,7 +23,7 @@ const steps = [
     number: '03',
     title: 'Decision-Grade Intelligence',
     description: 'Generate polished, unbiased executive summaries in seconds. Access structured technical scores, behavioral insights, and critical takeaways formatted for high-stakes decision making. Share definitive insights with hiring managers without editing a single line.',
-    image: exportImage,
+    image: analysisVideo,
     imageAlt: 'Professional Report Export',
     isVideo: true
   }
