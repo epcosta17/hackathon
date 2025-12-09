@@ -591,7 +591,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                           ? 'Upload Failed'
                           : isComplete
                             ? 'Transcription complete!'
-                            : 'Processing Audio...'}
+                            : <span className="text-xs text-indigo-400 animate-pulse tracking-wide">Transcribing... </span>}
                       </span>
                       {!isComplete && !error && progress > 0 && (
                         <span className="text-xs text-indigo-400 font-medium animate-pulse">
