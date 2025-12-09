@@ -744,25 +744,13 @@ export function TranscriptEditor({
 
     console.log('🚀 Sending analysis request with config:', { promptConfig, modelConfig });
 
-    // Get auth token for the request
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) {
-      throw new Error('Authentication token not found.');
-    }
-
     try {
-      const response = await fetch('http://localhost:8000/v1/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          transcript_blocks: transcriptBlocks,
-          is_reanalysis: isReanalysis,
-          prompt_config: promptConfig,
-          analysis_mode: modelConfig
-        })
+      // Use postJSON which handles auth and base URL automatically
+      const response = await postJSON('/v1/analyze', {
+        transcript_blocks: transcriptBlocks,
+        is_reanalysis: isReanalysis,
+        prompt_config: promptConfig,
+        analysis_mode: modelConfig
       });
 
       if (!response.ok) {
