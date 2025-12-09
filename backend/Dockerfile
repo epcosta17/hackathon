@@ -17,6 +17,6 @@ COPY . .
 # Cloud Run defaults to port 8080
 ENV PORT=8080
 
-# Run the application
+# Run the application with Hypercorn for HTTP/2 support
 # We use shell form to allow variable expansion for $PORT
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+CMD hypercorn main:app --bind 0.0.0.0:$PORT

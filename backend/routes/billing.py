@@ -18,6 +18,18 @@ CREDIT_PACKS = {
     "pack_20": {"credits": 20, "price_cents": 1500, "name": "20 Interview Credits (Best Value)"}
 }
 
+# Exchange Rates (Approximate for Demo)
+EXCHANGE_RATES = {
+    "usd": 1.0,
+    "eur": 0.92,
+    "gbp": 0.79,
+    "cad": 1.36,
+    "inr": 84.50,
+    "aud": 1.52,
+    "jpy": 150.0,
+    "cny": 7.25
+}
+
 @router.post("/create-payment-intent")
 async def create_payment_intent(
     data: Dict[str, str], 
@@ -25,23 +37,52 @@ async def create_payment_intent(
 ):
     """Create a Stripe PaymentIntent for buying credits (Elements Flow)"""
     pack_id = data.get("pack_id", "pack_5")
+    currency = data.get("currency", "usd").lower()
+    
     pack = CREDIT_PACKS.get(pack_id)
     
     if not pack:
         raise HTTPException(status_code=400, detail="Invalid credit pack")
 
+    if currency not in EXCHANGE_RATES:
+        # Fallback to USD if unsupported
+        currency = "usd"
+
     try:
+        # Calculate amount in target currency
+        # Base price in cents (USD) * Rate
+        # Note: JPY is zero-decimal currency, but Stripe API handles 'amount' as smallest unit. 
+        # For JPY 1000 yen -> 1000. For USD 10.00 -> 1000.
+        # This simple logic might need refinement for zero-decimal currencies but works for standard 2-decimal.
+        
+        base_price_cents = pack['price_cents']
+        rate = EXCHANGE_RATES.get(currency, 1.0)
+        
+        # Stripe expects integer amounts
+        final_amount = int(base_price_cents * rate)
+        
+        # Special case for zero-decimal currencies like JPY
+        if currency in ['jpy', 'krw', 'vnd']:
+            # 500 cents = $5.00 -> * 150 = 750 (750 Yen).
+            # But Stripe 'amount' for JPY is just integer Yen.
+            # So 500 cents / 100 = $5 * 150 = 750 Yen. 
+            # Our formula 'cents * rate' does: 500 * 150 = 75000 (which would be 75000 Yen = $500).
+            # So we need to adjustments:
+            final_amount = int((base_price_cents / 100.0) * rate)
+
         # Create a PaymentIntent with the order amount and currency
         intent = stripe.PaymentIntent.create(
-            amount=pack['price_cents'],
-            currency='usd',
+            amount=final_amount,
+            currency=currency,
             automatic_payment_methods={
                 'enabled': True,
             },
             metadata={
                 "user_id": current_user['uid'],
                 "credits": pack['credits'],
-                "pack_id": pack_id
+                "pack_id": pack_id,
+                "currency": currency,
+                "original_price_usd": pack['price_cents']
             }
         )
         return {"clientSecret": intent.client_secret}
