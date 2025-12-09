@@ -43,31 +43,36 @@ async def get_current_user(
         # ---------------------------------------------------------
         # Email Domain Whitelist (Prevent Custom Domain Abuse)
         # ---------------------------------------------------------
-        ALLOWED_EMAIL_DOMAINS = {
-            # Google
-            'gmail.com', 'googlemail.com',
-            # Microsoft
-            'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
-            # Yahoo
-            'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.es',
-            'yahoo.it', 'yahoo.com.br', 'yahoo.co.jp', 'yahoo.in',
-            # ProtonMail
-            'protonmail.com', 'proton.me', 'pm.me',
-            # Apple
-            'icloud.com', 'me.com', 'mac.com',
-            # Other popular providers
-            'aol.com', 'zoho.com', 'yandex.com', 'mail.com',
-            'gmx.com', 'gmx.net', 'fastmail.com',
-        }
+        # Skip domain validation for Google OAuth users (Google already verified the email)
+        sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
         
-        email = decoded_token.get('email', '').lower()
-        if email:
-            domain = email.split('@')[-1] if '@' in email else ''
-            if domain not in ALLOWED_EMAIL_DOMAINS:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Account creation is restricted to popular email providers. Domain '{domain}' is not allowed.",
-                )
+        if sign_in_provider != 'google.com':
+            # Only enforce domain whitelist for non-Google sign-ins
+            ALLOWED_EMAIL_DOMAINS = {
+                # Google
+                'gmail.com', 'googlemail.com',
+                # Microsoft
+                'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+                # Yahoo
+                'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.es',
+                'yahoo.it', 'yahoo.com.br', 'yahoo.co.jp', 'yahoo.in',
+                # ProtonMail
+                'protonmail.com', 'proton.me', 'pm.me',
+                # Apple
+                'icloud.com', 'me.com', 'mac.com',
+                # Other popular providers
+                'aol.com', 'zoho.com', 'yandex.com', 'mail.com',
+                'gmx.com', 'gmx.net', 'fastmail.com',
+            }
+            
+            email = decoded_token.get('email', '').lower()
+            if email:
+                domain = email.split('@')[-1] if '@' in email else ''
+                if domain not in ALLOWED_EMAIL_DOMAINS:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Account creation is restricted to popular email providers. Domain '{domain}' is not allowed.",
+                    )
         
         # ---------------------------------------------------------
         # Sync with Firestore (Credit Initialization)
