@@ -147,25 +147,28 @@ function MainApp() {
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
 
   // Sync user data with backend (initializes credits for new users)
+  // IMPORTANT: Only call after email is verified, otherwise middleware blocks it
   useEffect(() => {
     const syncUser = async () => {
+      // Only sync if email is verified
+      if (!currentUser?.emailVerified) {
+        console.log('⏸️ Skipping user sync - email not verified yet');
+        return;
+      }
+
       try {
+        console.log('🔄 Syncing user with backend...');
         await authenticatedFetch('/v1/auth/me');
-        console.log('✅ User synced with backend');
+        console.log('✅ User synced with backend - credits initialized');
       } catch (error) {
-        // If 403 (unverified), it's fine, we just want to trigger creation if possible. 
-        // But wait, our middleware BLOCKS unverified users. 
-        // So we might need to allow unverified users on /v1/auth/me OR handle it.
-        // Actually, if blocked, it means they can't get credits yet anyway.
-        // Credits should be assigned *after* verification?
-        // Let's check middleware.
         console.error('Failed to sync user:', error);
       }
     };
+
     if (currentUser) {
       syncUser();
     }
-  }, [currentUser]);
+  }, [currentUser]); // Trigger on currentUser change (includes initial login)
 
   // Handle Stripe Redirects
   // Handle Query Params (Stripe Success & Email Verification)
