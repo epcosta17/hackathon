@@ -54,7 +54,7 @@ const faqData: FAQCategory[] = [
         answer: 'Interview Lens supports the most common audio formats, including MP3 and WAV files. You can simply drag and drop your recording to start the transcription and analysis.',
       },
       {
-        question: 'What are "Credits," and how do they work?',
+        question: 'What are "Credits",  and how do they work?',
         answer: 'Analysis is credit-based. One credit equals one full AI analysis of an interview recording. We offer cost-effective packs (e.g., Starter Pack, Pro Pack) that allow you to manage your analysis budget efficiently.',
       },
       {

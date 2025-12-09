@@ -25,7 +25,7 @@ from routes import transcription, analysis, interviews, notes, auth, billing
 # --- FastAPI Setup ---
 
 app = FastAPI(
-    title="InterviewLens API",
+    title="Interview Lens API",
     description="Backend for AI-Powered Interview Analysis",
     docs_url="/",
 )
