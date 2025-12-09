@@ -3,6 +3,24 @@ import { Mail, Lock, Chrome, User, ScanEye, FileAudio } from 'lucide-react';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
+// Allowed Email Domains (must match backend)
+const ALLOWED_EMAIL_DOMAINS = new Set([
+    // Google
+    'gmail.com', 'googlemail.com',
+    // Microsoft
+    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+    // Yahoo
+    'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.es',
+    'yahoo.it', 'yahoo.com.br', 'yahoo.co.jp', 'yahoo.in',
+    // ProtonMail
+    'protonmail.com', 'proton.me', 'pm.me',
+    // Apple
+    'icloud.com', 'me.com', 'mac.com',
+    // Other popular providers
+    'aol.com', 'zoho.com', 'yandex.com', 'mail.com',
+    'gmx.com', 'gmx.net', 'fastmail.com',
+]);
+
 export function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
@@ -15,6 +33,14 @@ export function LoginPage() {
         e.preventDefault();
         setIsLoading(true);
         setError('');
+
+        // Validate email domain
+        const emailDomain = email.toLowerCase().split('@')[1];
+        if (!emailDomain || !ALLOWED_EMAIL_DOMAINS.has(emailDomain)) {
+            setError(`Only popular email providers are allowed. Domain '${emailDomain}' is not supported.`);
+            setIsLoading(false);
+            return;
+        }
 
         try {
             if (isSignUp) {

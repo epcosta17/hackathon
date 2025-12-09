@@ -346,9 +346,14 @@ def get_notes(user_id: str, interview_id: int) -> List[Dict[str, Any]]:
     docs = doc_ref.collection('notes').order_by('timestamp').stream()
     return [doc.to_dict() for doc in docs]
 
-def delete_note(user_id: str, note_id: int) -> bool:
-    ref = _find_note_ref(user_id, note_id)
-    if ref:
-        ref.delete()
-        return True
-    return False
+def delete_note(user_id: str, interview_id: int, note_id: int) -> bool:
+    """Delete a note using direct path (no collection group query needed)"""
+    doc_ref = _get_interview_doc(user_id, interview_id)
+    note_ref = doc_ref.collection('notes').document(str(note_id))
+    
+    # Check if note exists
+    if not note_ref.get().exists:
+        return False
+    
+    note_ref.delete()
+    return True

@@ -439,19 +439,9 @@ export function TranscriptEditor({
       });
 
       if (response.ok) {
-        const result = await response.json();
-        // Backend returns { id: number, message: string }
-        // We need to construct the full note object for the state
-        const savedNote: Note = {
-          id: result.id,
-          interview_id: currentInterviewId,
-          timestamp: currentTime,
-          content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
-          is_bookmark: isBookmark,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setNotes((prev: Note[]) => [...prev, savedNote]);
+        // Don't manually update state - Firestore listener will handle it automatically
+        // This prevents duplicate notes from appearing
+        console.log('✅ Note saved to backend, Firestore listener will update UI');
       }
       setNewNoteContent('');
       setIsAddingNote(false);
@@ -476,7 +466,7 @@ export function TranscriptEditor({
 
     // 2. Background Process: Silent Backend Delete
     try {
-      const response = await authenticatedFetch(`/v1/notes/${noteId}`, {
+      const response = await authenticatedFetch(`/v1/interviews/${currentInterviewId}/notes/${noteId}`, {
         method: 'DELETE',
       });
 

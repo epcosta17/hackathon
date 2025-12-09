@@ -57,15 +57,16 @@ async def update_note_endpoint(
         raise HTTPException(status_code=500, detail=f"Failed to update note: {str(e)}")
 
 
-@router.delete("/notes/{note_id}")
+@router.delete("/interviews/{interview_id}/notes/{note_id}")
 async def delete_note_endpoint(
+    interview_id: int,
     note_id: int,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Delete a note."""
     try:
         user_id = current_user['uid']
-        success = delete_note(user_id, note_id)
+        success = delete_note(user_id, interview_id, note_id)
         if not success:
             raise HTTPException(status_code=404, detail="Note not found")
         return {"message": "Note deleted successfully"}
