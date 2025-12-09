@@ -150,12 +150,12 @@ function MainApp() {
   useEffect(() => {
     const syncUser = async () => {
       try {
-        await authenticatedFetch('/api/auth/me');
+        await authenticatedFetch('/v1/auth/me');
         console.log('✅ User synced with backend');
       } catch (error) {
         // If 403 (unverified), it's fine, we just want to trigger creation if possible. 
         // But wait, our middleware BLOCKS unverified users. 
-        // So we might need to allow unverified users on /api/auth/me OR handle it.
+        // So we might need to allow unverified users on /v1/auth/me OR handle it.
         // Actually, if blocked, it means they can't get credits yet anyway.
         // Credits should be assigned *after* verification?
         // Let's check middleware.
@@ -340,7 +340,7 @@ function MainApp() {
         if (preUploadedAudioUrl.includes('/temp/')) {
           try {
             console.log('📦 Finalizing audio file...');
-            const finalizeRes = await authenticatedFetch('/api/audio/finalize', {
+            const finalizeRes = await authenticatedFetch('/v1/audio/finalize', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ audio_url: preUploadedAudioUrl })
@@ -550,7 +550,7 @@ function MainApp() {
           console.error('Failed to get token for audio stream:', e);
         }
 
-        // interviewData.audio_url is the relative path stored by backend e.g. "/api/audio/..."
+        // interviewData.audio_url is the relative path stored by backend e.g. "/v1/audio/..."
         const baseUrl = `${API_BASE_URL}${interviewData.audio_url}`;
         setAudioUrl(token ? `${baseUrl}?token=${token}` : baseUrl);
       } else {

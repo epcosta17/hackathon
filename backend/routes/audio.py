@@ -9,7 +9,7 @@ from pydantic import BaseModel
 class FinalizeAudioRequest(BaseModel):
     audio_url: str
 
-@router.post("/api/audio/finalize")
+@router.post("/v1/audio/finalize")
 async def finalize_audio(
     request: FinalizeAudioRequest, 
     background_tasks: BackgroundTasks,
@@ -24,12 +24,12 @@ async def finalize_audio(
     if not audio_url:
         raise HTTPException(status_code=400, detail="Missing audio_url")
         
-    # extract filename from /api/audio/temp/{filename}
-    if "/api/audio/temp/" not in audio_url:
+    # extract filename from /v1/audio/temp/{filename}
+    if "/v1/audio/temp/" not in audio_url:
         # Already permanent or invalid? Just return it.
         return {"audio_url": audio_url}
 
-    filename = audio_url.split('/api/audio/temp/')[-1]
+    filename = audio_url.split('/v1/audio/temp/')[-1]
     
     old_path = f"{user_id}/temp_audio/{filename}"
     new_path = f"{user_id}/audio/{filename}"
@@ -44,11 +44,11 @@ async def finalize_audio(
         print(f"⚠️ Failed to move file {old_path}. It might not exist.")
         # Fallback: assume it might already be correct or lost. 
         # But we return the permanent URL format anyway so the frontend saves a valid link.
-        return {"audio_url": f"/api/audio/{filename}"}
+        return {"audio_url": f"/v1/audio/{filename}"}
 
     # Return the clean API URL for the permanent file
     
     # Trigger cleanup of old temp files for this user (garbage collection)
     background_tasks.add_task(storage_service.cleanup_temp_files, user_id=user_id)
     
-    return {"audio_url": f"/api/audio/{filename}"}
+    return {"audio_url": f"/v1/audio/{filename}"}

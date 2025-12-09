@@ -16,7 +16,7 @@ from database import (
 )
 from middleware.auth_middleware import get_current_user
 
-router = APIRouter(prefix="/api", tags=["interviews"])
+router = APIRouter(prefix="/v1", tags=["interviews"])
 
 
 import time
@@ -59,7 +59,7 @@ async def create_interview(
             gcs_path = f"{user_id}/audio/{audio_filename}"
             storage_service.upload_file(gcs_path, f, content_type=audio_file.content_type)
             
-            audio_url = f"/api/audio/{audio_filename}"
+            audio_url = f"/v1/audio/{audio_filename}"
         
         # New signature: user_id, interview_id, title, audio_url
         save_interview(
@@ -210,7 +210,7 @@ async def upload_interview_audio(
         gcs_path = f"{user_id}/audio/{audio_filename}"
         storage_service.upload_file(gcs_path, f, content_type=audio_file.content_type)
         
-        audio_url = f"/api/audio/{audio_filename}"
+        audio_url = f"/v1/audio/{audio_filename}"
         print(f"✅ [UPLOAD] Audio uploaded to {gcs_path}", flush=True)
 
         # 2. Update Firestore Document

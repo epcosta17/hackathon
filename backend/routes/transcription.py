@@ -10,7 +10,7 @@ from typing import Dict, Any
 import os
 import time
 
-router = APIRouter(prefix="/api", tags=["transcription"])
+router = APIRouter(prefix="/v1", tags=["transcription"])
 
 # Import transcription functions from service
 from services.transcription_service import transcribe_with_whisper_cpp, transcribe_with_deepgram, generate_mock_transcript
@@ -120,7 +120,7 @@ async def transcribe_endpoint(
         # Setup GCS Path
         remote_filename = f"{uuid.uuid4()}{ext}"
         gcs_path = f"{user_id}/temp_audio/{remote_filename}"  # Store in temp first
-        audio_url = f"/api/audio/temp/{remote_filename}"      # New temp URL format
+        audio_url = f"/v1/audio/temp/{remote_filename}"      # New temp URL format
         
         # Priority: Deepgram API > whisper.cpp (FREE!) > WhisperX Local > OpenAI API > Mock Data
         deepgram_key = os.getenv("DEEPGRAM_API_KEY")
@@ -169,7 +169,7 @@ async def transcribe_endpoint(
             from services.storage_service import storage_service
             with open(temp_file.name, 'rb') as f_up:
                     storage_service.upload_file(gcs_path, f_up, content_type=audio_file.content_type)
-            audio_url = f"/api/audio/temp/{remote_filename}"
+            audio_url = f"/v1/audio/temp/{remote_filename}"
 
             logger.info(f"Starting whisper-cli transcription for: {temp_file.name}")
             progress_queue = asyncio.Queue() # Not really used in non-streaming but cleaner to keep logic

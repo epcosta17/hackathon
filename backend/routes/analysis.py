@@ -11,7 +11,7 @@ from services.docx_service import generate_docx_async, get_cached_docx
 from services.analysis_service import generate_analysis_report
 from middleware.auth_middleware import get_current_user
 
-router = APIRouter(prefix="/api", tags=["analysis"])
+router = APIRouter(prefix="/v1", tags=["analysis"])
 
 
 @router.post("/analyze", response_model=AnalysisData)

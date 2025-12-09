@@ -83,7 +83,7 @@ export function AnalysisDashboard({
       if (analysisData && transcriptBlocks.length > 0) {
         // Generate DOCX from existing analysis data (without re-analyzing)
         try {
-          const response = await postJSON('/api/generate-report', {
+          const response = await postJSON('/v1/generate-report', {
             analysis_data: analysisData,
             transcript_blocks: transcriptBlocks
           });

@@ -153,7 +153,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     setInterviews(prev => prev.filter(i => i.id !== idToDelete));
 
     try {
-      const response = await authenticatedFetch(`/api/interviews/${idToDelete}`, {
+      const response = await authenticatedFetch(`/v1/interviews/${idToDelete}`, {
         method: 'DELETE',
       });
 
@@ -223,7 +223,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       formData.append("audio_file", file);
 
       // Use Standard Post for transcription (Wait for response)
-      const response = await authenticatedFetch('/api/transcribe', {
+      const response = await authenticatedFetch('/v1/transcribe', {
         method: 'POST',
         body: formData,
       });

@@ -6,7 +6,7 @@ from models.schemas import NoteCreate, NoteUpdate
 from database import add_note, update_note, get_notes, delete_note
 from middleware.auth_middleware import get_current_user
 
-router = APIRouter(prefix="/api", tags=["notes"])
+router = APIRouter(prefix="/v1", tags=["notes"])
 
 
 @router.post("/interviews/{interview_id}/notes")

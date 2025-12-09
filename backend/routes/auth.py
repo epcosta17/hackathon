@@ -5,7 +5,7 @@ from middleware.auth_middleware import get_current_user
 from pydantic import BaseModel
 
 
-router = APIRouter(prefix="/api/auth", tags=["authentication"])
+router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 
 
 class VerifyTokenResponse(BaseModel):

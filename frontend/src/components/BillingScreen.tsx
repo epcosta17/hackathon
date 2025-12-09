@@ -47,7 +47,7 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
         try {
             setIsCheckingOut(packId);
 
-            const response = await authenticatedFetch('/api/billing/create-payment-intent', {
+            const response = await authenticatedFetch('/v1/billing/create-payment-intent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

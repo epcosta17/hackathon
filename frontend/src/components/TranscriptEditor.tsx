@@ -345,7 +345,7 @@ export function TranscriptEditor({
         // Save to database if we have an interview ID
         if (currentInterviewId) {
           try {
-            await authenticatedFetch(`/api/interviews/${currentInterviewId}/waveform`, {
+            await authenticatedFetch(`/v1/interviews/${currentInterviewId}/waveform`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ waveform_data: normalizedWaveform }),
@@ -432,7 +432,7 @@ export function TranscriptEditor({
 
     // If interview exists, save to backend
     try {
-      const response = await postJSON(`/api/interviews/${currentInterviewId}/notes`, {
+      const response = await postJSON(`/v1/interviews/${currentInterviewId}/notes`, {
         timestamp: currentTime,
         content: isBookmark ? `Bookmark at ${formatTime(currentTime)}` : newNoteContent,
         is_bookmark: isBookmark,
@@ -476,7 +476,7 @@ export function TranscriptEditor({
 
     // 2. Background Process: Silent Backend Delete
     try {
-      const response = await authenticatedFetch(`/api/notes/${noteId}`, {
+      const response = await authenticatedFetch(`/v1/notes/${noteId}`, {
         method: 'DELETE',
       });
 

@@ -6,7 +6,7 @@ from database import get_firestore_db
 from middleware.auth_middleware import get_current_user
 from typing import Dict, Any
 
-router = APIRouter(prefix="/api/billing", tags=["billing"])
+router = APIRouter(prefix="/v1/billing", tags=["billing"])
 
 # Initialize Stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
