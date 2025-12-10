@@ -72,6 +72,7 @@ export function HowItWorks() {
                   muted
                   loop
                   playsInline
+                  preload="metadata"
                   className="w-full h-auto"
                 />
 
