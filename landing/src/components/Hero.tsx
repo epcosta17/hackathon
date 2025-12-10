@@ -45,7 +45,7 @@ export function Hero() {
                 muted
                 loop
                 playsInline
-                preload="metadata"
+                preload="auto"
                 className="w-full h-auto"
               />
             </div>
