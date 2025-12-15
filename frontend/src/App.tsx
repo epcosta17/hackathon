@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsScreen } from './components/SettingsScreen';
 
-export type Screen = 'upload' | 'editor' | 'analysis' | 'settings' | 'analysis-settings';
+export type Screen = 'upload' | 'editor' | 'analysis' | 'settings' | 'analysis-settings' | 'admin';
 
 // ... (existing code)
 
@@ -25,6 +25,7 @@ import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } fr
 import { authenticatedFetch, API_BASE_URL } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BillingScreen } from './components/BillingScreen';
+import { AdminScreen } from './components/AdminScreen';
 
 export interface Word {
   text: string;
@@ -653,6 +654,7 @@ function MainApp() {
           onLoadInterview={handleLoadInterview}
           onNavigateToSettings={handleNavigateToSettings}
           onNavigateToAnalysisConfig={handleNavigateToAnalysisConfig}
+          onNavigateToAdmin={() => setCurrentScreen('admin')}
         />
       )}
       {currentScreen === 'settings' && (
@@ -660,6 +662,9 @@ function MainApp() {
       )}
       {currentScreen === 'analysis-settings' && (
         <SettingsScreen onBack={handleBackToUpload} />
+      )}
+      {currentScreen === 'admin' && (
+        <AdminScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'editor' && (
         <ErrorBoundary>

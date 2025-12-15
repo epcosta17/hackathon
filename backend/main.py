@@ -20,7 +20,11 @@ load_dotenv()
 from services.auth_service import initialize_firebase
 
 # Import routers
-from routes import transcription, analysis, interviews, notes, auth, billing
+from routes import (
+    transcription, analysis, 
+    interviews, notes, auth, 
+    billing, audio, admin
+)
 
 # --- FastAPI Setup ---
 
@@ -54,9 +58,9 @@ app.include_router(transcription.router)
 app.include_router(analysis.router)
 app.include_router(interviews.router)
 app.include_router(notes.router)
-from routes import audio
 app.include_router(audio.router)
 app.include_router(billing.router)
+app.include_router(admin.router)
 
 
 # Initialize database and Firebase on startup

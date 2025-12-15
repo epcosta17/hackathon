@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles, Zap } from 'lucide-react';
+import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles, Zap, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
@@ -11,6 +11,7 @@ import { authenticatedFetch } from '../utils/api';
 import { db, auth } from '../config/firebase';
 import { collection, query, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { NoCreditsDialog } from './NoCreditsDialog';
+import { useAuth } from '../contexts/AuthContext';
 
 // ... (interfaces)
 
@@ -27,9 +28,11 @@ interface UploadScreenProps {
   onLoadInterview: (id: string | number) => void;
   onNavigateToSettings: () => void;
   onNavigateToAnalysisConfig: () => void;
+  onNavigateToAdmin: () => void;
 }
 
-export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavigateToSettings, onNavigateToAnalysisConfig }: UploadScreenProps) {
+export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavigateToSettings, onNavigateToAnalysisConfig, onNavigateToAdmin }: UploadScreenProps) {
+  const { isAdmin } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   // ... (existing state)
 
@@ -314,7 +317,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             <div className="flex items-center gap-3">
               <button
                 onClick={onNavigateToSettings}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
+                className="flex items-center gap-2 px-3 h-9 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
               >
                 <div className="bg-white/10 p-1 rounded group-hover:bg-white/20 transition-colors">
                   <Zap className="w-3 h-3 text-white fill-white" />
@@ -326,11 +329,20 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
               </button>
               <button
                 onClick={onNavigateToAnalysisConfig}
-                className="w-10 h-10 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
+                className="w-9 h-9 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
                 title="Configure Analysis"
               >
                 <Sparkles className="w-5 h-5 fill-white/20" />
               </button>
+              {isAdmin && (
+                <button
+                  onClick={onNavigateToAdmin}
+                  className="w-9 h-9 rounded-lg bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 flex items-center justify-center transition-all shadow-lg shadow-red-500/20 text-white group"
+                  title="Admin Dashboard"
+                >
+                  <Shield className="w-5 h-5" />
+                </button>
+              )}
               <UserMenu />
             </div>
           </div>

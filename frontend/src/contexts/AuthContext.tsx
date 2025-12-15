@@ -13,6 +13,7 @@ import { auth } from '../config/firebase';
 interface AuthContextType {
     currentUser: User | null;
     loading: boolean;
+    isAdmin: boolean;
     signOut: () => Promise<void>;
     getIdToken: () => Promise<string | null>;
 }
@@ -30,11 +31,26 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         console.log("AuthProvider: Setting up onAuthStateChanged listener...");
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             console.log("AuthProvider: onAuthStateChanged fired. User:", user ? user.uid : "null");
+
+            if (user) {
+                // Check if user is admin via custom claims
+                try {
+                    const tokenResult = await user.getIdTokenResult();
+                    setIsAdmin(!!tokenResult.claims.admin);
+                } catch (e) {
+                    console.error("Error fetching claims:", e);
+                    setIsAdmin(false);
+                }
+            } else {
+                setIsAdmin(false);
+            }
+
             setCurrentUser(user);
             setLoading(false);
         });
@@ -59,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const value: AuthContextType = {
         currentUser,
         loading,
+        isAdmin,
         signOut,
         getIdToken,
     };

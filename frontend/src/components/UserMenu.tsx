@@ -20,7 +20,7 @@ export function UserMenu() {
     return (
         <button
             onClick={handleLogout}
-            className="p-2 rounded-lg bg-gradient-to-r from-slate-700 to-zinc-700 hover:from-slate-600 hover:to-zinc-600 transition-all text-white shadow-lg shadow-black/20 group"
+            className="w-9 h-9 flex items-center justify-center rounded-lg bg-gradient-to-r from-slate-700 to-zinc-700 hover:from-slate-600 hover:to-zinc-600 transition-all text-white shadow-lg shadow-black/20 group"
             title="Sign out"
         >
             <LogOut className="w-5 h-5 text-zinc-300 group-hover:text-white transition-colors" />
