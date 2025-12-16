@@ -23,7 +23,7 @@ from services.auth_service import initialize_firebase
 from routes import (
     transcription, analysis, 
     interviews, notes, auth, 
-    billing, audio, admin
+    billing, audio, admin, health
 )
 
 # --- FastAPI Setup ---
@@ -61,6 +61,7 @@ app.include_router(notes.router)
 app.include_router(audio.router)
 app.include_router(billing.router)
 app.include_router(admin.router)
+app.include_router(health.router)
 
 
 # Initialize database and Firebase on startup

@@ -771,6 +771,22 @@ function MainApp() {
 
 // Main App component with AuthProvider
 function App() {
+  // Warm up backend
+  useEffect(() => {
+    // We use the authenticatedFetch's base URL logic or just imports
+    // But since this is outside AuthProvider/context, simpler to just use fetch with env var if possible
+    // or just hardcode the likely prod URL if env is tricky to access here.
+    // However, we imported API_BASE_URL from utils/api in this file!
+    const ping = async () => {
+      try {
+        await fetch(`${API_BASE_URL}/v1/health`);
+      } catch (e) {
+        // quiet fail
+      }
+    };
+    ping();
+  }, []);
+
   return (
     <AuthProvider>
       <AuthenticatedApp />
