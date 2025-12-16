@@ -26,3 +26,10 @@ interviewlens-32576-5c17f1992c26.json
 .envrc
 build/
 *.fish
+backend/env.ps1
+frontend/deploy.ps1
+frontend/env.ps1
+landing/deploy.ps1
+landing/env.ps1
+backend/deploy.ps1
+cors.json

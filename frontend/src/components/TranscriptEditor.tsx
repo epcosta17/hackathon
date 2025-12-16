@@ -105,6 +105,10 @@ export function TranscriptEditor({
 
       const downloadWithParallelChunks = async () => {
         try {
+          // Optimization: Wait 3s to let the initial stream buffer without competition
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          if (abortController.signal.aborted) return;
+
           console.log('🚀 Starting optimized parallel chunk download...');
 
           // First, get file size by fetching headers only
@@ -171,8 +175,8 @@ export function TranscriptEditor({
             return { index: i, start, end };
           });
 
-          // Download chunks in parallel (respecting browser connection limit of 6)
-          const batchSize = 6;
+          // Download chunks in parallel (throttled to 3 to leave bandwidth for streaming)
+          const batchSize = 3;
           const chunkBlobs: Blob[] = new Array(actualChunks);
 
           for (let i = 0; i < chunks.length; i += batchSize) {
