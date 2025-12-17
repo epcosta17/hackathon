@@ -18,7 +18,7 @@ def verify_admin(current_user: Dict[str, Any] = Depends(get_current_user)):
 class UserAdminView(BaseModel):
     uid: str
     email: Optional[str] = None
-    credits: int = 0
+    credits: float = 0
     interview_count: int = 0
     created_at: Optional[str] = None
     last_login: Optional[str] = None
