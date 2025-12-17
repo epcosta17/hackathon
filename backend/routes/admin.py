@@ -25,7 +25,7 @@ class UserAdminView(BaseModel):
 
 class AdminStats(BaseModel):
     total_users: int
-    total_credits: int
+    total_credits: float
     total_interviews: int
 
 class AddCreditsRequest(BaseModel):
