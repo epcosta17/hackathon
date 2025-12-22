@@ -26,12 +26,12 @@ interface InterviewSummary {
 interface UploadScreenProps {
   onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => void;
   onLoadInterview: (id: string | number) => void;
+  onNavigateToBilling: () => void;
   onNavigateToSettings: () => void;
-  onNavigateToAnalysisConfig: () => void;
   onNavigateToAdmin: () => void;
 }
 
-export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavigateToSettings, onNavigateToAnalysisConfig, onNavigateToAdmin }: UploadScreenProps) {
+export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavigateToBilling, onNavigateToSettings, onNavigateToAdmin }: UploadScreenProps) {
   const { isAdmin } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   // ... (existing state)
@@ -316,7 +316,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
             <div className="flex items-center gap-3">
               <button
-                onClick={onNavigateToSettings}
+                onClick={onNavigateToBilling}
                 className="flex items-center gap-2 px-3 h-9 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
               >
                 <div className="bg-white/10 p-1 rounded group-hover:bg-white/20 transition-colors">
@@ -328,7 +328,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                 </div>
               </button>
               <button
-                onClick={onNavigateToAnalysisConfig}
+                onClick={onNavigateToSettings}
                 className="w-9 h-9 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
                 title="Configure Analysis"
               >
@@ -800,7 +800,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
           setShowNoCreditsDialog(false);
           setHasDismissedCreditsDialog(true);
         }}
-        onNavigateToSettings={onNavigateToSettings}
+        onNavigateToBilling={onNavigateToBilling}
       />
     </div>
   );

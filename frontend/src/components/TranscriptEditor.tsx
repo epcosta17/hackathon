@@ -39,7 +39,7 @@ interface TranscriptEditorProps {
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
   onSave: () => void;
-  onNavigateToSettings: () => void;
+  onNavigateToBilling: () => void;
 }
 
 export function TranscriptEditor({
@@ -57,7 +57,7 @@ export function TranscriptEditor({
   notes = [],
   setNotes,
   onSave,
-  onNavigateToSettings,
+  onNavigateToBilling,
 }: TranscriptEditorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -1509,7 +1509,7 @@ export function TranscriptEditor({
       <NoCreditsDialog
         isOpen={showNoCreditsDialog}
         onClose={() => setShowNoCreditsDialog(false)}
-        onNavigateToSettings={onNavigateToSettings}
+        onNavigateToBilling={onNavigateToBilling}
       />
     </div>
   );

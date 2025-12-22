@@ -7,10 +7,10 @@ import { Button } from './ui/button';
 interface NoCreditsDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onNavigateToSettings: () => void;
+    onNavigateToBilling: () => void;
 }
 
-export function NoCreditsDialog({ isOpen, onClose, onNavigateToSettings }: NoCreditsDialogProps) {
+export function NoCreditsDialog({ isOpen, onClose, onNavigateToBilling }: NoCreditsDialogProps) {
     if (!isOpen || typeof document === 'undefined') return null;
 
     return createPortal(
@@ -82,7 +82,7 @@ export function NoCreditsDialog({ isOpen, onClose, onNavigateToSettings }: NoCre
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <Button
-                        onClick={onNavigateToSettings}
+                        onClick={onNavigateToBilling}
                         style={{
                             width: '100%',
                             background: 'linear-gradient(to right, #4f46e5, #7c3aed)', // indigo-600 to violet-600

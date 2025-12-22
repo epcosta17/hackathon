@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsScreen } from './components/SettingsScreen';
 
-export type Screen = 'upload' | 'editor' | 'analysis' | 'settings' | 'analysis-settings' | 'admin';
+export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin';
 
 // ... (existing code)
 
@@ -219,12 +219,12 @@ function MainApp() {
 
   // Handle Stripe Redirects
 
-  const handleNavigateToSettings = () => {
-    setCurrentScreen('settings');
+  const handleNavigateToBilling = () => {
+    setCurrentScreen('billing');
   };
 
-  const handleNavigateToAnalysisConfig = () => {
-    setCurrentScreen('analysis-settings');
+  const handleNavigateToSettings = () => {
+    setCurrentScreen('settings');
   };
 
   // Pre-fill title when loading existing interview
@@ -652,15 +652,15 @@ function MainApp() {
         <UploadScreen
           onTranscriptionComplete={handleTranscriptionComplete}
           onLoadInterview={handleLoadInterview}
+          onNavigateToBilling={handleNavigateToBilling}
           onNavigateToSettings={handleNavigateToSettings}
-          onNavigateToAnalysisConfig={handleNavigateToAnalysisConfig}
           onNavigateToAdmin={() => setCurrentScreen('admin')}
         />
       )}
-      {currentScreen === 'settings' && (
+      {currentScreen === 'billing' && (
         <BillingScreen onBack={handleBackToUpload} />
       )}
-      {currentScreen === 'analysis-settings' && (
+      {currentScreen === 'settings' && (
         <SettingsScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'admin' && (
@@ -683,7 +683,7 @@ function MainApp() {
             notes={notes}
             setNotes={setNotes}
             onSave={() => setShowSaveDialog(true)}
-            onNavigateToSettings={handleNavigateToSettings}
+            onNavigateToBilling={handleNavigateToBilling}
           />
         </ErrorBoundary>
       )}
