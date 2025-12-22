@@ -3,8 +3,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { createPortal } from 'react-dom';
 
 export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
@@ -14,11 +14,12 @@ import { EmailVerificationPending } from './components/EmailVerificationPending'
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { Button } from './components/ui/button';
+import { TooltipProvider } from './components/ui/tooltip';
 import { Input } from './components/ui/input';
 import { Save, X } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { db, auth } from './config/firebase';
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { authenticatedFetch, API_BASE_URL } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BillingScreen } from './components/BillingScreen';
@@ -164,8 +165,14 @@ function MainApp() {
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
   const [currentInterviewId, setCurrentInterviewId] = useState<string | number | null>(() => {
     const path = window.location.pathname;
-    if (path.startsWith('/transcription/')) return path.replace('/transcription/', '');
-    if (path.startsWith('/analysis/')) return path.replace('/analysis/', '');
+    if (path.startsWith('/transcription/')) {
+      const id = path.replace('/transcription/', '');
+      return id === 'new' ? null : id;
+    }
+    if (path.startsWith('/analysis/')) {
+      const id = path.replace('/analysis/', '');
+      return id === 'new' ? null : id;
+    }
     return null;
   });
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
@@ -202,44 +209,39 @@ function MainApp() {
     }
   }, [currentUser]); // Trigger on currentUser change (includes initial login)
 
-  // Sync URL with Screen State
-  useEffect(() => {
-    const path = location.pathname;
-    const screenToPath: Record<string, string> = {
-      upload: '/',
-      billing: '/billing',
-      settings: '/settings',
-      admin: '/admin',
-      editor: currentInterviewId ? `/transcription/${currentInterviewId}` : '/',
-      analysis: currentInterviewId ? `/analysis/${currentInterviewId}` : '/',
-      'not-found': location.pathname, // Keep the URL as is for 404
-    };
-
-    const targetPath = screenToPath[currentScreen];
-    if (targetPath && path !== targetPath) {
-      navigate(targetPath);
-    }
-  }, [currentScreen, navigate, location.pathname, currentInterviewId]);
-
   // Sync Screen State with Browser Navigation (Back/Forward)
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/billing') setCurrentScreen('billing');
-    else if (path === '/settings') setCurrentScreen('settings');
-    else if (path === '/admin') setCurrentScreen('admin');
+
+    // Determine screen and possibly interview ID from path
+    let newScreen: Screen = 'upload';
+    let newInterviewId: string | number | null = currentInterviewId;
+
+    if (path === '/billing') newScreen = 'billing';
+    else if (path === '/settings') newScreen = 'settings';
+    else if (path === '/admin') newScreen = 'admin';
     else if (path.startsWith('/transcription/')) {
+      newScreen = 'editor';
       const id = path.replace('/transcription/', '');
-      setCurrentScreen('editor');
-      if (id !== String(currentInterviewId)) setCurrentInterviewId(id);
+      newInterviewId = id === 'new' ? null : id;
     }
     else if (path.startsWith('/analysis/')) {
+      newScreen = 'analysis';
       const id = path.replace('/analysis/', '');
-      setCurrentScreen('analysis');
-      if (id !== String(currentInterviewId)) setCurrentInterviewId(id);
+      newInterviewId = id === 'new' ? null : id;
     }
-    else if (path === '/') setCurrentScreen('upload');
-    else setCurrentScreen('not-found');
-  }, [location.pathname]);
+    else if (path === '/') newScreen = 'upload';
+    else newScreen = 'not-found';
+
+    // Update state only if changed to avoid redundant renders and flickering
+    if (newScreen !== currentScreen) {
+      setCurrentScreen(newScreen);
+    }
+
+    if (newInterviewId !== currentInterviewId) {
+      setCurrentInterviewId(newInterviewId);
+    }
+  }, [location.pathname, currentScreen, currentInterviewId]);
 
   // Trigger data fetch for deep links
   useEffect(() => {
@@ -283,11 +285,11 @@ function MainApp() {
   // Handle Stripe Redirects
 
   const handleNavigateToBilling = () => {
-    setCurrentScreen('billing');
+    navigate('/billing');
   };
 
   const handleNavigateToSettings = () => {
-    setCurrentScreen('settings');
+    navigate('/settings');
   };
 
   // Pre-fill title when loading existing interview
@@ -322,7 +324,7 @@ function MainApp() {
       setWaveformData(null);
     }
 
-    setCurrentScreen('editor');
+    navigate('/transcription/new');
   };
 
   const handleAnalysisComplete = (data: AnalysisData) => {
@@ -335,7 +337,7 @@ function MainApp() {
     setAnalysisData(dataWithTimestamp as AnalysisData);
     setHasNewAnalysis(true); // Mark that analyze button was clicked
     console.log('✅ hasNewAnalysis set to TRUE');
-    setCurrentScreen('analysis');
+    navigate(currentInterviewId ? `/analysis/${currentInterviewId}` : '/analysis/new');
 
     // Auto-update if interview already exists
     if (currentInterviewId) {
@@ -534,11 +536,11 @@ function MainApp() {
   };
 
   const handleBackToEditor = () => {
-    setCurrentScreen('editor');
+    navigate(currentInterviewId ? `/transcription/${currentInterviewId}` : '/transcription/new');
   };
 
   const handleBackToUpload = () => {
-    setCurrentScreen('upload');
+    navigate('/');
     setTranscriptBlocks([]);
     setAnalysisData(null);
     setAudioFile(null);
@@ -552,11 +554,9 @@ function MainApp() {
     console.log('🏠 Going home - hasNewAnalysis set to FALSE');
   };
 
-  // Optimistic Navigation: Switch screen immediately
   const handleLoadInterview = (interviewId: string | number) => {
     console.log('🚀 Optimistic Load: Switching to editor immediately');
-    setCurrentInterviewId(interviewId);
-    setCurrentScreen('editor');
+    navigate(`/transcription/${interviewId}`);
 
     // Clear previous data to show skeleton state
     setTranscriptBlocks([]);
@@ -725,7 +725,7 @@ function MainApp() {
           onLoadInterview={handleLoadInterview}
           onNavigateToBilling={handleNavigateToBilling}
           onNavigateToSettings={handleNavigateToSettings}
-          onNavigateToAdmin={() => setCurrentScreen('admin')}
+          onNavigateToAdmin={() => navigate('/admin')}
         />
       )}
       {currentScreen === 'billing' && (
@@ -749,7 +749,7 @@ function MainApp() {
               transcriptBlocks={transcriptBlocks}
               setTranscriptBlocks={setTranscriptBlocks}
               onAnalysisComplete={handleAnalysisComplete}
-              onViewAnalysis={() => setCurrentScreen('analysis')}
+              onViewAnalysis={() => navigate(currentInterviewId ? `/analysis/${currentInterviewId}` : '/analysis/new')}
               onBackToUpload={handleBackToUpload}
               audioFile={audioFile}
               audioUrl={audioUrl}
@@ -878,7 +878,9 @@ function App() {
 
   return (
     <AuthProvider>
-      <AuthenticatedApp />
+      <TooltipProvider>
+        <AuthenticatedApp />
+      </TooltipProvider>
     </AuthProvider>
   );
 }

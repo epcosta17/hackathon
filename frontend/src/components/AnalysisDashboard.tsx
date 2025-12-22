@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, Check, BarChart3, PlusCircle, XCircle, Target, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
+import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, BarChart3, PlusCircle, XCircle, Target, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Input } from './ui/input';
 import { AnalysisData } from '../App';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -333,48 +334,77 @@ export function AnalysisDashboard({
               </div>
             </div>
             <div className="flex gap-3 flex-shrink-0">
-              <Button
-                onClick={onBackToUpload}
-                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Back to Home
-              </Button>
-              <Button
-                onClick={onBackToEditor}
-                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Transcript
-              </Button>
-              {hasNewAnalysis && (
-                <Button
-                  onClick={() => {
-                    console.log('🟢 Save Interview button clicked');
-                    setShowSaveDialog(true);
-                  }}
-                  disabled={isSaving}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save Interview'}
-                </Button>
-              )}
-              <Button
-                onClick={onBackToUpload}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-              >
-                <PlusCircle className="w-4 h-4 mr-2" />
-                New Interview
-              </Button>
-              <Button
-                onClick={handleDownloadReport}
-                disabled={isDownloading}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                {isDownloading ? 'Generating...' : 'Download Report'}
-              </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onBackToEditor}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Back to Transcript</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onBackToUpload}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
+                  >
+                    <Home className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Back to Home</TooltipContent>
+              </Tooltip>
+
+
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => {
+                      console.log('🟢 Save/Update Interview button clicked');
+                      setShowSaveDialog(true);
+                    }}
+                    disabled={isSaving}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isSaving ? 'Saving...' : currentInterviewId ? 'Update Interview' : 'Save Interview'}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onBackToUpload}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New Interview</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleDownloadReport}
+                    disabled={isDownloading}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isDownloading ? 'Generating...' : 'Download Report'}
+                </TooltipContent>
+              </Tooltip>
 
             </div>
           </div>

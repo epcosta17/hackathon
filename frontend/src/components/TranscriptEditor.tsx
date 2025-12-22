@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Pause, Edit2, Sparkles, Eye, File, FileText, Home, StickyNote, Bookmark, FilePlus2, Trash2, Download, ChevronDown } from 'lucide-react';
+import { Play, Pause, Edit2, Sparkles, Eye, File, FileText, Home, StickyNote, Bookmark, FilePlus2, Trash2, Download, ChevronDown, Save } from 'lucide-react';
 
 import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
 import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Textarea } from './ui/textarea';
 import { TranscriptBlock, AnalysisData } from '../App';
 import { motion } from 'motion/react';
@@ -886,58 +887,84 @@ export function TranscriptEditor({
               </div>
             </div>
             <div className="flex gap-3">
-              <Button
-                onClick={onBackToUpload}
-                className="bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Back to Home
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onBackToUpload}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-slate-600 to-zinc-600 hover:from-slate-700 hover:to-zinc-700 text-white"
+                  >
+                    <Home className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Back to Home</TooltipContent>
+              </Tooltip>
+
               {existingAnalysis && (
-                <Button
-                  onClick={onViewAnalysis}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Analysis
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={onViewAnalysis}
+                      className="h-10 w-10 p-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View Analysis</TooltipContent>
+                </Tooltip>
               )}
-              {!currentInterviewId && (
-                <Button
-                  onClick={onSave}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                >
-                  <StickyNote className="w-4 h-4 mr-2" />
-                  Save Interview
-                </Button>
-              )}
-              <Button
-                onClick={handleRunAnalysis}
-                disabled={isAnalyzing}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
-              >
-                <Sparkles className={`w-4 h-4 mr-2 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-                {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
-              </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={onSave}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                  >
+                    <Save className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {currentInterviewId ? 'Update Interview' : 'Save Interview'}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleRunAnalysis}
+                    disabled={isAnalyzing}
+                    className="h-10 w-10 p-0 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+                  >
+                    <Sparkles className={`w-4 h-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
+                </TooltipContent>
+              </Tooltip>
 
               {/* Export Dropdown */}
               <div style={{ position: 'relative' }}>
-                <Button
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setExportMenuPosition({
-                      top: rect.bottom + 8,
-                      right: window.innerWidth - rect.right,
-                    });
-                    setShowExportMenu(true);
-                  }}
-                  variant="outline"
-                  className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                  <ChevronDown className="w-3 h-3 ml-1" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setExportMenuPosition({
+                          top: rect.bottom + 8,
+                          right: window.innerWidth - rect.right,
+                        });
+                        setShowExportMenu(true);
+                      }}
+                      variant="outline"
+                      className="h-10 w-12 px-2 bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-white flex items-center justify-center gap-1 group transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="text-zinc-500 text-xs select-none"> </span>
+                      <ChevronDown className="w-3 h-3 opacity-50 transition-transform group-hover:translate-y-0.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export Options</TooltipContent>
+                </Tooltip>
               </div>
 
             </div>

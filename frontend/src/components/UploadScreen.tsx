@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles, Zap, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Progress } from './ui/progress';
 import { TranscriptBlock } from '../App';
 import { toast } from 'sonner';
@@ -315,33 +316,48 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={onNavigateToBilling}
-                className="flex items-center gap-2 px-3 h-9 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
-              >
-                <div className="bg-white/10 p-1 rounded group-hover:bg-white/20 transition-colors">
-                  <Zap className="w-3 h-3 text-white fill-white" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-indigo-100 font-medium uppercase tracking-wider leading-none">Credits</p>
-                  <p className="text-sm text-white font-bold leading-none mt-0.5">{credits !== null ? credits : '-'}</p>
-                </div>
-              </button>
-              <button
-                onClick={onNavigateToSettings}
-                className="w-9 h-9 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
-                title="Configure Analysis"
-              >
-                <Sparkles className="w-5 h-5 fill-white/20" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onNavigateToBilling}
+                    className="flex items-center gap-2 px-3 h-9 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all group text-left shadow-lg shadow-indigo-500/20"
+                  >
+                    <div className="bg-white/10 p-1 rounded group-hover:bg-white/20 transition-colors">
+                      <Zap className="w-3 h-3 text-white fill-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-indigo-100 font-medium uppercase tracking-wider leading-none">Credits</p>
+                      <p className="text-sm text-white font-bold leading-none mt-0.5">{credits !== null ? credits : '-'}</p>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Manage Credits & Subscriptions</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onNavigateToSettings}
+                    className="w-9 h-9 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
+                  >
+                    <Sparkles className="w-5 h-5 fill-white/20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Configure Analysis Settings</TooltipContent>
+              </Tooltip>
+
               {isAdmin && (
-                <button
-                  onClick={onNavigateToAdmin}
-                  className="w-9 h-9 rounded-lg bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 flex items-center justify-center transition-all shadow-lg shadow-red-500/20 text-white group"
-                  title="Admin Dashboard"
-                >
-                  <Shield className="w-5 h-5" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={onNavigateToAdmin}
+                      className="w-9 h-9 rounded-lg bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 flex items-center justify-center transition-all shadow-lg shadow-red-500/20 text-white group"
+                    >
+                      <Shield className="w-5 h-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Admin Dashboard</TooltipContent>
+                </Tooltip>
               )}
               <UserMenu />
             </div>
@@ -373,12 +389,17 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             }}
           >
             <h2 className="text-white text-sm font-semibold">Previous Interviews</h2>
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Close Sidebar</TooltipContent>
+            </Tooltip>
           </motion.div>
 
           {/* Search Bar */}
@@ -464,12 +485,17 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                           <span>{formatDate(interview.created_at)}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => handleDeleteInterview(interview.id, e)}
-                        className="p-1 text-zinc-600 hover:text-red-400 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => handleDeleteInterview(interview.id as number, e)}
+                            className="p-1 text-zinc-600 hover:text-red-400 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Interview</TooltipContent>
+                      </Tooltip>
                     </div>
                   </motion.div>
                 ))
@@ -483,12 +509,17 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
           <div className="w-full flex items-center mb-4 min-h-[40px]">
             <div>
               {!isSidebarOpen && (
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setIsSidebarOpen(true)}
+                      className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white"
+                    >
+                      <Menu className="w-5 h-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Open Previous Interviews</TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -668,26 +699,33 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                   scale: { duration: 0.4, ease: "easeInOut" }
                 }}
               >
-                <Button
-                  onClick={startTranscription}
-                  disabled={!file || isTranscribing}
-                  className={`w-full h-14 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all ${isComplete
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600'
-                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
-                    }`}
-                >
-                  {isComplete ? (
-                    <>
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                      Transcription Finished
-                    </>
-                  ) : (
-                    <>
-                      <FileAudio className={`w-5 h-5 mr-2 ${isTranscribing ? 'animate-pulse' : ''}`} />
-                      {isTranscribing ? 'Processing Audio...' : 'Start Transcription & Analysis'}
-                    </>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={startTranscription}
+                      disabled={!file || isTranscribing}
+                      className={`w-full h-14 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all ${isComplete
+                        ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+                        : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+                        }`}
+                    >
+                      {isComplete ? (
+                        <>
+                          <CheckCircle className="w-5 h-5 mr-2" />
+                          Transcription Finished
+                        </>
+                      ) : (
+                        <>
+                          <FileAudio className={`w-5 h-5 mr-2 ${isTranscribing ? 'animate-pulse' : ''}`} />
+                          {isTranscribing ? 'Processing Audio...' : 'Start Transcription & Analysis'}
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {!file ? "Please select a file first" : isTranscribing ? "Processing..." : "Run AI Transcription"}
+                  </TooltipContent>
+                </Tooltip>
               </motion.div>
             </motion.div >
           </div >
