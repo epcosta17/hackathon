@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles, Zap, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,7 +46,28 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
   const [isComplete, setIsComplete] = useState(false);
   const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoadingInterviews, setIsLoadingInterviews] = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const filteredInterviews = useMemo(() => {
+    const trimmedQuery = debouncedQuery.trim().toLowerCase();
+    if (!trimmedQuery) return interviews;
+
+    return interviews.filter(i => {
+      const title = (i.title || '').toLowerCase();
+      const preview = (i.transcript_preview || '').toLowerCase();
+      const idStr = String(i.id || '').toLowerCase();
+      return title.includes(trimmedQuery) || preview.includes(trimmedQuery) || idStr.includes(trimmedQuery);
+    });
+  }, [interviews, debouncedQuery]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [currentFact, setCurrentFact] = useState("Did you know? AI speech recognition helps make content accessible to everyone.");
@@ -98,14 +119,12 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
         setupListener(user.uid);
       } else {
         setInterviews([]);
-        setIsLoadingInterviews(false);
       }
     });
 
     let unsubscribeFirestore: () => void;
 
     const setupListener = (uid: string) => {
-      setIsLoadingInterviews(true);
       const path = `users/${uid}/interviews`;
       console.log(`📡 [Firestore] Listening to: ${path}`);
 
@@ -117,9 +136,9 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
         snapshot.forEach((doc) => {
           const data = doc.data();
           loadedInterviews.push({
-            id: data.id,
-            title: data.title,
-            transcript_preview: data.transcript_preview,
+            id: data.id || doc.id,
+            title: data.title || 'Untitled Interview',
+            transcript_preview: data.transcript_preview || 'No preview available',
             created_at: data.created_at,
             updated_at: data.updated_at
           });
@@ -127,15 +146,9 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
         loadedInterviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        const filtered = searchQuery
-          ? loadedInterviews.filter(i => i.title.toLowerCase().includes(searchQuery.toLowerCase()))
-          : loadedInterviews;
-
-        setInterviews(filtered);
-        setIsLoadingInterviews(false);
+        setInterviews(loadedInterviews);
       }, (error) => {
         console.error("Firestore Error:", error);
-        setIsLoadingInterviews(false);
       });
     };
 
@@ -143,7 +156,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       unsubscribeAuth();
       if (unsubscribeFirestore) unsubscribeFirestore();
     };
-  }, [searchQuery]);
+  }, []);
 
   const fetchFunFact = async () => {
     try {
@@ -429,8 +442,8 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
           {/* Interviews List */}
           <div className="px-4 pt-4 pb-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-            <div className="space-y-2" style={{ paddingTop: interviews.length === 0 ? '50px' : '0' }}>
-              {interviews.length === 0 ? (
+            <div className="space-y-2" style={{ paddingTop: filteredInterviews.length === 0 ? '50px' : '0' }}>
+              {filteredInterviews.length === 0 ? (
                 <motion.div
                   className="text-center py-12 px-4"
                   initial={{ opacity: 0, y: 10 }}
@@ -455,7 +468,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                   )}
                 </motion.div>
               ) : (
-                interviews.map((interview, index) => (
+                filteredInterviews.map((interview, index) => (
                   <motion.div
                     key={interview.id}
                     initial={{ opacity: 0, y: 20 }}

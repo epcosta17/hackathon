@@ -715,7 +715,8 @@ export function TranscriptEditor({
 
   const handleRunAnalysis = async () => {
     // Logic: First analysis is free (included in 1 credit). Re-analysis costs 0.5.
-    const isReanalysis = !!existingAnalysis;
+    // Only charge for re-analysis if it's an ALREADY SAVED interview.
+    const isReanalysis = !!existingAnalysis && !!currentInterviewId;
 
     // Frontend Credit Check (Only for Re-analysis)
     if (isReanalysis) {
@@ -938,7 +939,7 @@ export function TranscriptEditor({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {isAnalyzing ? 'Analyzing...' : existingAnalysis ? 'Run New Analysis' : 'Run AI Analysis'}
+                  {isAnalyzing ? 'Analyzing...' : (existingAnalysis && currentInterviewId) ? 'Run New Analysis' : 'Run AI Analysis'}
                 </TooltipContent>
               </Tooltip>
 
