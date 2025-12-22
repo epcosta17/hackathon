@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsScreen } from './components/SettingsScreen';
-
-export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin';
-
-// ... (existing code)
-
 import { createPortal } from 'react-dom';
+
+export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
@@ -26,6 +23,7 @@ import { authenticatedFetch, API_BASE_URL } from './utils/api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BillingScreen } from './components/BillingScreen';
 import { AdminScreen } from './components/AdminScreen';
+import { NotFoundScreen } from './components/NotFoundScreen';
 
 export interface Word {
   text: string;
@@ -150,12 +148,13 @@ function MainApp() {
   const location = useLocation();
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
     const path = window.location.pathname;
+    if (path === '/') return 'upload';
     if (path === '/billing') return 'billing';
     if (path === '/settings') return 'settings';
     if (path === '/admin') return 'admin';
     if (path.startsWith('/transcription/')) return 'editor';
     if (path.startsWith('/analysis/')) return 'analysis';
-    return 'upload';
+    return 'not-found';
   });
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
@@ -176,6 +175,8 @@ function MainApp() {
   const [preUploadedAudioUrl, setPreUploadedAudioUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
+  const isFetchingRef = React.useRef(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   // Sync user data with backend (initializes credits for new users)
   // IMPORTANT: Only call after email is verified, otherwise middleware blocks it
@@ -211,6 +212,7 @@ function MainApp() {
       admin: '/admin',
       editor: currentInterviewId ? `/transcription/${currentInterviewId}` : '/',
       analysis: currentInterviewId ? `/analysis/${currentInterviewId}` : '/',
+      'not-found': location.pathname, // Keep the URL as is for 404
     };
 
     const targetPath = screenToPath[currentScreen];
@@ -236,11 +238,12 @@ function MainApp() {
       if (id !== String(currentInterviewId)) setCurrentInterviewId(id);
     }
     else if (path === '/') setCurrentScreen('upload');
+    else setCurrentScreen('not-found');
   }, [location.pathname]);
 
   // Trigger data fetch for deep links
   useEffect(() => {
-    if (currentUser && currentInterviewId && transcriptBlocks.length === 0 && !loading) {
+    if (currentUser && currentInterviewId && transcriptBlocks.length === 0 && !loading && !isFetchingRef.current) {
       console.log('🔗 Deep Link Detected: Fetching interview data for', currentInterviewId);
       fetchInterviewData(currentInterviewId);
     }
@@ -568,7 +571,13 @@ function MainApp() {
 
   // Inside App component
   const fetchInterviewData = async (interviewId: string | number) => {
+    // Avoid duplicate fetches
+    if (isFetchingRef.current) return;
+
     console.time('Fetch Interview Data (Firestore)');
+    isFetchingRef.current = true;
+    setIsDataLoading(true);
+
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -576,8 +585,6 @@ function MainApp() {
       }
 
       // Construct references
-      // Path: users/{uid}/interviews/{interviewId}
-      // Sub-collections: data/transcript, data/analysis, data/waveform
       const interviewRef = doc(db, 'users', user.uid, 'interviews', String(interviewId));
       const transcriptRef = doc(db, 'users', user.uid, 'interviews', String(interviewId), 'data', 'transcript');
       const analysisRef = doc(db, 'users', user.uid, 'interviews', String(interviewId), 'data', 'analysis');
@@ -592,9 +599,9 @@ function MainApp() {
       ]);
 
       console.timeEnd('Fetch Interview Data (Firestore)');
-
       if (!interviewSnap.exists()) {
-        toast.error("Interview not found");
+        console.warn('❌ Interview not found in Firestore:', interviewId);
+        setCurrentScreen('not-found');
         return;
       }
 
@@ -654,6 +661,10 @@ function MainApp() {
     } catch (err) {
       console.error('Failed to load interview from Firestore:', err);
       toast.error('Failed to load interview. Please try again.');
+      setCurrentScreen('not-found');
+    } finally {
+      setIsDataLoading(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -727,46 +738,64 @@ function MainApp() {
         <AdminScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'editor' && (
-        <ErrorBoundary>
-          <TranscriptEditor
-            transcriptBlocks={transcriptBlocks}
-            setTranscriptBlocks={setTranscriptBlocks}
-            onAnalysisComplete={handleAnalysisComplete}
-            onViewAnalysis={() => setCurrentScreen('analysis')}
-            onBackToUpload={handleBackToUpload}
-            audioFile={audioFile}
-            audioUrl={audioUrl}
-            audioDuration={audioDuration}
-            waveformData={waveformData}
-            existingAnalysis={analysisData}
-            currentInterviewId={currentInterviewId}
-            notes={notes}
-            setNotes={setNotes}
-            onSave={() => setShowSaveDialog(true)}
-            onNavigateToBilling={handleNavigateToBilling}
-          />
-        </ErrorBoundary>
+        isDataLoading ? (
+          <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-zinc-400 font-medium animate-pulse">Loading transcript...</p>
+          </div>
+        ) : transcriptBlocks.length > 0 ? (
+          <ErrorBoundary>
+            <TranscriptEditor
+              transcriptBlocks={transcriptBlocks}
+              setTranscriptBlocks={setTranscriptBlocks}
+              onAnalysisComplete={handleAnalysisComplete}
+              onViewAnalysis={() => setCurrentScreen('analysis')}
+              onBackToUpload={handleBackToUpload}
+              audioFile={audioFile}
+              audioUrl={audioUrl}
+              audioDuration={audioDuration}
+              waveformData={waveformData}
+              existingAnalysis={analysisData}
+              currentInterviewId={currentInterviewId}
+              notes={notes}
+              setNotes={setNotes}
+              onSave={() => setShowSaveDialog(true)}
+              onNavigateToBilling={handleNavigateToBilling}
+            />
+          </ErrorBoundary>
+        ) : null
       )}
       {
-        currentScreen === 'analysis' && analysisData && (
-          <AnalysisDashboard
-            analysisData={analysisData}
-            transcriptBlocks={transcriptBlocks}
-            onBackToUpload={handleBackToUpload}
-            onBackToEditor={handleBackToEditor}
-            currentInterviewId={currentInterviewId}
-            currentInterviewTitle={currentInterviewTitle}
-            onSaveInterview={(input: string | number) => handleSaveInterview(input)}
-            audioFile={audioFile}
-            notes={notes}
-            waveformData={waveformData}
-            hasNewAnalysis={hasNewAnalysis}
-            onAnalysisSaved={() => {
-              setHasNewAnalysis(false);
-            }}
-          />
+        currentScreen === 'analysis' && (
+          isDataLoading ? (
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-zinc-400 font-medium animate-pulse">Loading analysis...</p>
+            </div>
+          ) : analysisData ? (
+            <AnalysisDashboard
+              analysisData={analysisData}
+              transcriptBlocks={transcriptBlocks}
+              onBackToUpload={handleBackToUpload}
+              onBackToEditor={handleBackToEditor}
+              currentInterviewId={currentInterviewId}
+              currentInterviewTitle={currentInterviewTitle}
+              onSaveInterview={(input: string | number) => handleSaveInterview(input)}
+              audioFile={audioFile}
+              notes={notes}
+              waveformData={waveformData}
+              hasNewAnalysis={hasNewAnalysis}
+              onAnalysisSaved={() => {
+                setHasNewAnalysis(false);
+              }}
+            />
+          ) : null
         )
       }
+
+      {currentScreen === 'not-found' && (
+        <NotFoundScreen onBackToHome={handleBackToUpload} />
+      )}
 
       {/* Save Interview Dialog, now managed by App.tsx */}
       {
