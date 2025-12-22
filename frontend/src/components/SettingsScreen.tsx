@@ -140,8 +140,8 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
                 <div className="w-full px-8 py-4">
                     <div className="flex items-center justify-between gap-8">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center">
-                                <Settings className="w-5 h-5 text-zinc-400" />
+                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
+                                <Settings className="w-5 h-5 text-white" />
                             </div>
                             <div>
                                 <h1 className="text-white text-xl font-bold leading-tight">Analysis Configuration</h1>

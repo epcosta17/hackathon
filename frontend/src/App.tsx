@@ -146,14 +146,29 @@ function AuthenticatedApp() {
 // Main app logic (extracted from original App component)
 function MainApp() {
   const { currentUser, loading } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('upload');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    const path = window.location.pathname;
+    if (path === '/billing') return 'billing';
+    if (path === '/settings') return 'settings';
+    if (path === '/admin') return 'admin';
+    if (path.startsWith('/transcription/')) return 'editor';
+    if (path.startsWith('/analysis/')) return 'analysis';
+    return 'upload';
+  });
   const [transcriptBlocks, setTranscriptBlocks] = useState<TranscriptBlock[]>([]);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [waveformData, setWaveformData] = useState<number[] | null>(null);
-  const [currentInterviewId, setCurrentInterviewId] = useState<string | number | null>(null);
+  const [currentInterviewId, setCurrentInterviewId] = useState<string | number | null>(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/transcription/')) return path.replace('/transcription/', '');
+    if (path.startsWith('/analysis/')) return path.replace('/analysis/', '');
+    return null;
+  });
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -186,6 +201,51 @@ function MainApp() {
     }
   }, [currentUser]); // Trigger on currentUser change (includes initial login)
 
+  // Sync URL with Screen State
+  useEffect(() => {
+    const path = location.pathname;
+    const screenToPath: Record<string, string> = {
+      upload: '/',
+      billing: '/billing',
+      settings: '/settings',
+      admin: '/admin',
+      editor: currentInterviewId ? `/transcription/${currentInterviewId}` : '/',
+      analysis: currentInterviewId ? `/analysis/${currentInterviewId}` : '/',
+    };
+
+    const targetPath = screenToPath[currentScreen];
+    if (targetPath && path !== targetPath) {
+      navigate(targetPath);
+    }
+  }, [currentScreen, navigate, location.pathname, currentInterviewId]);
+
+  // Sync Screen State with Browser Navigation (Back/Forward)
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/billing') setCurrentScreen('billing');
+    else if (path === '/settings') setCurrentScreen('settings');
+    else if (path === '/admin') setCurrentScreen('admin');
+    else if (path.startsWith('/transcription/')) {
+      const id = path.replace('/transcription/', '');
+      setCurrentScreen('editor');
+      if (id !== String(currentInterviewId)) setCurrentInterviewId(id);
+    }
+    else if (path.startsWith('/analysis/')) {
+      const id = path.replace('/analysis/', '');
+      setCurrentScreen('analysis');
+      if (id !== String(currentInterviewId)) setCurrentInterviewId(id);
+    }
+    else if (path === '/') setCurrentScreen('upload');
+  }, [location.pathname]);
+
+  // Trigger data fetch for deep links
+  useEffect(() => {
+    if (currentUser && currentInterviewId && transcriptBlocks.length === 0 && !loading) {
+      console.log('🔗 Deep Link Detected: Fetching interview data for', currentInterviewId);
+      fetchInterviewData(currentInterviewId);
+    }
+  }, [currentUser, currentInterviewId, loading]);
+
   // Handle Stripe Redirects
   // Handle Query Params (Stripe Success & Email Verification)
   useEffect(() => {
@@ -194,13 +254,13 @@ function MainApp() {
     // Stripe Success
     if (query.get('success')) {
       toast.success('Credits added successfully!');
-      window.history.replaceState({}, document.title, "/");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Email Verified via Custom Handler
     if (query.get('verified')) {
       toast.success('Email verified successfully!');
-      window.history.replaceState({}, document.title, "/");
+      window.history.replaceState({}, document.title, window.location.pathname);
 
       // Force reload user to update UI state if needed
       if (currentUser) {
@@ -213,7 +273,7 @@ function MainApp() {
     // Stripe Canceled
     if (query.get('canceled')) {
       toast.error('Payment canceled');
-      window.history.replaceState({}, document.title, "/");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [currentUser]);
 
