@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ArrowLeft, Settings, CheckCircle2, RotateCcw, Zap, Brain, Key, Trash2, Copy, AlertCircle, Eye, EyeOff } from 'lucide-react';
@@ -77,8 +77,13 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         // Only show loading if we don't have cached data
         return !localStorage.getItem('settings_enabled_blocks') || !localStorage.getItem('settings_model_mode');
     });
+    const location = useLocation();
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'general' | 'analysis' | 'api'>('analysis');
+    const [activeTab, setActiveTab] = useState<'general' | 'analysis' | 'api'>(() => {
+        if (location.hash === '#api') return 'api';
+        if (location.hash === '#analysis') return 'analysis';
+        return 'analysis';
+    });
 
     // API Keys State
     const [apiKeys, setApiKeys] = useState<any[]>([]);
@@ -572,7 +577,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
                                                         <p className="text-xs text-indigo-300 leading-relaxed flex items-start gap-2">
                                                             <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                                                             <span>
-                                                                Include `X-Hub-Signature-256` in your webhook headers to verify authenticity.
+                                                                Include `X-Interview-Lens-Signature` in your webhook headers to verify authenticity.
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.preventDefault();

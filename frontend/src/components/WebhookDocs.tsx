@@ -164,18 +164,18 @@ async def webhook_listener(
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
                                 {
-                                    title: "1. Get Secret",
-                                    desc: "Copy your Secret from the API settings.",
+                                    title: "1. Define Secret",
+                                    desc: "Enter a strong, random string in your API Settings under Webhooks.",
                                     icon: Key
                                 },
                                 {
-                                    title: "2. Hash Body",
-                                    desc: "Compute the HMAC-SHA256 of the raw body.",
+                                    title: "2. Hash Payload",
+                                    desc: "The signature uses a combination of timestamp and body.",
                                     icon: Terminal
                                 },
                                 {
-                                    title: "3. Compare",
-                                    desc: "Verify it matches the header using timing-safe compare.",
+                                    title: "3. Verify",
+                                    desc: "Use timing-safe comparison to check the signature header.",
                                     icon: CheckCircle2
                                 }
                             ].map((step, i) => (
@@ -191,6 +191,47 @@ async def webhook_listener(
                                     <p className="text-sm text-zinc-500 leading-relaxed">{step.desc}</p>
                                 </motion.div>
                             ))}
+                        </div>
+                        <div className="mt-6 p-6 rounded-xl bg-indigo-500/5 border border-indigo-500/10 space-y-4">
+                            <div className="flex items-start gap-2 text-indigo-300">
+                                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm font-bold">How to create a secret:</p>
+                            </div>
+                            <p className="text-sm text-zinc-400 leading-relaxed">
+                                <button
+                                    onClick={onBack}
+                                    className="text-indigo-400 hover:text-indigo-300 font-medium underline underline-offset-4 transition-colors"
+                                >
+                                    Navigate to Settings → API & Integrations
+                                </button>
+                                {" "}and enter a strong, random string in the "Webhook Secret" field and Save Changes. You can generate a secure 32-byte secret using your terminal:
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 px-1">Bash / Terminal</p>
+                                    <div className="bg-black/40 rounded-lg p-3 border border-zinc-800 flex items-center justify-between group">
+                                        <code className="text-xs text-indigo-400 font-mono">openssl rand -hex 32</code>
+                                        <button
+                                            onClick={() => copyToClipboard('openssl rand -hex 32')}
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-white transition-all"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-[10px] uppercase tracking-wider font-bold text-zinc-500 px-1">Python</p>
+                                    <div className="bg-black/40 rounded-lg p-3 border border-zinc-800 flex items-center justify-between group">
+                                        <code className="text-xs text-emerald-400 font-mono">secrets.token_hex(32)</code>
+                                        <button
+                                            onClick={() => copyToClipboard('python3 -c "import secrets; print(secrets.token_hex(32))"')}
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-white transition-all"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </motion.section>
 

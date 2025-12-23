@@ -178,12 +178,10 @@ function MainApp() {
     return null;
   });
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [interviewTitle, setInterviewTitle] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [preUploadedAudioUrl, setPreUploadedAudioUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [hasNewAnalysis, setHasNewAnalysis] = useState(false); // Track if analyze button was clicked
   const isFetchingRef = React.useRef(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
 
@@ -338,8 +336,6 @@ function MainApp() {
     };
     console.log('📊 New analysis complete with timestamp:', dataWithTimestamp._analysisTimestamp);
     setAnalysisData(dataWithTimestamp as AnalysisData);
-    setHasNewAnalysis(true); // Mark that analyze button was clicked
-    console.log('✅ hasNewAnalysis set to TRUE');
     navigate(currentInterviewId ? `/analysis/${currentInterviewId}` : '/analysis/new');
 
     // Auto-update if interview already exists
@@ -361,7 +357,6 @@ function MainApp() {
 
           console.log('✅ Auto-update successful (Firestore)');
           toast.success('Interview updated with new analysis');
-          setHasNewAnalysis(false);
         } catch (err) {
           console.error('❌ Auto-update error:', err);
         }
@@ -375,7 +370,6 @@ function MainApp() {
   };
 
   const handleAnalysisSaved = () => {
-    setHasNewAnalysis(false);
   };
 
   const handleSaveInterview = async (titleOverride?: string | number) => {
@@ -527,16 +521,6 @@ function MainApp() {
     }, 0);
   };
 
-  const handleDownloadReport = async () => {
-    setIsDownloading(true);
-    try {
-      // ... fetch logic for download ...
-    } catch (error) {
-      toast.error('An error occurred while downloading the report.');
-    } finally {
-      setIsDownloading(false);
-    }
-  };
 
   const handleBackToEditor = () => {
     navigate(currentInterviewId ? `/transcription/${currentInterviewId}` : '/transcription/new');
@@ -553,7 +537,6 @@ function MainApp() {
     setCurrentInterviewId(null);
     setCurrentInterviewTitle('');
     setNotes([]);
-    setHasNewAnalysis(false); // Clear flag when going home
     console.log('🏠 Going home - hasNewAnalysis set to FALSE');
   };
 
@@ -671,31 +654,8 @@ function MainApp() {
     }
   };
 
-  const handleShowSaveDialog = () => {
-    // This logic now moves to App.tsx
-    // For now, we'll just log it.
-    console.log('Show save dialog triggered');
-  };
 
-  const pageTransition = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-    transition: { duration: 0.3 }
-  };
 
-  const motionProps = {
-    variants: pageTransition,
-    initial: "initial",
-    animate: "animate",
-    exit: "exit"
-  };
-
-  const handleInterviewSaved = (id: string) => {
-    setCurrentInterviewId(id);
-    setHasNewAnalysis(false);
-    console.log('✅ Interview saved/updated, ID:', id);
-  };
 
   if (loading) {
     return (
@@ -741,7 +701,7 @@ function MainApp() {
         <AdminScreen onBack={handleBackToUpload} />
       )}
       {currentScreen === 'webhook-docs' && (
-        <WebhookDocs onBack={() => navigate('/settings')} />
+        <WebhookDocs onBack={() => navigate('/settings#api')} />
       )}
       {currentScreen === 'editor' && (
         isDataLoading ? (
@@ -787,12 +747,7 @@ function MainApp() {
               currentInterviewId={currentInterviewId}
               currentInterviewTitle={currentInterviewTitle}
               onSaveInterview={(input: string | number) => handleSaveInterview(input)}
-              audioFile={audioFile}
-              notes={notes}
-              waveformData={waveformData}
-              hasNewAnalysis={hasNewAnalysis}
               onAnalysisSaved={() => {
-                setHasNewAnalysis(false);
               }}
             />
           ) : null
