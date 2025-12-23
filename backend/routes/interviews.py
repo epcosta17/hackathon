@@ -23,7 +23,7 @@ import time
 
 @router.post("/interviews")
 async def create_interview(
-    title: str = Form(...),
+    title: Optional[str] = Form(None),
     # Optional fields kept for API compatibility but ignored for persistence
     transcript_text: Optional[str] = Form(None),
     transcript_words: Optional[str] = Form(None),
@@ -62,10 +62,11 @@ async def create_interview(
             audio_url = f"/v1/audio/{audio_filename}"
         
         # New signature: user_id, interview_id, title, audio_url
+        final_title = title if title else f"Interview-{interview_id}"
         save_interview(
             user_id=user_id,
             interview_id=interview_id,
-            title=title,
+            title=final_title,
             audio_url=audio_url
         )
         

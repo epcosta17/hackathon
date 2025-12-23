@@ -367,7 +367,8 @@ def save_full_interview_data(
     transcript_words: List[Dict[str, Any]],
     analysis_data: Dict[str, Any],
     audio_url: str,
-    audio_duration: float
+    audio_duration: float,
+    waveform_data: Optional[List[float]] = None
 ) -> int:
     """
     Save a complete interview including transcript and analysis data in one batch.
@@ -411,6 +412,11 @@ def save_full_interview_data(
 
     analysis_ref = interview_ref.collection('data').document('analysis')
     batch.set(analysis_ref, analysis_dict)
+    
+    # 4. Waveform Sub-collection (Optional)
+    if waveform_data:
+        waveform_ref = interview_ref.collection('data').document('waveform')
+        batch.set(waveform_ref, {'data': waveform_data})
     
     batch.commit()
     print(f"✅ [DATABASE] Saved full interview data for {interview_id}")

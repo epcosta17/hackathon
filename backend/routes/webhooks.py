@@ -15,12 +15,15 @@ from middleware.auth_middleware import get_current_user
 from services.transcription_service import transcribe_with_deepgram
 from services.analysis_service import generate_analysis_report
 from services.storage_service import storage_service
-from services.waveform_service import get_audio_duration
+from services.waveform_service import get_audio_duration, generate_waveform_universal
 from database import get_firestore_db, save_full_interview_data
 from google.cloud import firestore
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/v1", tags=["webhooks"])
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 async def run_full_analysis_webhook_task(
     user_id: str,
@@ -52,8 +55,9 @@ async def run_full_analysis_webhook_task(
             temp_file.write(audio_content)
             temp_path = temp_file.name
         
-        # 3. Get Duration
+        # 3. Get Duration & Waveform
         duration = get_audio_duration(temp_path)
+        waveform_data = generate_waveform_universal(temp_path)
         
         # 4. Upload to GCS
         remote_filename = f"{uuid.uuid4()}{ext}"
@@ -87,7 +91,7 @@ async def run_full_analysis_webhook_task(
         
         # 7. Save to Firestore
         interview_id = int(time.time() * 1000)
-        title = config.get("title", "Async Webhook Interview")
+        title = config.get("title", f"Interview-{interview_id}")
         
         save_full_interview_data(
             user_id=user_id,
@@ -97,7 +101,8 @@ async def run_full_analysis_webhook_task(
             transcript_words=[b.model_dump() for b in transcript_blocks],
             analysis_data=analysis_data,
             audio_url=audio_url,
-            audio_duration=duration
+            audio_duration=duration,
+            waveform_data=waveform_data
         )
         
         # 8. Generate Deep-links
@@ -111,21 +116,14 @@ async def run_full_analysis_webhook_task(
         
         # 9. Notify Webhook with consolidated payload
         payload = {
-            "status": "completed",
-            "interview_id": interview_id,
-            "title": title,
-            "audio_url": audio_url,
-            "duration": duration,
-            "transcript": [b.model_dump() for b in transcript_blocks],
             "analysis": analysis_data.model_dump() if hasattr(analysis_data, 'model_dump') else analysis_data,
-            "deep_links": deep_links,
-            "timestamp": int(time.time())
+            "deep_links": deep_links
         }
         
         # 10. Prepare Headers & Signature
         headers = {"Content-Type": "application/json"}
         if webhook_secret:
-            timestamp = str(payload["timestamp"])
+            timestamp = str(int(time.time()))
             payload_str = json.dumps(payload, separators=(',', ':'))
             signature_payload = f"{timestamp}.{payload_str}"
             

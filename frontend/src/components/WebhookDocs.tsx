@@ -17,38 +17,85 @@ export const WebhookDocs = ({ onBack }: WebhookDocsProps) => {
         toast.success('Code snippet copied to clipboard');
     };
 
-    const nodeCode = `const crypto = require('crypto');
+    const nodeCode = `const express = require('express');
+const crypto = require('crypto');
+const app = express();
 
-function verifyWebhook(payload, signature, secret) {
-    const hmac = crypto.createHmac('sha256', secret);
-    const digest = Buffer.from(
-        'sha256=' + hmac.update(payload).digest('hex'),
-        'utf8'
-    );
-    const checksum = Buffer.from(signature, 'utf8');
-    
-    if (checksum.length !== digest.length) {
-        return false;
+// Secret from your API Settings
+const WEBHOOK_SECRET = 'your_webhook_secret';
+
+// Use express.json() to parse the body
+app.use(express.json());
+
+app.post('/webhook', (req, res) => {
+    const signature = req.headers['x-interview-lens-signature'];
+    const timestamp = req.headers['x-interview-lens-timestamp'];
+
+    if (!signature || !timestamp) {
+        return res.status(401).send('Missing headers');
     }
-    
-    return crypto.timingSafeEqual(digest, checksum);
-}`;
 
-    const pythonCode = `import hmac
+    // 1. Reconstruct the signature payload
+    // Note: We use compact JSON (no spaces) for signing
+    const payloadStr = JSON.stringify(req.body);
+    const signaturePayload = \`\${timestamp}.\${payloadStr}\`;
+
+    // 2. Verify HMAC-SHA256
+    const expectedSignature = crypto
+        .createHmac('sha256', WEBHOOK_SECRET)
+        .update(signaturePayload)
+        .digest('hex');
+
+    if (signature !== expectedSignature) {
+        console.error('❌ Signature mismatch');
+        return res.status(401).send('Invalid signature');
+    }
+
+    // 3. Process the analysis
+    console.log('✅ Webhook received:', req.body.analysis.executiveSummary);
+    res.json({ received: true });
+});
+
+app.listen(8001, () => console.log('Listening on port 8001'));`;
+
+    const pythonCode = `from fastapi import FastAPI, Request, Header, HTTPException
+import hmac
 import hashlib
+import json
 
-def verify_webhook(payload_body, signature, secret):
-    # payload_body should be raw bytes
+app = FastAPI()
+
+# Secret from your API Settings
+WEBHOOK_SECRET = "your_webhook_secret"
+
+@app.post("/webhook")
+async def webhook_listener(
+    request: Request,
+    x_interview_lens_signature: str = Header(None),
+    x_interview_lens_timestamp: str = Header(None)
+):
+    if not x_interview_lens_signature or not x_interview_lens_timestamp:
+        raise HTTPException(status_code=401, detail="Missing headers")
+
+    # 1. Get components
+    payload = await request.json()
+    
+    # 2. Reconstruct signature payload (compact JSON)
+    payload_str = json.dumps(payload, separators=(',', ':'))
+    signature_payload = f"{x_interview_lens_timestamp}.{payload_str}"
+    
+    # 3. Verify HMAC-SHA256
     expected_signature = hmac.new(
-        secret.encode(),
-        payload_body,
+        WEBHOOK_SECRET.encode(),
+        signature_payload.encode(),
         hashlib.sha256
     ).hexdigest()
-    
-    return hmac.compare_digest(
-        f"sha256={expected_signature}",
-        signature
-    )`;
+
+    if not hmac.compare_digest(expected_signature, x_interview_lens_signature):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    print(f"✅ Success! Analysis received for interview ID: {payload.get('interview_id')}")
+    return {"status": "success"}`;
 
     return (
         <div className="h-screen overflow-y-auto bg-zinc-950 py-12 px-4 sm:px-6 lg:px-8">
@@ -79,7 +126,7 @@ def verify_webhook(payload_body, signature, secret):
                     </div>
                     <div>
                         <h1 className="text-3xl font-bold text-white tracking-tight">Webhook Security</h1>
-                        <p className="text-zinc-400">Verifying authenticity with X-Hub-Signature-256</p>
+                        <p className="text-zinc-400">Verifying authenticity with X-Interview-Lens-Signature</p>
                     </div>
                 </motion.div>
 
@@ -99,7 +146,7 @@ def verify_webhook(payload_body, signature, secret):
                                 To ensure that webhooks received by your server are actually sent by us, we sign each request with a HMAC (Hash-based Message Authentication Code).
                             </p>
                             <p>
-                                The signature is included in the <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-indigo-300 font-mono text-sm">X-Hub-Signature-256</code> header. It's generated using your individual Webhook Secret and the raw request body.
+                                The signature is included in the <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-indigo-300 font-mono text-sm">X-Interview-Lens-Signature</code> header. It's generated using your individual Webhook Secret, the <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-indigo-300 font-mono text-sm">X-Interview-Lens-Timestamp</code>, and the request body.
                             </p>
                         </div>
                     </motion.section>
