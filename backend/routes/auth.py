@@ -1,7 +1,10 @@
-"""Authentication routes for Firebase token verification and user management"""
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any
+import secrets
+import hashlib
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Dict, Any, List
 from middleware.auth_middleware import get_current_user
+from database import get_firestore_db
 from pydantic import BaseModel
 
 
@@ -55,21 +58,79 @@ async def get_current_user_info(current_user: Dict[str, Any] = Depends(get_curre
         "exp": current_user.get("exp"),
         "iat": current_user.get("iat"),
     }
+
+
+# --- API Key Management ---
+
+class APIKeyMetadata(BaseModel):
+    """Metadata for an API key"""
+    id: str
+    prefix: str
+    created_at: str
+    last_used: str | None = None
+
+@router.post("/api-keys")
+async def generate_api_key(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Generate a new API key for the current user.
+    The raw key is only returned ONCE.
+    """
+    # Generate random key
+    raw_key = f"ivl_{secrets.token_urlsafe(32)}"
+    hashed_key = hashlib.sha256(raw_key.encode()).hexdigest()
+    
+    db = get_firestore_db()
+    now = datetime.utcnow().isoformat()
+    
+    key_doc = {
+        "user_id": current_user['uid'],
+        "email": current_user.get('email'),
+        "prefix": raw_key[:8] + "...",
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    # Store hashed key as document ID
+    db.collection('api_keys').document(hashed_key).set(key_doc)
+    
     return {
-        "uid": current_user.get("uid"),
-        "email": current_user.get("email"),
-        "email_verified": current_user.get("email_verified"),
-        "name": current_user.get("name"),
-        "picture": current_user.get("picture"),
-        "auth_time": current_user.get("auth_time"),
-        "iss": current_user.get("iss"),
-        "aud": current_user.get("aud"),
-        "exp": current_user.get("exp"),
-        "iat": current_user.get("iat"),
+        "api_key": raw_key,
+        "message": "Store this key safely. It will not be shown again."
     }
 
+@router.get("/api-keys", response_model=List[APIKeyMetadata])
+async def list_api_keys(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """List metadata for all active API keys for this user"""
+    db = get_firestore_db()
+    docs = db.collection('api_keys').where('user_id', '==', current_user['uid']).stream()
+    
+    keys = []
+    for doc in docs:
+        d = doc.to_dict()
+        keys.append(APIKeyMetadata(
+            id=doc.id,
+            prefix=d.get('prefix', 'ivl_...'),
+            created_at=d.get('created_at'),
+            last_used=d.get('last_used')
+        ))
+    
+    return sorted(keys, key=lambda x: x.created_at, reverse=True)
 
-# --- Custom Action Handler (Hosted by Backend) ---
+@router.delete("/api-keys/{key_hash}")
+async def revoke_api_key(key_hash: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Revoke (delete) an API key"""
+    db = get_firestore_db()
+    doc_ref = db.collection('api_keys').document(key_hash)
+    doc = doc_ref.get()
+    
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Key not found")
+    
+    if doc.to_dict().get('user_id') != current_user['uid']:
+        raise HTTPException(status_code=403, detail="Not authorized to revoke this key")
+    
+    doc_ref.delete()
+    return {"status": "success", "message": "API key revoked"}
 
 from fastapi.responses import HTMLResponse
 

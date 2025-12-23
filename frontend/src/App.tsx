@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsScreen } from './components/SettingsScreen';
+import { WebhookDocs } from './components/WebhookDocs';
 import { createPortal } from 'react-dom';
 
-export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found';
+export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found' | 'webhook-docs';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
@@ -153,6 +154,7 @@ function MainApp() {
     if (path === '/billing') return 'billing';
     if (path === '/settings') return 'settings';
     if (path === '/admin') return 'admin';
+    if (path === '/docs/webhooks') return 'webhook-docs';
     if (path.startsWith('/transcription/')) return 'editor';
     if (path.startsWith('/analysis/')) return 'analysis';
     return 'not-found';
@@ -230,6 +232,7 @@ function MainApp() {
       const id = path.replace('/analysis/', '');
       newInterviewId = id === 'new' ? null : id;
     }
+    else if (path === '/docs/webhooks') newScreen = 'webhook-docs';
     else if (path === '/') newScreen = 'upload';
     else newScreen = 'not-found';
 
@@ -736,6 +739,9 @@ function MainApp() {
       )}
       {currentScreen === 'admin' && (
         <AdminScreen onBack={handleBackToUpload} />
+      )}
+      {currentScreen === 'webhook-docs' && (
+        <WebhookDocs onBack={() => navigate('/settings')} />
       )}
       {currentScreen === 'editor' && (
         isDataLoading ? (

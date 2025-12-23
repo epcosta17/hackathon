@@ -33,3 +33,4 @@ landing/deploy.ps1
 landing/env.ps1
 backend/deploy.ps1
 cors.json
+zoom/

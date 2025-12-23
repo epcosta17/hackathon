@@ -1,7 +1,8 @@
 """Authentication middleware for protecting API endpoints"""
+import hashlib
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from services.auth_service import verify_firebase_token
 
 
@@ -13,69 +14,99 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> Dict[str, Any]:
     """
-    Dependency to get the current authenticated user from Firebase token
+    Dependency to get the current authenticated user from Firebase token or API Key
     
     Args:
         credentials: HTTP Authorization credentials (Bearer token)
         
     Returns:
-        Decoded token containing user information
+        Decoded token or API key owner information merged with DB user data
         
     Raises:
         HTTPException: If token is invalid or verification fails
     """
     token = credentials.credentials
+    decoded_token = {}
+    uid = None
     
     try:
-        # Verify the Firebase ID token
-        decoded_token = await verify_firebase_token(token)
-        uid = decoded_token.get('uid')
-        
-        # ---------------------------------------------------------
-        # Email Verification Check
-        # ---------------------------------------------------------
-        if not decoded_token.get('email_verified', False):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Email not verified. Please verify your email to access the platform.",
-            )
-        
-        # ---------------------------------------------------------
-        # Email Domain Whitelist (Prevent Custom Domain Abuse)
-        # ---------------------------------------------------------
-        # Skip domain validation for Google OAuth users (Google already verified the email)
-        sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
-        
-        if sign_in_provider != 'google.com':
-            # Only enforce domain whitelist for non-Google sign-ins
-            ALLOWED_EMAIL_DOMAINS = {
-                # Google
-                'gmail.com', 'googlemail.com',
-                # Microsoft
-                'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
-                # Yahoo
-                'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.es',
-                'yahoo.it', 'yahoo.com.br', 'yahoo.co.jp', 'yahoo.in',
-                # ProtonMail
-                'protonmail.com', 'proton.me', 'pm.me',
-                # Apple
-                'icloud.com', 'me.com', 'mac.com',
-                # Other popular providers
-                'aol.com', 'zoho.com', 'yandex.com', 'mail.com',
-                'gmx.com', 'gmx.net', 'fastmail.com',
-            }
+        if token.startswith("ey"):
+            # ---------------------------------------------------------
+            # Firebase ID Token
+            # ---------------------------------------------------------
+            decoded_token = await verify_firebase_token(token)
+            uid = decoded_token.get('uid')
             
-            email = decoded_token.get('email', '').lower()
-            if email:
-                domain = email.split('@')[-1] if '@' in email else ''
-                if domain not in ALLOWED_EMAIL_DOMAINS:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Account creation is restricted to popular email providers. Domain '{domain}' is not allowed.",
-                    )
+            # Email Verification Check
+            if not decoded_token.get('email_verified', False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Email not verified. Please verify your email to access the platform.",
+                )
+            
+            # Email Domain Whitelist (Skip for Google OAuth)
+            sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
+            if sign_in_provider != 'google.com':
+                ALLOWED_EMAIL_DOMAINS = {
+                    'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com',
+                    'live.com', 'msn.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.fr',
+                    'yahoo.de', 'yahoo.es', 'yahoo.it', 'yahoo.com.br', 'yahoo.co.jp',
+                    'yahoo.in', 'protonmail.com', 'proton.me', 'pm.me', 'icloud.com',
+                    'me.com', 'mac.com', 'aol.com', 'zoho.com', 'yandex.com',
+                    'mail.com', 'gmx.com', 'gmx.net', 'fastmail.com',
+                }
+                email = decoded_token.get('email', '').lower()
+                if email:
+                    domain = email.split('@')[-1] if '@' in email else ''
+                    if domain not in ALLOWED_EMAIL_DOMAINS:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Account creation is restricted to popular email providers. Domain '{domain}' is not allowed.",
+                        )
         
+        elif token.startswith("ivl_"):
+            # ---------------------------------------------------------
+            # Custom API Key (ivl_...)
+            # ---------------------------------------------------------
+            from database import get_firestore_db
+            db = get_firestore_db()
+            
+            # Hash the key using SHA-256
+            hashed_key = hashlib.sha256(token.encode()).hexdigest()
+            
+            # Look up in api_keys collection
+            key_doc = db.collection('api_keys').document(hashed_key).get()
+            if not key_doc.exists:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid API Key",
+                )
+            
+            key_data = key_doc.to_dict()
+            uid = key_data.get('user_id')
+            
+            if not uid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API Key has no associated user",
+                )
+            
+            # Mock the decoded_token structure for downstream consistency
+            decoded_token = {
+                'uid': uid,
+                'email': key_data.get('email', 'api-key-user@example.com'),
+                'email_verified': True,
+                'firebase': {'sign_in_provider': 'api_key'}
+            }
+        
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token format. Must be a Firebase ID Token or an 'ivl_' API key.",
+            )
+
         # ---------------------------------------------------------
-        # Sync with Firestore (Credit Initialization)
+        # Sync with Firestore (Credit Initialization / Fetch)
         # ---------------------------------------------------------
         from database import get_firestore_db
         from datetime import datetime
@@ -113,9 +144,10 @@ async def get_current_user(
             db_user_data = user_doc.to_dict()
             
         # Merge DB data (credits) into the token payload
-        # This makes current_user['credits'] available in all routes
         return {**decoded_token, **db_user_data}
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Auth Error: {e}")
         raise HTTPException(
@@ -127,22 +159,14 @@ async def get_current_user(
 
 async def get_optional_user(
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))
-) -> Dict[str, Any] | None:
+) -> Optional[Dict[str, Any]]:
     """
     Optional authentication dependency - returns user if authenticated, None otherwise
-    Useful for endpoints that work for both authenticated and unauthenticated users
-    
-    Args:
-        credentials: HTTP Authorization credentials (Bearer token), optional
-        
-    Returns:
-        Decoded token containing user information, or None if not authenticated
     """
     if credentials is None:
         return None
     
     try:
-        decoded_token = await verify_firebase_token(credentials.credentials)
-        return decoded_token
+        return await get_current_user(credentials)
     except Exception:
         return None

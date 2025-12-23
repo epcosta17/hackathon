@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Sparkles, Zap, Shield } from 'lucide-react';
+import { Upload, FileAudio, CheckCircle, Clock, Trash2, AlertTriangle, Menu, X, Settings, Sparkles, Zap, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -156,6 +156,41 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
       unsubscribeAuth();
       if (unsubscribeFirestore) unsubscribeFirestore();
     };
+  }, []);
+
+  // Warm settings cache on mount
+  useEffect(() => {
+    const warmSettingsCache = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const settingsRef = doc(db, 'users', user.uid, 'settings', 'analysis');
+        const snap = await getDoc(settingsRef);
+
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.enabled_blocks) {
+            localStorage.setItem('settings_enabled_blocks', JSON.stringify(data.enabled_blocks));
+          }
+          if (data.model_mode) {
+            localStorage.setItem('settings_model_mode', data.model_mode);
+          }
+          if (data.webhook_secret) {
+            localStorage.setItem('settings_webhook_secret', data.webhook_secret);
+          }
+          console.log('🚀 [Settings] Cache warmed successfully (blocks, mode, secret)');
+        }
+      } catch (error) {
+        console.error('Failed to warm settings cache:', error);
+      }
+    };
+
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (user) warmSettingsCache();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const fetchFunFact = async () => {
@@ -353,10 +388,10 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                     onClick={onNavigateToSettings}
                     className="w-9 h-9 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/20 text-white group"
                   >
-                    <Sparkles className="w-5 h-5 fill-white/20" />
+                    <Settings className="w-5 h-5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Configure Analysis Settings</TooltipContent>
+                <TooltipContent>Settings</TooltipContent>
               </Tooltip>
 
               {isAdmin && (

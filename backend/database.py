@@ -357,3 +357,61 @@ def delete_note(user_id: str, interview_id: int, note_id: int) -> bool:
     
     note_ref.delete()
     return True
+
+
+def save_full_interview_data(
+    user_id: str,
+    interview_id: int,
+    title: str,
+    transcript_text: str,
+    transcript_words: List[Dict[str, Any]],
+    analysis_data: Dict[str, Any],
+    audio_url: str,
+    audio_duration: float
+) -> int:
+    """
+    Save a complete interview including transcript and analysis data in one batch.
+    Used by the asynchronous webhook flow.
+    """
+    db = get_firestore_db()
+    batch = db.batch()
+    
+    now = datetime.utcnow().isoformat()
+    
+    # 1. Main Document (Metadata)
+    interview_ref = _get_interview_doc(user_id, interview_id)
+    preview = transcript_text[:200] + ('...' if len(transcript_text) > 200 else '')
+    
+    interview_data = {
+        'id': interview_id,
+        'title': title,
+        'transcript_preview': preview,
+        'audio_url': audio_url,
+        'audio_duration': audio_duration,
+        'created_at': now,
+        'updated_at': now
+    }
+    batch.set(interview_ref, interview_data)
+    
+    # 2. Transcript Sub-collection
+    transcript_ref = interview_ref.collection('data').document('transcript')
+    batch.set(transcript_ref, {
+        'text': transcript_text,
+        'words': transcript_words
+    })
+    
+    # 3. Analysis Sub-collection
+    # Convert AnalysisData Pydantic model to dict if needed
+    if hasattr(analysis_data, 'model_dump'):
+        analysis_dict = analysis_data.model_dump()
+    elif hasattr(analysis_data, 'dict'):
+        analysis_dict = analysis_data.dict()
+    else:
+        analysis_dict = analysis_data
+
+    analysis_ref = interview_ref.collection('data').document('analysis')
+    batch.set(analysis_ref, analysis_dict)
+    
+    batch.commit()
+    print(f"✅ [DATABASE] Saved full interview data for {interview_id}")
+    return interview_id

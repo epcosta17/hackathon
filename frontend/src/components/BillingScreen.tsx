@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CreditCard, ArrowLeft, CheckCircle2, Zap, ShieldCheck, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { authenticatedFetch } from '../utils/api';
@@ -171,8 +171,13 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
     };
 
     return (
-        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center py-12 px-4 animate-in fade-in duration-500">
-            <div className="max-w-4xl w-full">
+        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center py-12 px-4">
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="max-w-4xl w-full"
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-12">
                     <div className="flex items-center gap-4">
@@ -216,6 +221,7 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
                     className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 mb-12 flex items-center justify-between relative overflow-hidden"
                 >
                     <div className="relative z-10">
@@ -248,7 +254,7 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
+                        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
                         className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 hover:border-zinc-700 transition-colors flex flex-col"
                     >
                         <div className="flex justify-between items-start mb-4">
@@ -298,7 +304,7 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
+                        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
                         className="bg-zinc-900 border border-indigo-500/30 rounded-2xl p-6 relative flex flex-col shadow-lg shadow-indigo-500/5"
                     >
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
@@ -357,28 +363,37 @@ export function BillingScreen({ onBack }: BillingScreenProps) {
                     <ShieldCheck className="w-4 h-4" />
                     <span>Secure payments processed by Stripe</span>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Embedded Checkout Modal */}
-            {clientSecret && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <AnimatePresence>
+                {clientSecret && (
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-zinc-900 rounded-xl border border-zinc-800 w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
                     >
-                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 flex-shrink-0">
-                            <h3 className="text-lg font-semibold text-white">Complete Purchase</h3>
-                            <Button variant="ghost" size="icon" onClick={handleCloseCheckout} className="hover:bg-zinc-800 rounded-full">
-                                <X className="w-5 h-5 text-zinc-400" />
-                            </Button>
-                        </div>
-                        <div className="flex-1 bg-zinc-950 p-2 overflow-y-auto">
-                            <CheckoutForm clientSecret={clientSecret} onComplete={handleCloseCheckout} />
-                        </div>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="bg-zinc-900 rounded-xl border border-zinc-800 w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl"
+                        >
+                            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 flex-shrink-0">
+                                <h3 className="text-lg font-semibold text-white">Complete Purchase</h3>
+                                <Button variant="ghost" size="icon" onClick={handleCloseCheckout} className="hover:bg-zinc-800 rounded-full">
+                                    <X className="w-5 h-5 text-zinc-400" />
+                                </Button>
+                            </div>
+                            <div className="flex-1 bg-zinc-950 p-2 overflow-y-auto">
+                                <CheckoutForm clientSecret={clientSecret} onComplete={handleCloseCheckout} />
+                            </div>
+                        </motion.div>
                     </motion.div>
-                </div>
-            )}
+                )}
+            </AnimatePresence>
         </div>
     );
 }

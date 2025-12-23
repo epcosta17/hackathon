@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Home, ChevronDown, ChevronUp, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, BarChart3, PlusCircle, XCircle, Target, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
+import { Download, Home, Award, TrendingUp, Brain, Clock, Users, Code, MessageSquare, Zap, HelpCircle, ArrowLeft, Save, BarChart3, PlusCircle, XCircle, Target, Lightbulb, CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { Input } from './ui/input';
 import { AnalysisData } from '../App';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   SiReact, SiNextdotjs, SiTypescript, SiNodedotjs, SiExpress, SiPostgresql,
@@ -17,17 +16,8 @@ import {
 
 import { db, auth } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getJSON, postJSON, authenticatedFetch } from '../utils/api';
+import { postJSON, authenticatedFetch } from '../utils/api';
 
-interface Note {
-  id: number;
-  interview_id: string | number;
-  timestamp: number;
-  content: string;
-  is_bookmark: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
 interface AnalysisDashboardProps {
   analysisData: AnalysisData;
@@ -37,10 +27,6 @@ interface AnalysisDashboardProps {
   currentInterviewId: string | number | null;
   currentInterviewTitle: string;
   onSaveInterview: (titleOrId: number | string) => void;
-  audioFile: File | null;
-  notes: Note[];
-  waveformData: number[] | null;
-  hasNewAnalysis: boolean;
   onAnalysisSaved: () => void;
 }
 
@@ -52,10 +38,6 @@ export function AnalysisDashboard({
   currentInterviewId,
   currentInterviewTitle,
   onSaveInterview,
-  audioFile,
-  notes,
-  waveformData,
-  hasNewAnalysis,
   onAnalysisSaved
 }: AnalysisDashboardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -69,13 +51,6 @@ export function AnalysisDashboard({
     }
   }, [currentInterviewTitle]);
 
-  const [expandedSections, setExpandedSections] = useState({
-    keyPoints: true,
-    coding: true,
-    technologies: true,
-    qa: true,
-    general: true,
-  });
 
   // Generate DOCX report when loading the dashboard
   // This ensures the report is available even after backend restarts
@@ -127,9 +102,6 @@ export function AnalysisDashboard({
 
   // Don't auto-show dialog - let user click Save button when ready
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   // Get technology icon based on name
   const getTechIcon = (techName: string) => {
@@ -262,33 +234,6 @@ export function AnalysisDashboard({
     }
   };
 
-  const getComplexityColor = (complexity: string) => {
-    if (complexity.includes('Expert')) return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
-    if (complexity.includes('Advanced')) return 'text-red-400 bg-red-500/10 border-red-500/20';
-    if (complexity.includes('Intermediate')) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-    return 'text-green-400 bg-green-500/10 border-green-500/20';
-  };
-
-  const getComplexityTextColor = (complexity: string) => {
-    if (complexity.includes('Expert')) return 'text-purple-400';
-    if (complexity.includes('Advanced')) return 'text-red-400';
-    if (complexity.includes('Intermediate')) return 'text-yellow-400';
-    return 'text-green-400';
-  };
-
-  const getPaceColor = (pace: string) => {
-    if (pace.includes('Intensive')) return 'text-red-400 bg-red-500/10 border-red-500/20';
-    if (pace.includes('Fast')) return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-    if (pace.includes('Moderate')) return 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
-    return 'text-green-400 bg-green-500/10 border-green-500/20';
-  };
-
-  const getPaceTextColor = (pace: string) => {
-    if (pace.includes('Intensive')) return 'text-red-400';
-    if (pace.includes('Fast')) return 'text-orange-400';
-    if (pace.includes('Moderate')) return 'text-indigo-400';
-    return 'text-green-400';
-  };
 
   // Score tooltips
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
@@ -610,14 +555,22 @@ export function AnalysisDashboard({
                     <Zap className="w-4 h-4 text-zinc-500" />
                     <p className="text-zinc-500 text-xs">Complexity</p>
                   </div>
-                  <p className={`text-xl font-bold ${getComplexityTextColor(analysisData.statistics.complexity)}`}>{analysisData.statistics.complexity}</p>
+                  <p className={`text-xl font-bold ${analysisData.statistics.complexity.includes('Expert') ? 'text-purple-400' :
+                    analysisData.statistics.complexity.includes('Advanced') ? 'text-red-400' :
+                      analysisData.statistics.complexity.includes('Intermediate') ? 'text-yellow-400' :
+                        'text-green-400'
+                    }`}>{analysisData.statistics.complexity}</p>
                 </div>
                 <div className="flex flex-col items-center min-w-[80px]">
                   <div className="flex items-center gap-1 mb-1">
                     <TrendingUp className="w-4 h-4 text-zinc-500" />
                     <p className="text-zinc-500 text-xs">Pace</p>
                   </div>
-                  <p className={`text-xl font-bold ${getPaceTextColor(analysisData.statistics.pace)}`}>{analysisData.statistics.pace}</p>
+                  <p className={`text-xl font-bold ${analysisData.statistics.pace.includes('Intensive') ? 'text-red-400' :
+                    analysisData.statistics.pace.includes('Fast') ? 'text-orange-400' :
+                      analysisData.statistics.pace.includes('Moderate') ? 'text-indigo-400' :
+                        'text-green-400'
+                    }`}>{analysisData.statistics.pace}</p>
                 </div>
                 <div className="flex flex-col items-center min-w-[70px]">
                   <div className="flex items-center gap-1 mb-1">
@@ -748,51 +701,35 @@ export function AnalysisDashboard({
               transition={{ duration: 0.5, delay: 0.3, ease: [0.43, 0.13, 0.23, 0.96] }}
               className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
             >
-              <button
-                onClick={() => toggleSection('general')}
-                className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors rounded-t-lg"
-              >
+              <div className="flex items-center justify-between p-6 rounded-t-lg">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-500/10 rounded-lg">
                     <MessageSquare className="w-5 h-5 text-blue-400" />
                   </div>
                   <h2 className="text-xl font-bold text-white">General Assessment</h2>
                 </div>
-                {expandedSections.general ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-              </button>
+              </div>
 
-              <AnimatePresence>
-                {expandedSections.general && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-6 pt-6 border-t border-zinc-800/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-blue-950/20 rounded-lg p-5 border border-blue-900/20">
-                          <p className="text-blue-400 text-sm font-bold mb-2 uppercase tracking-wide">Overview</p>
-                          <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.howInterview}</p>
-                        </div>
-                        <div className="bg-emerald-950/20 rounded-lg p-5 border border-emerald-900/20">
-                          <p className="text-emerald-400 text-sm font-bold mb-2 uppercase tracking-wide">Attitude</p>
-                          <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.attitude}</p>
-                        </div>
-                        <div className="bg-amber-950/20 rounded-lg p-5 border border-amber-900/20">
-                          <p className="text-amber-400 text-sm font-bold mb-2 uppercase tracking-wide">Structure</p>
-                          <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.structure}</p>
-                        </div>
-                        <div className="bg-purple-950/20 rounded-lg p-5 border border-purple-900/20">
-                          <p className="text-purple-400 text-sm font-bold mb-2 uppercase tracking-wide">Environment</p>
-                          <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.platform}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="p-6 pt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-blue-950/20 rounded-lg p-5 border border-blue-900/20">
+                    <p className="text-blue-400 text-sm font-bold mb-2 uppercase tracking-wide">Overview</p>
+                    <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.howInterview}</p>
+                  </div>
+                  <div className="bg-emerald-950/20 rounded-lg p-5 border border-emerald-900/20">
+                    <p className="text-emerald-400 text-sm font-bold mb-2 uppercase tracking-wide">Attitude</p>
+                    <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.attitude}</p>
+                  </div>
+                  <div className="bg-amber-950/20 rounded-lg p-5 border border-amber-900/20">
+                    <p className="text-amber-400 text-sm font-bold mb-2 uppercase tracking-wide">Structure</p>
+                    <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.structure}</p>
+                  </div>
+                  <div className="bg-purple-950/20 rounded-lg p-5 border border-purple-900/20">
+                    <p className="text-purple-400 text-sm font-bold mb-2 uppercase tracking-wide">Environment</p>
+                    <p className="text-zinc-300 leading-relaxed">{analysisData.generalComments.platform}</p>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -804,32 +741,17 @@ export function AnalysisDashboard({
               transition={{ duration: 0.5, delay: 0.35, ease: [0.43, 0.13, 0.23, 0.96] }}
               className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
             >
-              <button
-                onClick={() => toggleSection('keyPoints')}
-                className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-              >
+              <div className="p-6">
                 <h2 className="text-xl font-bold text-white">💡 Key Technical Emphasis Points</h2>
-                {expandedSections.keyPoints ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-              </button>
-              <AnimatePresence>
-                {expandedSections.keyPoints && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                      {analysisData.keyPoints.map((point, idx) => (
-                        <div key={idx}>
-                          <p className="text-yellow-400 font-semibold mb-3">{point.title}</p>
-                          <p className="leading-loose">{point.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              </div>
+              <div className="px-6 pb-6 space-y-6 text-zinc-300 transition-all">
+                {analysisData.keyPoints.map((point, idx) => (
+                  <div key={idx}>
+                    <p className="text-yellow-400 font-semibold mb-3">{point.title}</p>
+                    <p className="leading-loose">{point.content}</p>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           )}
 
@@ -841,38 +763,23 @@ export function AnalysisDashboard({
               transition={{ duration: 0.5, delay: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
               className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
             >
-              <button
-                onClick={() => toggleSection('coding')}
-                className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-              >
+              <div className="p-6">
                 <h2 className="text-xl font-bold text-white">💻 Live Coding Challenge Details</h2>
-                {expandedSections.coding ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-              </button>
-              <AnimatePresence>
-                {expandedSections.coding && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                      <div>
-                        <p className="font-semibold mb-3" style={{ color: '#818cf8' }}>Core Exercise</p>
-                        <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-3" style={{ color: '#fb923c' }}>Critical Follow-up</p>
-                        <p className="leading-loose">{analysisData.codingChallenge.followUp}</p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-3" style={{ color: '#c084fc' }}>Required Knowledge</p>
-                        <p className="leading-loose">{analysisData.codingChallenge.knowledge}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              </div>
+              <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                <div>
+                  <p className="font-semibold mb-3" style={{ color: '#818cf8' }}>Core Exercise</p>
+                  <p className="leading-loose">{analysisData.codingChallenge.coreExercise}</p>
+                </div>
+                <div>
+                  <p className="font-semibold mb-3" style={{ color: '#fb923c' }}>Critical Follow-up</p>
+                  <p className="leading-loose">{analysisData.codingChallenge.followUp}</p>
+                </div>
+                <div>
+                  <p className="font-semibold mb-3" style={{ color: '#c084fc' }}>Required Knowledge</p>
+                  <p className="leading-loose">{analysisData.codingChallenge.knowledge}</p>
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -884,44 +791,29 @@ export function AnalysisDashboard({
               transition={{ duration: 0.5, delay: 0.45, ease: [0.43, 0.13, 0.23, 0.96] }}
               className="bg-zinc-900/30 border border-zinc-800 rounded-lg mb-8"
             >
-              <button
-                onClick={() => toggleSection('technologies')}
-                className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-              >
+              <div className="p-6">
                 <h2 className="text-xl font-bold text-white">🛠️ Technologies and Tools Used</h2>
-                {expandedSections.technologies ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-              </button>
-              <AnimatePresence>
-                {expandedSections.technologies && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-6 pb-6">
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {analysisData.technologies.map((tech, idx) => (
-                          <div
-                            key={idx}
-                            className="px-4 py-2.5 rounded-lg hover:bg-zinc-800/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 mb-1">
-                              {getTechIcon(tech.name)}
-                              <span className="text-sm font-semibold truncate" style={{ color: '#a855f7' }}>{tech.name}</span>
-                            </div>
-                            {tech.timestamps && (
-                              <div className="text-xs text-zinc-500 ml-9">
-                                {tech.timestamps}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+              </div>
+              <div className="px-6 pb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {analysisData.technologies.map((tech, idx) => (
+                    <div
+                      key={idx}
+                      className="px-4 py-2.5 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 mb-1">
+                        {getTechIcon(tech.name)}
+                        <span className="text-sm font-semibold truncate" style={{ color: '#a855f7' }}>{tech.name}</span>
                       </div>
+                      {tech.timestamps && (
+                        <div className="text-xs text-zinc-500 ml-9">
+                          {tech.timestamps}
+                        </div>
+                      )}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -933,32 +825,17 @@ export function AnalysisDashboard({
               transition={{ duration: 0.5, delay: 0.5, ease: [0.43, 0.13, 0.23, 0.96] }}
               className="bg-zinc-900/30 border border-zinc-800 rounded-lg"
             >
-              <button
-                onClick={() => toggleSection('qa')}
-                className="w-full flex items-center justify-between p-6 hover:bg-zinc-800/30 transition-colors"
-              >
+              <div className="p-6">
                 <h2 className="text-xl font-bold text-white">🗣️ Non-Technical & Situational Q&A Topics</h2>
-                {expandedSections.qa ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
-              </button>
-              <AnimatePresence>
-                {expandedSections.qa && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="px-6 pb-6 space-y-6 text-zinc-300">
-                      {analysisData.qaTopics.map((topic, idx) => (
-                        <div key={idx}>
-                          <p className="text-green-400 font-semibold mb-3">{topic.title}</p>
-                          <p className="leading-loose">{topic.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              </div>
+              <div className="px-6 pb-6 space-y-6 text-zinc-300">
+                {analysisData.qaTopics.map((topic, idx) => (
+                  <div key={idx}>
+                    <p className="text-green-400 font-semibold mb-3">{topic.title}</p>
+                    <p className="leading-loose">{topic.content}</p>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           )}
         </div>
