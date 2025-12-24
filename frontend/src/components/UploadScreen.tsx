@@ -26,7 +26,7 @@ interface InterviewSummary {
 }
 
 interface UploadScreenProps {
-  onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => void;
+  onTranscriptionComplete: (blocks: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string, interviewId?: string | number) => void;
   onLoadInterview: (id: string | number) => void;
   onNavigateToBilling: () => void;
   onNavigateToSettings: () => void;
@@ -309,7 +309,7 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             setProgress(100);
 
             setTimeout(() => {
-              onTranscriptionComplete(data.transcript_words, file!, data.waveform_data, data.audio_url);
+              onTranscriptionComplete(data.transcript_words, file!, data.waveform_data, data.audio_url, pendingInterviewId);
               setPendingInterviewId(null);
               setIsTranscribing(false);
             }, 1000);

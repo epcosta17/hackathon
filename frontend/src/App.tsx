@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsScreen } from './components/SettingsScreen';
 import { WebhookDocs } from './components/WebhookDocs';
-import { createPortal } from 'react-dom';
-
-export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found' | 'webhook-docs';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { UploadScreen } from './components/UploadScreen';
 import { TranscriptEditor } from './components/TranscriptEditor';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
@@ -14,10 +10,10 @@ import { VerifyEmail } from './components/VerifyEmail';
 import { EmailVerificationPending } from './components/EmailVerificationPending';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
-import { Button } from './components/ui/button';
 import { TooltipProvider } from './components/ui/tooltip';
-import { Input } from './components/ui/input';
-import { Save, X } from 'lucide-react';
+
+export type Screen = 'upload' | 'editor' | 'analysis' | 'billing' | 'settings' | 'admin' | 'not-found' | 'webhook-docs';
+
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { db, auth } from './config/firebase';
 import { doc, getDoc, writeBatch, setDoc } from 'firebase/firestore';
@@ -179,7 +175,7 @@ function MainApp() {
   });
   const [currentInterviewTitle, setCurrentInterviewTitle] = useState<string>('');
   const [interviewTitle, setInterviewTitle] = useState('');
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  // const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [preUploadedAudioUrl, setPreUploadedAudioUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const isFetchingRef = React.useRef(false);
@@ -246,11 +242,11 @@ function MainApp() {
 
   // Trigger data fetch for deep links
   useEffect(() => {
-    if (currentUser && currentInterviewId && transcriptBlocks.length === 0 && !loading && !isFetchingRef.current) {
-      console.log('🔗 Deep Link Detected: Fetching interview data for', currentInterviewId);
+    if (currentUser && currentInterviewId && transcriptBlocks.length === 0 && !loading && !isFetchingRef.current && !isDataLoading) {
+      console.log('🔗 Deep Link Detected: Fetching interview data for', currentInterviewId, 'Current Blocks:', transcriptBlocks.length);
       fetchInterviewData(currentInterviewId);
     }
-  }, [currentUser, currentInterviewId, loading]);
+  }, [currentUser, currentInterviewId, loading, transcriptBlocks.length, isDataLoading]);
 
   // Handle Stripe Redirects
   // Handle Query Params (Stripe Success & Email Verification)
@@ -300,7 +296,7 @@ function MainApp() {
     }
   }, [currentInterviewTitle]);
 
-  const handleTranscriptionComplete = (transcript: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string) => {
+  const handleTranscriptionComplete = (transcript: TranscriptBlock[], file: File, waveform?: number[], audioUrl?: string, interviewId?: string | number) => {
     setTranscriptBlocks(transcript);
     setAudioFile(file);
     const url = URL.createObjectURL(file);
@@ -325,7 +321,13 @@ function MainApp() {
       setWaveformData(null);
     }
 
-    navigate('/transcription/new');
+    if (interviewId) {
+      console.log('🆔 Setting currentInterviewId:', interviewId);
+      setCurrentInterviewId(interviewId);
+      navigate(`/transcription/${interviewId}`);
+    } else {
+      navigate('/transcription/new');
+    }
   };
 
   const handleAnalysisComplete = (data: AnalysisData) => {
@@ -389,7 +391,7 @@ function MainApp() {
 
     // 1. Optimistic UI: Close immediately
     console.time('Save Dialog Close');
-    setShowSaveDialog(false);
+    // setShowSaveDialog(false);
     console.timeEnd('Save Dialog Close');
 
     // 2. Start Background Process
@@ -704,117 +706,101 @@ function MainApp() {
         <WebhookDocs onBack={() => navigate('/settings#api')} />
       )}
       {currentScreen === 'editor' && (
-        isDataLoading ? (
-          <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
-            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-zinc-400 font-medium animate-pulse">Loading transcript...</p>
-          </div>
-        ) : transcriptBlocks.length > 0 ? (
-          <ErrorBoundary>
-            <TranscriptEditor
-              transcriptBlocks={transcriptBlocks}
-              setTranscriptBlocks={setTranscriptBlocks}
-              onAnalysisComplete={handleAnalysisComplete}
-              onViewAnalysis={() => navigate(currentInterviewId ? `/analysis/${currentInterviewId}` : '/analysis/new')}
-              onBackToUpload={handleBackToUpload}
-              audioFile={audioFile}
-              audioUrl={audioUrl}
-              audioDuration={audioDuration}
-              waveformData={waveformData}
-              existingAnalysis={analysisData}
-              currentInterviewId={currentInterviewId}
-              notes={notes}
-              setNotes={setNotes}
-              onSave={() => setShowSaveDialog(true)}
-              onNavigateToBilling={handleNavigateToBilling}
-            />
-          </ErrorBoundary>
-        ) : null
+        <ErrorBoundary>
+          <TranscriptEditor
+            transcriptBlocks={transcriptBlocks}
+            setTranscriptBlocks={setTranscriptBlocks}
+            onAnalysisComplete={handleAnalysisComplete}
+            onViewAnalysis={() => navigate(currentInterviewId ? `/analysis/${currentInterviewId}` : '/analysis/new')}
+            onBackToUpload={handleBackToUpload}
+            audioFile={audioFile}
+            audioUrl={audioUrl}
+            audioDuration={audioDuration}
+            waveformData={waveformData}
+            existingAnalysis={analysisData}
+            currentInterviewId={currentInterviewId}
+            notes={notes}
+            setNotes={setNotes}
+            onSave={() => { }} // Save button is hidden
+            onNavigateToBilling={handleNavigateToBilling}
+          />
+        </ErrorBoundary>
       )}
-      {
-        currentScreen === 'analysis' && (
-          isDataLoading ? (
-            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-zinc-400 font-medium animate-pulse">Loading analysis...</p>
-            </div>
-          ) : analysisData ? (
-            <AnalysisDashboard
-              analysisData={analysisData}
-              transcriptBlocks={transcriptBlocks}
-              onBackToUpload={handleBackToUpload}
-              onBackToEditor={handleBackToEditor}
-              currentInterviewId={currentInterviewId}
-              currentInterviewTitle={currentInterviewTitle}
-              onSaveInterview={(input: string | number) => handleSaveInterview(input)}
-              onAnalysisSaved={() => {
-              }}
-            />
-          ) : null
-        )
-      }
+      {currentScreen === 'analysis' && analysisData && (
+        <AnalysisDashboard
+          analysisData={analysisData}
+          transcriptBlocks={transcriptBlocks}
+          onBackToUpload={handleBackToUpload}
+          onBackToEditor={handleBackToEditor}
+          currentInterviewId={currentInterviewId}
+          currentInterviewTitle={currentInterviewTitle}
+          onSaveInterview={(input: string | number) => handleSaveInterview(input)}
+          onAnalysisSaved={() => {
+          }}
+        />
+      )}
 
       {currentScreen === 'not-found' && (
         <NotFoundScreen onBackToHome={handleBackToUpload} />
       )}
 
       {/* Save Interview Dialog, now managed by App.tsx */}
-      {
-        showSaveDialog && createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 100,
-            }}
-            onClick={() => setShowSaveDialog(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-zinc-700"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-white">Save Interview</h2>
-                <Button variant="ghost" size="icon" onClick={() => setShowSaveDialog(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-zinc-400 mb-4">Please provide a title for this interview session.</p>
-              <Input
-                type="text"
-                placeholder="e.g., Senior Frontend Engineer Interview"
-                value={interviewTitle}
-                onChange={(e) => setInterviewTitle(e.target.value)}
-                className="w-full bg-zinc-900 border-zinc-700 text-white"
-              />
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700 text-zinc-300">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => handleSaveInterview()}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Interview
-                </Button>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )
-      }
+      {/* 
+         showSaveDialog && createPortal(
+           <div
+             style={{
+               position: 'fixed',
+               top: 0,
+               left: 0,
+               right: 0,
+               bottom: 0,
+               backgroundColor: 'rgba(0, 0, 0, 0.7)',
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               zIndex: 100,
+             }}
+             onClick={() => setShowSaveDialog(false)}
+           >
+             <motion.div
+               initial={{ opacity: 0, scale: 0.9 }}
+               animate={{ opacity: 1, scale: 1 }}
+               exit={{ opacity: 0, scale: 0.9 }}
+               transition={{ duration: 0.2 }}
+               onClick={(e) => e.stopPropagation()}
+               className="bg-zinc-800 rounded-lg shadow-xl p-6 w-full max-w-md border border-zinc-700"
+             >
+               <div className="flex justify-between items-center mb-4">
+                 <h2 className="text-xl font-bold text-white">Save Interview</h2>
+                 <Button variant="ghost" size="icon" onClick={() => setShowSaveDialog(false)}>
+                   <X className="h-4 w-4" />
+                 </Button>
+               </div>
+               <p className="text-zinc-400 mb-4">Please provide a title for this interview session.</p>
+               <Input
+                 type="text"
+                 placeholder="e.g., Senior Frontend Engineer Interview"
+                 value={interviewTitle}
+                 onChange={(e) => setInterviewTitle(e.target.value)}
+                 className="w-full bg-zinc-900 border-zinc-700 text-white"
+               />
+               <div className="flex justify-end gap-3 mt-6">
+                 <Button variant="outline" onClick={() => setShowSaveDialog(false)} className="border-zinc-600 hover:bg-zinc-700 text-zinc-300">
+                   Cancel
+                 </Button>
+                 <Button
+                   onClick={() => handleSaveInterview()}
+                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                 >
+                   <Save className="w-4 h-4 mr-2" />
+                   Save Interview
+                 </Button>
+               </div>
+             </motion.div>
+           </div>,
+           document.body
+         )
+       */}
     </div >
   );
 }

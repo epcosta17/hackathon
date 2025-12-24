@@ -914,19 +914,21 @@ export function TranscriptEditor({
                 </Tooltip>
               )}
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={onSave}
-                    className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                  >
-                    <Save className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {currentInterviewId ? 'Update Interview' : 'Save Interview'}
-                </TooltipContent>
-              </Tooltip>
+              {/* 
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                   <Button
+                     onClick={onSave}
+                     className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                   >
+                     <Save className="w-4 h-4" />
+                   </Button>
+                 </TooltipTrigger>
+                 <TooltipContent>
+                   {currentInterviewId ? 'Update Interview' : 'Save Interview'}
+                 </TooltipContent>
+               </Tooltip>
+               */}
 
               <Tooltip>
                 <TooltipTrigger asChild>

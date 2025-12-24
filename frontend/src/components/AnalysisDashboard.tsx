@@ -306,23 +306,25 @@ export function AnalysisDashboard({
 
 
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={() => {
-                      console.log('🟢 Save/Update Interview button clicked');
-                      setShowSaveDialog(true);
-                    }}
-                    disabled={isSaving}
-                    className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <Save className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isSaving ? 'Saving...' : currentInterviewId ? 'Update Interview' : 'Save Interview'}
-                </TooltipContent>
-              </Tooltip>
+              {/* 
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                   <Button
+                     onClick={() => {
+                       console.log('🟢 Save/Update Interview button clicked');
+                       setShowSaveDialog(true);
+                     }}
+                     disabled={isSaving}
+                     className="h-10 w-10 p-0 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                   >
+                     <Save className="w-4 h-4" />
+                   </Button>
+                 </TooltipTrigger>
+                 <TooltipContent>
+                   {isSaving ? 'Saving...' : currentInterviewId ? 'Update Interview' : 'Save Interview'}
+                 </TooltipContent>
+               </Tooltip>
+               */}
 
               <Tooltip>
                 <TooltipTrigger asChild>
