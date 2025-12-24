@@ -22,6 +22,7 @@ interface InterviewSummary {
   transcript_preview: string;
   created_at: string;
   updated_at: string;
+  status?: 'processing' | 'completed' | 'failed';
 }
 
 interface UploadScreenProps {
@@ -140,7 +141,8 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
             title: data.title || 'Untitled Interview',
             transcript_preview: data.transcript_preview || 'No preview available',
             created_at: data.created_at,
-            updated_at: data.updated_at
+            updated_at: data.updated_at,
+            status: data.status
           });
         });
 
@@ -285,6 +287,49 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
     }
   };
 
+  const [pendingInterviewId, setPendingInterviewId] = useState<string | number | null>(null);
+
+  // Poll for completion if we have a pending interview
+  useEffect(() => {
+    if (!pendingInterviewId || !interviews.length) return;
+
+    const pending = interviews.find(i => String(i.id) === String(pendingInterviewId));
+    if (pending && pending.status === 'completed') {
+      console.log('✅ Background transcription completed!', pendingInterviewId);
+
+      // Load the full data and call completion
+      const finalizeProcessing = async () => {
+        try {
+          // Fetch full data from backend (optional, but ensures we have everything)
+          // or just pull from Firestore
+          const response = await authenticatedFetch(`/v1/interviews/${pendingInterviewId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setIsComplete(true);
+            setProgress(100);
+
+            setTimeout(() => {
+              onTranscriptionComplete(data.transcript_words, file!, data.waveform_data, data.audio_url);
+              setPendingInterviewId(null);
+              setIsTranscribing(false);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error("Failed to finalize background task:", error);
+          setError("Failed to load completed transcription.");
+          setIsTranscribing(false);
+          setPendingInterviewId(null);
+        }
+      };
+
+      finalizeProcessing();
+    } else if (pending && pending.status === 'failed') {
+      setError("Transcription failed in background.");
+      setIsTranscribing(false);
+      setPendingInterviewId(null);
+    }
+  }, [interviews, pendingInterviewId, file, onTranscriptionComplete]);
+
   const startTranscription = async () => {
     // Block if no credits
     if (credits !== null && credits <= 0) {
@@ -295,45 +340,34 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
 
     setIsTranscribing(true);
     setError(null);
-    // Set to -1 to trigger the indeterminate "Validating" state immediately
     setProgress(-1);
 
     try {
       const formData = new FormData();
       formData.append("audio_file", file);
 
-      // Use Standard Post for transcription (Wait for response)
-      const response = await authenticatedFetch('/v1/transcribe', {
+      // Use Async Post for transcription
+      const response = await authenticatedFetch('/v1/transcribe-async', {
         method: 'POST',
         body: formData,
       });
 
-      // Wait for the full JSON response
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.detail || `HTTP error! status: ${response.status}`);
       }
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // Transcription complete!
-      setIsComplete(true);
-      setProgress(100);
-
-      setTimeout(() => {
-        onTranscriptionComplete(data.transcript, file, data.waveform, data.audio_url);
-      }, 1500);
+      console.log('📡 Transcription queued:', data.interview_id);
+      setPendingInterviewId(data.interview_id);
+      // We don't set setIsComplete(true) here because it's still processing in background
 
     } catch (error: any) {
-      console.error('Error during transcription:', error);
+      console.error('Error during transcription init:', error);
 
-      // Check for insufficient credits error
       if (error.message && (error.message.includes('Insufficient credits') || error.message.includes('402'))) {
         setShowNoCreditsDialog(true);
-        setError(null); // Clear generic error
+        setError(null);
         setIsTranscribing(false);
         setIsComplete(false);
         setProgress(100);
@@ -531,6 +565,12 @@ export function UploadScreen({ onTranscriptionComplete, onLoadInterview, onNavig
                         <div className="flex items-center gap-1 mt-1 text-xs text-zinc-600">
                           <Clock className="w-3 h-3" />
                           <span>{formatDate(interview.created_at)}</span>
+                          {interview.status === 'processing' && (
+                            <span className="ml-2 flex items-center gap-1 text-indigo-400 font-medium">
+                              <Sparkles className="w-3 h-3 animate-pulse" />
+                              Processing...
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Tooltip>

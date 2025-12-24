@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Any
 import os
 import time
+from datetime import datetime
 
 router = APIRouter(prefix="/v1", tags=["transcription"])
 
@@ -232,6 +233,98 @@ async def transcribe_endpoint(
     
     # Trigger cleanup of old temp files
     background_tasks.add_task(storage_service.cleanup_temp_files, user_id=user_id)
+
+
+@router.post("/transcribe-async")
+async def transcribe_async_endpoint(
+    audio_file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Asynchronous transcription endpoint. 
+    Uploads to GCS, creates an 'interview' placeholder in Firestore, and queues a Cloud Task.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if audio_file.content_type not in ["audio/mpeg", "audio/wav", "audio/mp3", "audio/x-wav"]:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only MP3 and WAV supported.")
+    
+    user_id = current_user['uid']
+    db = get_firestore_db()
+    user_ref = db.collection('users').document(user_id)
+
+    # 1. Credit Check
+    user_snap = user_ref.get()
+    current_credits = user_snap.get('credits') if user_snap.exists else 0
+    if not isinstance(current_credits, (int, float)) or current_credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits.")
+
+    # 2. Setup ID and Paths
+    interview_id = int(time.time() * 1000)
+    file_extension = ".mp3" if "mp3" in audio_file.content_type else ".wav"
+    raw_filename = audio_file.filename or "audio.mp3"
+    ext_from_file = os.path.splitext(raw_filename)[1]
+    ext = ext_from_file if ext_from_file else file_extension
+    
+    remote_filename = f"{uuid.uuid4()}{ext}"
+    gcs_path = f"{user_id}/temp_audio/{remote_filename}"
+    
+    try:
+        # 3. Upload to GCS
+        # Note: audio_file.file is a SpooledTemporaryFile
+        storage_service.upload_file(gcs_path, audio_file.file, content_type=audio_file.content_type)
+        logger.info(f"📤 [TRANSCRIPTION-ASYNC] Uploaded to GCS: {gcs_path}")
+
+        # 4. Create Firestore Placeholder
+        interview_ref = user_ref.collection('interviews').document(str(interview_id))
+        now = datetime.utcnow().isoformat()
+        interview_ref.set({
+            'id': interview_id,
+            'title': raw_filename,
+            'status': 'processing',
+            'created_at': now,
+            'updated_at': now,
+            'audio_url': f"/v1/audio/temp/{remote_filename}"
+        })
+
+        # 5. Deduct Credit
+        user_ref.update({"credits": firestore.Increment(-1)})
+
+        # 6. Queue Cloud Task
+        from services.task_service import task_service
+        try:
+            task_service.create_analysis_task(
+                user_id=user_id,
+                gcs_uri=gcs_path,
+                content_type=audio_file.content_type,
+                original_filename=raw_filename,
+                config={
+                    "task_type": "transcription_only",
+                    "interview_id": interview_id,
+                    "title": raw_filename
+                },
+                webhook_url=None # No external webhook for this internal flow
+            )
+            logger.info(f"✅ [TRANSCRIPTION-ASYNC] Queued task for {interview_id}")
+        except Exception as e:
+            # Rollback: Refund and delete doc if task fails to queue
+            user_ref.update({"credits": firestore.Increment(1)})
+            interview_ref.delete()
+            logger.error(f"❌ Failed to queue task: {e}")
+            raise HTTPException(status_code=500, detail="Failed to queue transcription task")
+
+        return {
+            "status": "processing",
+            "interview_id": interview_id,
+            "message": "Transcription started in background."
+        }
+
+    except Exception as e:
+        logger.error(f"Error in async transcription ingest: {e}")
+        if not isinstance(e, HTTPException):
+            raise HTTPException(status_code=500, detail=str(e))
+        raise e
 
 
 

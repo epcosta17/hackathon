@@ -133,11 +133,22 @@ async def run_full_analysis_pipeline(
             
     except Exception as e:
         logger.error(f"❌ [TASK] Pipeline failed: {str(e)}")
-        # Handle refund if needed (simplified for Cloud Task)
+        
+        # Update status to failed if we have an interview_id
+        if 'interview_id' in locals() and interview_id:
+            try:
+                db = get_firestore_db()
+                db.collection('users').document(user_id).collection('interviews').document(str(interview_id)).update({
+                    'status': 'failed',
+                    'error': str(e),
+                    'updated_at': datetime.utcnow().isoformat()
+                })
+            except: pass
+
         # Notify failure...
         if webhook_url:
             try:
-                error_payload = {"status": "error", "error": str(e), "timestamp": int(time.time())}
+                error_payload = {"status": "error", "error": str(e), "timestamp": int(time.time()), "interview_id": locals().get('interview_id')}
                 async with httpx.AsyncClient() as client:
                     await client.post(webhook_url, json=error_payload, timeout=10.0)
             except: pass
@@ -147,26 +158,109 @@ async def run_full_analysis_pipeline(
         if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
 
+async def run_transcription_pipeline(
+    user_id: str,
+    gcs_uri: str,
+    content_type: str,
+    original_filename: str,
+    interview_id: int,
+    config: Dict[str, Any]
+):
+    """
+    Transcription-only pipeline logic: Transcription -> Waveform -> Save Status.
+    Called by the Cloud Task worker endpoint for /transcribe-async flow.
+    """
+    from datetime import datetime
+    temp_path = None
+    try:
+        # 1. Download from GCS
+        ext = os.path.splitext(original_filename)[1] or ".mp3"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
+            temp_path = temp_file.name
+            storage_service.download_file(gcs_uri, temp_path)
+        
+        # 2. Get Duration & Waveform
+        duration = get_audio_duration(temp_path)
+        waveform_data = generate_waveform_universal(temp_path)
+        
+        # 3. Transcribe
+        signed_url = storage_service.generate_signed_url(gcs_uri)
+        transcript_blocks = await transcribe_with_deepgram(signed_url)
+        
+        plain_text = " ".join([b.text for b in transcript_blocks])
+        
+        # 4. Save to Firestore
+        title = config.get("title", original_filename)
+        audio_filename = os.path.basename(gcs_uri)
+        audio_url = f"/v1/audio/temp/{audio_filename}" # Keep in temp for now, frontend will finalize on save
+
+        save_full_interview_data(
+            user_id=user_id,
+            interview_id=interview_id,
+            title=title,
+            transcript_text=plain_text,
+            transcript_words=[b.model_dump() for b in transcript_blocks] if hasattr(transcript_blocks[0], 'model_dump') else [b for b in transcript_blocks],
+            analysis_data={}, # Empty analysis for now
+            audio_url=audio_url,
+            audio_duration=duration,
+            waveform_data=waveform_data
+        )
+
+        # 5. Update Status to Completed
+        db = get_firestore_db()
+        db.collection('users').document(user_id).collection('interviews').document(str(interview_id)).update({
+            'status': 'completed',
+            'updated_at': datetime.utcnow().isoformat()
+        })
+        
+        logger.info(f"✅ [TASK] Transcription completed for {interview_id}")
+
+    except Exception as e:
+        logger.error(f"❌ [TASK] Transcription pipeline failed: {str(e)}")
+        # Update status to failed
+        try:
+            db = get_firestore_db()
+            db.collection('users').document(user_id).collection('interviews').document(str(interview_id)).update({
+                'status': 'failed',
+                'error': str(e),
+                'updated_at': datetime.utcnow().isoformat()
+            })
+        except: pass
+        raise e
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
 @router.post("/tasks/process-audio")
 async def process_audio_task(request: Dict[str, Any]):
     """
     Worker endpoint called by Cloud Tasks.
     """
-    logger.info(f"👷 [WORKER] Received task for user: {request.get('user_id')}")
+    user_id = request.get('user_id')
+    config = request.get('config', {})
+    task_type = config.get('task_type', 'full_pipeline')
     
-    # Run the pipeline
-    # We don't use background_tasks here because Cloud Tasks expects the response 
-    # only after the work is done (for retry logic). 
-    # However, if it takes > 10 mins, we might need a different strategy or longer timeout.
-    await run_full_analysis_pipeline(
-        user_id=request['user_id'],
-        gcs_uri=request['gcs_uri'],
-        content_type=request['content_type'],
-        original_filename=request['original_filename'],
-        config=request['config'],
-        webhook_url=request['webhook_url'],
-        webhook_secret=request.get('webhook_secret')
-    )
+    logger.info(f"👷 [WORKER] Received {task_type} task for user: {user_id}")
+    
+    if task_type == "transcription_only":
+        await run_transcription_pipeline(
+            user_id=user_id,
+            gcs_uri=request['gcs_uri'],
+            content_type=request['content_type'],
+            original_filename=request['original_filename'],
+            interview_id=config['interview_id'],
+            config=config
+        )
+    else:
+        await run_full_analysis_pipeline(
+            user_id=user_id,
+            gcs_uri=request['gcs_uri'],
+            content_type=request['content_type'],
+            original_filename=request['original_filename'],
+            config=request['config'],
+            webhook_url=request.get('webhook_url'),
+            webhook_secret=request.get('webhook_secret')
+        )
     
     return {"status": "completed"}
 
