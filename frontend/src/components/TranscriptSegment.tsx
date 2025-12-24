@@ -1,8 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Edit2 } from 'lucide-react';
-import { Textarea } from './ui/textarea';
 import { TranscriptBlock } from '../App';
+import { Textarea } from './ui/textarea';
 
 interface TranscriptSegmentProps {
   block: TranscriptBlock;
@@ -52,10 +50,11 @@ export const TranscriptSegment = React.memo(({
     <div style={{ paddingBottom: '16px', paddingLeft: '4px', paddingRight: '4px' }}>
       <div
         ref={isActive ? activeBlockRef : null}
-        className={`group relative p-4 rounded-lg border transition-colors duration-200 ${isActive
+        className={`group relative p-4 rounded-lg border transition-colors duration-200 cursor-pointer ${isActive
           ? 'border-indigo-500 bg-indigo-500/10'
           : 'border-zinc-800 bg-zinc-900/30'
           }`}
+        onClick={() => jumpToTimestamp(block.timestamp)}
       >
         {/* Accent bar on the left when active */}
         {isActive && (
