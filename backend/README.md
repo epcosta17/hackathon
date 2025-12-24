@@ -1,13 +1,14 @@
 # Backend - AI Interview Analysis Platform
 
-FastAPI backend for AI-powered interview analysis with local transcription, Google Gemini integration, and automated report generation.
+FastAPI backend for AI-powered interview analysis with local transcription (Deepgram/Whisper), Google Gemini integration, and automated report generation. Validated for high-scale asynchronous processing using Google Cloud Tasks and Firestore.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.12+
-- whisper.cpp (`brew install whisper-cpp`)
-- Google Gemini API key (optional, uses mock data as fallback)
+- **Google Cloud Project** with Firestore, Cloud Tasks, and Vertex AI enabled.
+- **Deepgram API Key** (for production-grade transcription).
+- whisper.cpp (`brew install whisper-cpp`) - *Optional local fallback*
 
 ### Installation
 
@@ -19,27 +20,30 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Download Whisper model (only needed once)
+# Download Whisper model (only needed if using local fallback)
 cd ai
 ./download-ggml-model.sh
 cd ..
 
-# Optional: Set up environment variables
-echo "GEMINI_API_KEY=your_api_key_here" > .env
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your keys:
+# GEMINI_API_KEY=...
+# DEEPGRAM_API_KEY=...
+# GOOGLE_APPLICATION_CREDENTIALS=path/to/creds.json
 ```
 
 ### Running the Server
 
 ```bash
-# Development mode with auto-reload
+# Development mode
 python main.py
 
-# Or using uvicorn directly
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+# Production (using uvicorn directly)
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Server will start at `http://127.0.0.1:8000`
-
 API documentation: `http://127.0.0.1:8000/`
 
 ## 📁 Project Structure
@@ -47,255 +51,92 @@ API documentation: `http://127.0.0.1:8000/`
 ```
 backend/
 ├── main.py                    # FastAPI app entry point
-├── database.py                # SQLite database operations
+├── database.py                # Firestore database connection & operations
 ├── models/
-│   └── schemas.py            # Pydantic data models
 ├── services/
-│   ├── transcription_service.py   # Audio transcription logic
-│   ├── analysis_service.py        # AI analysis logic
-│   └── docx_service.py           # Report generation
+│   ├── transcription_service.py   # Deepgram & Whisper logic
+│   ├── analysis_service.py        # Gemini analysis logic
+│   ├── storage_service.py         # GCS file operations
+│   ├── task_service.py            # Cloud Tasks queueing
+│   └── docx_service.py            # Report generation
 ├── routes/
+│   ├── webhooks.py           # Async worker endpoints (Cloud Tasks)
 │   ├── transcription.py      # Transcription endpoints
 │   ├── analysis.py           # Analysis endpoints
-│   ├── interviews.py         # Interview CRUD endpoints
-│   └── notes.py              # Notes endpoints
-├── ai/
-│   ├── ggml-base.bin         # Whisper model
-│   ├── download-ggml-model.sh # Model download script
-│   └── PROMPT_JSON.md        # AI prompts for analysis
-└── requirements.txt
+│   └── interviews.py         # CRUD endpoints
 ```
 
 ## 🔌 API Endpoints
 
-### Transcription
-- `POST /api/transcribe-stream` - Upload and transcribe audio (Server-Sent Events)
-- `GET /api/audio/{filename}` - Serve audio files
+### Async Pipeline (Webhooks)
+- `POST /v1/analyze-async` - Queue a full analysis job (Upload -> GCS -> Cloud Task -> Webhook)
+- `POST /v1/tasks/process-audio` - Worker endpoint processed by Cloud Tasks.
 
-### Analysis
-- `POST /api/analyze` - Generate AI analysis from transcript
-- `POST /api/generate-report` - Generate DOCX from existing analysis
-- `POST /api/download-report` - Download generated DOCX report
-- `GET /api/ping` - Health check
+### Transcription & Analysis
+- `POST /v1/transcribe-stream` - Real-time SSE stream (Local dev flow)
+- `POST /v1/analyze` - Generate AI analysis from transcript
+- `GET /v1/audio/{filename}` - Stream audio with Range support
 
-### Interviews
-- `POST /api/interviews` - Create new interview
-- `GET /api/interviews` - List all interviews (supports search)
-- `GET /api/interviews/{id}` - Get interview by ID
-- `PUT /api/interviews/{id}` - Update interview
-- `DELETE /api/interviews/{id}` - Delete interview
-
-### Notes & Bookmarks
-- `POST /api/interviews/{id}/notes` - Add note/bookmark
-- `GET /api/interviews/{id}/notes` - Get all notes for interview
-- `PUT /api/notes/{id}` - Update note
-- `DELETE /api/notes/{id}` - Delete note
+### Interviews & Data
+- `GET /v1/interviews` - List interviews
+- `GET /v1/interviews/{id}` - Get full interview details
+- `POST /v1/interviews` - Save interview metadata
+- `DELETE /v1/interviews/{id}` - Delete interview and resources
 
 ## 🛠️ Architecture
 
-### Layered Design
+### Asynchronous Processing Pipeline
+For production robustness, the app uses an async pipeline:
+1. **Upload**: Client uploads audio to `analyze-async`.
+2. **Queue**: Audio stored in GCS, task queued in Cloud Tasks.
+3. **Process**: Cloud Task calls `/v1/tasks/process-audio`.
+   - Downloads from GCS.
+   - Transcribes (Deepgram).
+   - Analyzes (Gemini).
+   - Generates Waveform.
+4. **Save**: Results saved to **Firestore**.
+5. **Notify**: Webhook sent back to client/frontend.
 
-1. **Routes Layer** (`routes/`)
-   - HTTP request/response handling
-   - Input validation
-   - API endpoint definitions
+### Components
+- **Database**: Google Firestore (NoSQL Document Store).
+- **Storage**: Google Cloud Storage (Audio files).
+- **Compute**: Cloud Run (Containerized Backend).
+- **AI**: Vertex AI (Gemini 2.5) & Deepgram Nova-3.
 
-2. **Services Layer** (`services/`)
-   - Business logic
-   - External API integration
-   - File processing
+## 📊 Database Schema (Firestore)
 
-3. **Database Layer** (`database.py`)
-   - Data persistence
-   - CRUD operations
-   - SQLite integration
+**Collection: `users/{userId}/interviews`**
+- Documents contain metadata (`title`, `status`, `created_at`).
 
-4. **Models Layer** (`models/`)
-   - Pydantic schemas
-   - Data validation
-   - Type definitions
-
-### Key Features
-
-- **Modular Structure**: Clean separation of concerns
-- **No Circular Dependencies**: Clear import hierarchy
-- **Async/Await**: Non-blocking I/O operations
-- **Background Tasks**: Long-running operations don't block API
-- **Server-Sent Events**: Real-time progress updates for transcription
-- **In-Memory Caching**: Fast DOCX report retrieval
-
-## 📊 Database Schema
-
-### Interviews Table
-```sql
-CREATE TABLE interviews (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    transcript_text TEXT,
-    transcript_words JSON,
-    analysis_data JSON,
-    audio_url TEXT,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-)
-```
-
-### Notes Table
-```sql
-CREATE TABLE notes (
-    id INTEGER PRIMARY KEY,
-    interview_id INTEGER,
-    timestamp REAL,
-    content TEXT,
-    is_bookmark INTEGER,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    FOREIGN KEY (interview_id) REFERENCES interviews(id)
-)
-```
+**Sub-collections:**
+- `data/transcript`: Stores full word-level transcript.
+- `data/analysis`: Stores AI analysis JSON.
+- `data/waveform`: Stores pre-computed waveform array.
+- `notes/{noteId}`: User notes and bookmarks.
 
 ## 🔑 Environment Variables
 
-Create a `.env` file in the backend directory:
-
 ```env
-# Optional: Google Gemini API for AI analysis
-GEMINI_API_KEY=your_api_key_here
+# Google Cloud
+GOOGLE_APPLICATION_CREDENTIALS=service-account.json
+GCS_BUCKET_NAME=your-bucket
+GCS_PROJECT_ID=your-project
 
-# Optional: OpenAI API for transcription (alternative to whisper.cpp)
-OPENAI_API_KEY=your_api_key_here
+# AI Services
+GEMINI_API_KEY=...
+DEEPGRAM_API_KEY=...
+
+# App Config
+WEBHOOK_SECRET=...
 ```
 
-**Fallback Behavior:**
-- No `GEMINI_API_KEY`: Uses mock analysis data
-- No `whisper.cpp`: Uses mock transcription data
+## 🚢 Deployment
 
-## 📦 Dependencies
-
-Core dependencies:
-- `fastapi==0.115.0` - Web framework
-- `uvicorn[standard]==0.32.0` - ASGI server
-- `pydantic==2.9.2` - Data validation
-- `google-generativeai` - Gemini API
-- `python-docx` - DOCX generation
-- `python-dotenv` - Environment variables
-- `python-multipart` - File upload support
-
-See `requirements.txt` for full list.
-
-## 🐛 Troubleshooting
-
-### whisper.cpp not found
+### Docker
 ```bash
-brew install whisper-cpp
+docker build -t interviewlens-backend .
+docker run -p 8000:8000 --env-file .env interviewlens-backend
 ```
 
-### Model not found
-```bash
-cd ai
-./download-ggml-model.sh
-```
-
-### Port already in use
-```bash
-# Kill process on port 8000
-lsof -ti:8000 | xargs kill -9
-
-# Or change port
-uvicorn main:app --host 127.0.0.1 --port 8001 --reload
-```
-
-### Gemini API errors
-- Check your API key in `.env`
-- The app will automatically fall back to mock data if the API fails
-
-### Database locked errors
-- Close any other connections to `interviews.db`
-- Restart the server
-
-## 🧪 Testing
-
-### Manual Testing
-Use the interactive API docs at `http://127.0.0.1:8000/`:
-1. Click "Try it out" on any endpoint
-2. Fill in parameters
-3. Execute the request
-4. View response
-
-### Testing with curl
-```bash
-# Health check
-curl http://127.0.0.1:8000/api/ping
-
-# Upload audio
-curl -X POST http://127.0.0.1:8000/api/transcribe-stream \
-  -F "audio_file=@interview.mp3"
-
-# List interviews
-curl http://127.0.0.1:8000/api/interviews
-```
-
-## 🚀 Adding New Features
-
-### Example: Adding a new endpoint
-
-1. **Define models** in `models/schemas.py`:
-```python
-class NewFeatureRequest(BaseModel):
-    field1: str
-    field2: int
-```
-
-2. **Implement logic** in `services/`:
-```python
-# services/new_feature_service.py
-def process_feature(request):
-    # Business logic here
-    return result
-```
-
-3. **Create route** in `routes/`:
-```python
-# routes/new_feature.py
-from fastapi import APIRouter
-router = APIRouter(prefix="/api", tags=["new-feature"])
-
-@router.post("/new-feature")
-async def new_feature_endpoint(request: NewFeatureRequest):
-    return process_feature(request)
-```
-
-4. **Register router** in `main.py`:
-```python
-from routes import new_feature
-app.include_router(new_feature.router)
-```
-
-## 📈 Performance Tips
-
-### Apple Silicon Optimization
-- whisper.cpp automatically uses Metal for GPU acceleration
-- No additional configuration needed
-- Transcription is faster than real-time
-
-### Production Deployment
-- Use `gunicorn` with multiple workers
-- Set up proper logging
-- Use a production database (PostgreSQL, MySQL)
-- Implement rate limiting
-- Add authentication/authorization
-
-## 📚 Additional Resources
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-- [whisper.cpp GitHub](https://github.com/ggerganov/whisper.cpp)
-- [Google Gemini API](https://ai.google.dev/)
-
-## 📄 License
-
-MIT License
-
----
-
-**Need help?** Check the interactive API docs at `http://127.0.0.1:8000/` when the server is running.
+### Google Cloud Run
+The app is optimized for Cloud Run. Ensure your Service Account has permissions for Firestore, Storage, and Cloud Tasks.
