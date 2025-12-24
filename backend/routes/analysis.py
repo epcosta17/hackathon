@@ -143,6 +143,33 @@ async def download_report_endpoint(
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
 
 
+@router.get("/interviews/{interview_id}/report")
+async def download_report_by_id(
+    interview_id: int,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Download DOCX report for a specific interview by ID."""
+    from database import get_interview
+    
+    interview = get_interview(current_user['uid'], interview_id)
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+        
+    analysis_data = interview.get('analysis_data')
+    if not analysis_data:
+        raise HTTPException(status_code=400, detail="Interview has no analysis data yet")
+        
+    # generate_docx_bytes handles both dict and model
+    docx_buffer = await asyncio.to_thread(generate_docx_bytes, analysis_data)
+    
+    filename = f"interview_report_{interview_id}.docx"
+    return StreamingResponse(
+        docx_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @router.get("/ping")
 async def ping():
     """Simple endpoint to check API health."""

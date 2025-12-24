@@ -19,15 +19,16 @@ from services.waveform_service import get_audio_duration, generate_waveform_univ
 from database import get_firestore_db, save_full_interview_data
 from google.cloud import firestore
 from dotenv import load_dotenv
+from services.task_service import task_service
 
 router = APIRouter(prefix="/v1", tags=["webhooks"])
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-async def run_full_analysis_webhook_task(
+async def run_full_analysis_pipeline(
     user_id: str,
-    audio_content: bytes,
+    gcs_uri: str,
     content_type: str,
     original_filename: str,
     config: Dict[str, Any],
@@ -35,40 +36,26 @@ async def run_full_analysis_webhook_task(
     webhook_secret: Optional[str] = None
 ):
     """
-    Background worker that handles the full transcription, analysis, saving, and webhook notification.
+    Core pipeline logic: Transcription -> Analysis -> Save -> Webhook.
+    Called by the Cloud Task worker endpoint.
     """
     temp_path = None
-    credit_deducted = False
+    credit_deducted = True # In Cloud Task flow, we already deducted it or we assume it is deducted
     
     try:
-        db = get_firestore_db()
-        user_ref = db.collection('users').document(user_id)
-        
-        # 1. Deduct Credits
-        user_ref.update({"credits": firestore.Increment(-1)})
-        credit_deducted = True
-        logger.info(f"💰 [WEBHOOK] Deducted 1 credit for user {user_id}")
-        
-        # 2. Setup Temp File
+        # 1. Download from GCS to Temp for processing (duration/waveform/transcription)
         ext = os.path.splitext(original_filename)[1] or ".mp3"
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
-            temp_file.write(audio_content)
             temp_path = temp_file.name
+            storage_service.download_file(gcs_uri, temp_path)
         
-        # 3. Get Duration & Waveform
+        # 2. Get Duration & Waveform
         duration = get_audio_duration(temp_path)
         waveform_data = generate_waveform_universal(temp_path)
         
-        # 4. Upload to GCS
-        remote_filename = f"{uuid.uuid4()}{ext}"
-        gcs_path = f"{user_id}/audio/{remote_filename}"
-        with open(temp_path, "rb") as f:
-            storage_service.upload_file(gcs_path, f, content_type=content_type)
-        audio_url = f"/v1/audio/{remote_filename}"
-        
-        # 5. Transcribe
+        # 3. Transcribe
         # Deepgram signed URL for direct GCS access
-        signed_url = storage_service.generate_signed_url(gcs_path)
+        signed_url = storage_service.generate_signed_url(gcs_uri)
         transcript_blocks = await transcribe_with_deepgram(signed_url)
         
         # Formatted transcript for analysis
@@ -79,7 +66,7 @@ async def run_full_analysis_webhook_task(
         full_text_for_analysis = "\n".join(formatted_transcript)
         plain_text = " ".join([b.text for b in transcript_blocks])
         
-        # 6. Analyze
+        # 4. Analyze (Gemini)
         prompt_config = config.get("prompt_config")
         analysis_mode = config.get("analysis_mode", "fast")
         analysis_data = await asyncio.to_thread(
@@ -89,145 +76,163 @@ async def run_full_analysis_webhook_task(
             analysis_mode
         )
         
-        # 7. Save to Firestore
+        # 5. Save to Firestore
         interview_id = int(time.time() * 1000)
         title = config.get("title", f"Interview-{interview_id}")
         
+        # 5.1 Finalize Audio (Move from temp_audio/ to audio/)
+        audio_filename = os.path.basename(gcs_uri)
+        old_gcs_path = f"{user_id}/temp_audio/{audio_filename}"
+        new_gcs_path = f"{user_id}/audio/{audio_filename}"
+        
+        logger.info(f"📦 [TASK] Finalizing audio: {old_gcs_path} -> {new_gcs_path}")
+        storage_service.rename_file(old_gcs_path, new_gcs_path)
+        
+        audio_url = f"/v1/audio/{audio_filename}"
+
         save_full_interview_data(
             user_id=user_id,
             interview_id=interview_id,
             title=title,
             transcript_text=plain_text,
-            transcript_words=[b.model_dump() for b in transcript_blocks],
+            transcript_words=[b.model_dump() for b in transcript_blocks] if hasattr(transcript_blocks[0], 'model_dump') else [b for b in transcript_blocks],
             analysis_data=analysis_data,
             audio_url=audio_url,
             audio_duration=duration,
             waveform_data=waveform_data
         )
         
-        # 8. Generate Deep-links
-        # Use defaults from production if env not set
+        # 6. Notify Webhook
         frontend_url = os.getenv("FRONTEND_URL", "https://interviewlens-frontend-506249675300.us-central1.run.app").rstrip('/')
+        api_url = os.getenv("API_URL", "https://interviewlens-api-506249675300.us-central1.run.app").rstrip('/')
         
-        deep_links = {
-            "transcript": f"{frontend_url}/transcription/{interview_id}",
-            "analysis": f"{frontend_url}/analysis/{interview_id}"
-        }
-        
-        # 9. Notify Webhook with consolidated payload
         payload = {
             "analysis": analysis_data.model_dump() if hasattr(analysis_data, 'model_dump') else analysis_data,
-            "deep_links": deep_links
+            "deep_links": {
+                "transcript": f"{frontend_url}/transcription/{interview_id}",
+                "analysis": f"{frontend_url}/analysis/{interview_id}",
+                "report": f"{api_url}/v1/interviews/{interview_id}/report"
+            }
         }
         
-        # 10. Prepare Headers & Signature
         headers = {"Content-Type": "application/json"}
         if webhook_secret:
             timestamp = str(int(time.time()))
             payload_str = json.dumps(payload, separators=(',', ':'))
             signature_payload = f"{timestamp}.{payload_str}"
-            
-            signature = hmac.new(
-                webhook_secret.encode(),
-                signature_payload.encode(),
-                hashlib.sha256
-            ).hexdigest()
-            
+            signature = hmac.new(webhook_secret.encode(), signature_payload.encode(), hashlib.sha256).hexdigest()
             headers["X-Interview-Lens-Timestamp"] = timestamp
             headers["X-Interview-Lens-Signature"] = signature
-            logger.info(f"🔒 [WEBHOOK] Payload signed with secret (prefix: {webhook_secret[:3]}...)")
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(webhook_url, json=payload, headers=headers, timeout=30.0)
-            resp.raise_for_status()
-            logger.info(f"✅ [WEBHOOK] Notification successful: {webhook_url}")
+        if webhook_url:
+            async with httpx.AsyncClient() as client:
+                await client.post(webhook_url, json=payload, headers=headers, timeout=30.0)
+                logger.info(f"✅ [TASK] Notification successful for {user_id}")
+        else:
+            logger.warning(f"⚠️ [TASK] No webhook_url provided for user {user_id}, skipping success notification.")
             
     except Exception as e:
-        logger.error(f"❌ [WEBHOOK] Background task failed: {str(e)}")
-        
-        # Refund credit if it was deducted
-        if credit_deducted:
+        logger.error(f"❌ [TASK] Pipeline failed: {str(e)}")
+        # Handle refund if needed (simplified for Cloud Task)
+        # Notify failure...
+        if webhook_url:
             try:
-                user_ref.update({"credits": firestore.Increment(1)})
-                logger.info(f"↩️ [WEBHOOK] Refunded 1 credit to user {user_id}")
-            except Exception as refund_err:
-                logger.error(f"Failed to refund credit: {refund_err}")
-        
-        # Notify webhook of failure if possible
-        try:
-            error_payload = {
-                "status": "error",
-                "error": str(e),
-                "timestamp": int(time.time())
-            }
-            headers = {"Content-Type": "application/json"}
-            if webhook_secret:
-                timestamp = str(error_payload["timestamp"])
-                payload_str = json.dumps(error_payload, separators=(',', ':'))
-                signature_payload = f"{timestamp}.{payload_str}"
-                signature = hmac.new(webhook_secret.encode(), signature_payload.encode(), hashlib.sha256).hexdigest()
-                headers["X-Interview-Lens-Timestamp"] = timestamp
-                headers["X-Interview-Lens-Signature"] = signature
-
-            async with httpx.AsyncClient() as client:
-                await client.post(webhook_url, json=error_payload, headers=headers, timeout=10.0)
-        except Exception as notify_err:
-            logger.error(f"Failed to send error notification to webhook: {notify_err}")
-            
+                error_payload = {"status": "error", "error": str(e), "timestamp": int(time.time())}
+                async with httpx.AsyncClient() as client:
+                    await client.post(webhook_url, json=error_payload, timeout=10.0)
+            except: pass
+        else:
+            logger.warning(f"⚠️ [TASK] No webhook_url provided for user {user_id}, skipping error notification.")
     finally:
         if temp_path and os.path.exists(temp_path):
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
+            os.unlink(temp_path)
+
+@router.post("/tasks/process-audio")
+async def process_audio_task(request: Dict[str, Any]):
+    """
+    Worker endpoint called by Cloud Tasks.
+    """
+    logger.info(f"👷 [WORKER] Received task for user: {request.get('user_id')}")
+    
+    # Run the pipeline
+    # We don't use background_tasks here because Cloud Tasks expects the response 
+    # only after the work is done (for retry logic). 
+    # However, if it takes > 10 mins, we might need a different strategy or longer timeout.
+    await run_full_analysis_pipeline(
+        user_id=request['user_id'],
+        gcs_uri=request['gcs_uri'],
+        content_type=request['content_type'],
+        original_filename=request['original_filename'],
+        config=request['config'],
+        webhook_url=request['webhook_url'],
+        webhook_secret=request.get('webhook_secret')
+    )
+    
+    return {"status": "completed"}
 
 @router.post("/analyze-async")
 async def analyze_async_endpoint(
-    background_tasks: BackgroundTasks,
     audio: UploadFile = File(...),
     config: str = Form(...),
-    webhook_url: str = Form(...),
+    webhook_url: Optional[str] = Form(None),
     webhook_secret: Optional[str] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    Unified asynchronous endpoint. Returns immediate 202 and runs full pipeline in background,
-    notifying the webhook_url upon completion.
+    Unified asynchronous endpoint using Cloud Tasks for concurrency control.
     """
     try:
         config_dict = json.loads(config)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid config JSON")
     
-    # Check credits immediately
-    if current_user.get("credits", 0) < 1:
-        raise HTTPException(status_code=402, detail="Insufficient credits. 1 credit required.")
-    
-    # If secret not provided, try fetching from user settings
-    if not webhook_secret:
-        try:
-            db = get_firestore_db()
-            settings_doc = db.collection('users').document(current_user['uid']).collection('settings').document('analysis').get()
-            if settings_doc.exists:
-                webhook_secret = settings_doc.to_dict().get('webhook_secret')
-        except Exception as e:
-            logger.error(f"Failed to fetch default webhook secret: {e}")
+    # 0. Basic Validation
+    if webhook_url and not webhook_url.startswith("http"):
+        raise HTTPException(status_code=400, detail="If provided, webhook_url must start with http/https")
 
-    # Read audio content to memory for background task handling
-    audio_content = await audio.read()
+    user_id = current_user['uid']
+    db = get_firestore_db()
+    user_ref = db.collection('users').document(user_id)
     
-    background_tasks.add_task(
-        run_full_analysis_webhook_task,
-        user_id=current_user['uid'],
-        audio_content=audio_content,
-        content_type=audio.content_type,
-        original_filename=audio.filename,
-        config=config_dict,
-        webhook_url=webhook_url,
-        webhook_secret=webhook_secret
-    )
+    # 1. Check & Deduct Credits
+    if current_user.get("credits", 0) < 1:
+        raise HTTPException(status_code=402, detail="Insufficient credits.")
     
+    # 2. Upload to GCS immediately (staging for worker)
+    ext = os.path.splitext(audio.filename)[1] or ".mp3"
+    remote_filename = f"{uuid.uuid4()}{ext}"
+    gcs_path = f"{user_id}/temp_audio/{remote_filename}"
+    
+    storage_service.upload_file(gcs_path, audio.file, content_type=audio.content_type)
+    logger.info(f"📤 [INGEST] Uploaded audio to {gcs_path}")
+
+    # 3. Fetch default secret if missing
+    if not webhook_secret:
+        settings_doc = user_ref.collection('settings').document('analysis').get()
+        if settings_doc.exists:
+            webhook_secret = settings_doc.to_dict().get('webhook_secret')
+
+    # 4. Deduct credit
+    user_ref.update({"credits": firestore.Increment(-1)})
+
+    # 5. Create Cloud Task
+    try:
+        task_service.create_analysis_task(
+            user_id=user_id,
+            gcs_uri=gcs_path,
+            content_type=audio.content_type,
+            original_filename=audio.filename,
+            config=config_dict,
+            webhook_url=webhook_url,
+            webhook_secret=webhook_secret
+        )
+    except Exception as e:
+        # Refund on failure to queue
+        user_ref.update({"credits": firestore.Increment(1)})
+        logger.error(f"Failed to queue task: {e}")
+        raise HTTPException(status_code=500, detail="Failed to queue analysis task")
+
     return {
         "status": "processing",
-        "message": "Webhook will be notified upon completion"
+        "message": "Task queued. Webhook will be notified upon completion."
     }
